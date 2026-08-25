@@ -1,0 +1,1 @@
+"""Document ingestion domain boundary."""

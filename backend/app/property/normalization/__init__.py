@@ -1,0 +1,1 @@
+"""Property fact normalization boundary."""
