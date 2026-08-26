@@ -10,8 +10,23 @@ from app.documents.classification.models import DocumentClassificationCandidate,
 from app.documents.classification.prompts import CLASSIFICATION_SYSTEM_PROMPT
 from app.documents.classification.service import MIN_KNOWN_TYPE_CONFIDENCE
 from app.llm.structured_output import OpenAIStructuredOutputClient
+from app.property.normalization.ag_minutes import (
+    AgMinutesExtractionCandidate,
+    normalize_ag_minutes_candidate,
+)
+from app.property.normalization.ag_prompts import AG_EXTRACTION_SYSTEM_PROMPT
+from app.property.normalization.diagnostic_prompts import DIAGNOSTIC_EXTRACTION_SYSTEM_PROMPT
+from app.property.normalization.diagnostics import (
+    DiagnosticExtractionCandidate,
+    normalize_diagnostics_candidate,
+)
 from app.property.normalization.dpe import DpeExtractionCandidate, normalize_dpe_candidate
 from app.property.normalization.dpe_prompts import DPE_EXTRACTION_SYSTEM_PROMPT
+from app.property.normalization.financial_prompts import FINANCIAL_EXTRACTION_SYSTEM_PROMPT
+from app.property.normalization.financials import (
+    FinancialExtractionCandidate,
+    normalize_financial_candidate,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EVAL_DOCUMENT_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -75,9 +90,62 @@ async def run_dpe(client: OpenAIStructuredOutputClient) -> int:
     return failures
 
 
+async def run_structured(client: OpenAIStructuredOutputClient, suite: str) -> int:
+    configurations = {
+        "ag_minutes": (
+            AG_EXTRACTION_SYSTEM_PROMPT,
+            AgMinutesExtractionCandidate,
+            normalize_ag_minutes_candidate,
+            "items",
+        ),
+        "financials": (
+            FINANCIAL_EXTRACTION_SYSTEM_PROMPT,
+            FinancialExtractionCandidate,
+            normalize_financial_candidate,
+            "items",
+        ),
+        "diagnostics": (
+            DIAGNOSTIC_EXTRACTION_SYSTEM_PROMPT,
+            DiagnosticExtractionCandidate,
+            normalize_diagnostics_candidate,
+            "findings",
+        ),
+    }
+    prompt, response_model, normalize, collection_name = configurations[suite]
+    failures = 0
+    for fixture in load_fixtures(suite):
+        pages = fixture["pages"]
+        result = await client.parse(
+            system_prompt=prompt,
+            user_content=numbered_pages(pages),
+            response_model=response_model,
+        )
+        facts = normalize(
+            result.output,
+            document_id=EVAL_DOCUMENT_ID,
+            pages={index: text for index, text in enumerate(pages, start=1)},
+        ).model_dump(mode="json")
+        actual = [
+            {key: item.get(key) for key in expected}
+            for item, expected in zip(
+                facts[collection_name], fixture["expected_items"], strict=False
+            )
+        ]
+        passed = len(actual) == len(fixture["expected_items"]) and all(
+            item == expected
+            for item, expected in zip(actual, fixture["expected_items"], strict=True)
+        )
+        failures += not passed
+        outcome = "PASS" if passed else f"FAIL expected={fixture['expected_items']} actual={actual}"
+        print(f"{fixture['id']}: {outcome}")
+    return failures
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("suite", choices=("classification", "dpe"))
+    parser.add_argument(
+        "suite", choices=("classification", "dpe", "ag_minutes", "financials", "diagnostics")
+    )
     arguments = parser.parse_args()
     api_key = get_settings().openai_api_key
     if api_key is None:
@@ -85,7 +153,9 @@ async def main() -> int:
     client = OpenAIStructuredOutputClient(api_key.get_secret_value())
     if arguments.suite == "classification":
         return await run_classification(client)
-    return await run_dpe(client)
+    if arguments.suite == "dpe":
+        return await run_dpe(client)
+    return await run_structured(client, arguments.suite)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "annual_accounts_table",
+    "pages": [
+      "Exercice du 01/01/2025 au 31/12/2025 — Charges annuelles de copropriété : 2 480 €."
+    ],
+    "expected_items": [
+      {"kind": "annual_charges", "amount_eur": "2480.00", "period_start": "2025-01-01", "period_end": "2025-12-31"}
+    ]
+  },
+  {
+    "id": "funding_call_with_share",
+    "pages": [
+      "Appel de fonds toiture exigible le 30/09/2026. Montant copropriété 80 000 €. Quote-part du lot : 4 200 €."
+    ],
+    "expected_items": [
+      {"kind": "funding_call", "amount_eur": "80000.00", "property_share_amount_eur": "4200.00", "due_date": "2026-09-30"}
+    ]
+  }
+]

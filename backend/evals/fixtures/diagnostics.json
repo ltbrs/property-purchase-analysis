@@ -1,0 +1,29 @@
+[
+  {
+    "id": "carrez_measurement",
+    "pages": [
+      "Attestation loi Carrez — Surface privative du lot : 64,20 m². Mesurage du 01/04/2025."
+    ],
+    "expected_items": [
+      {"kind": "carrez", "measured_surface_m2": "64.20", "diagnostic_date": "2025-04-01"}
+    ]
+  },
+  {
+    "id": "gas_anomaly",
+    "pages": [
+      "État de l'installation intérieure de gaz — Anomalie A2 : robinet de commande non conforme."
+    ],
+    "expected_items": [
+      {"kind": "gas", "result": "anomaly", "measured_surface_m2": null}
+    ]
+  },
+  {
+    "id": "erp_factual_risk",
+    "pages": [
+      "État des risques et pollutions : bien situé dans le périmètre d'un plan de prévention du risque inondation."
+    ],
+    "expected_items": [
+      {"kind": "environmental_risk", "result": "risk_identified", "measured_surface_m2": null}
+    ]
+  }
+]

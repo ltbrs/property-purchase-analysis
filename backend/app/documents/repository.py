@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from pydantic import BaseModel
+from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -22,6 +23,11 @@ from app.property.normalization.dpe import (
     DpeExtractionRecord,
     NormalizedDpeFacts,
 )
+from app.property.normalization.structured import (
+    StructuredExtractionRecord,
+    StructuredExtractionType,
+)
+from app.risks.models.findings import RiskFinding, RiskFindingRecord
 
 
 class DocumentRepository:
@@ -112,6 +118,47 @@ class DocumentRepository:
     def get_dpe_extraction(self, document_id: UUID) -> DpeExtractionRecord | None:
         return self.session.scalar(
             select(DpeExtractionRecord).where(DpeExtractionRecord.document_id == document_id)
+        )
+
+    def get_structured_extraction(
+        self, document_id: UUID, extraction_type: StructuredExtractionType
+    ) -> StructuredExtractionRecord | None:
+        return self.session.scalar(
+            select(StructuredExtractionRecord).where(
+                StructuredExtractionRecord.document_id == document_id,
+                StructuredExtractionRecord.extraction_type == extraction_type.value,
+            )
+        )
+
+    def list_case_dpe_extractions(
+        self, analysis_case_id: UUID, user_id: UUID
+    ) -> list[DpeExtractionRecord]:
+        return list(
+            self.session.scalars(
+                select(DpeExtractionRecord)
+                .join(DocumentRecord, DocumentRecord.id == DpeExtractionRecord.document_id)
+                .join(DocumentRecord.analysis_case)
+                .where(
+                    DocumentRecord.analysis_case_id == analysis_case_id,
+                    AnalysisCaseRecord.user_id == user_id,
+                )
+            )
+        )
+
+    def list_case_structured_extractions(
+        self, analysis_case_id: UUID, user_id: UUID
+    ) -> list[StructuredExtractionRecord]:
+        return list(
+            self.session.scalars(
+                select(StructuredExtractionRecord)
+                .join(DocumentRecord, DocumentRecord.id == StructuredExtractionRecord.document_id)
+                .join(DocumentRecord.analysis_case)
+                .where(
+                    DocumentRecord.analysis_case_id == analysis_case_id,
+                    AnalysisCaseRecord.user_id == user_id,
+                )
+                .order_by(StructuredExtractionRecord.created_at)
+            )
         )
 
     def mark_extracting(self, document: DocumentRecord) -> None:
@@ -235,6 +282,86 @@ class DocumentRepository:
             raise
         self.session.refresh(dpe_extraction)
         return dpe_extraction
+
+    def save_structured_extraction(
+        self,
+        *,
+        document: DocumentRecord,
+        extraction_type: StructuredExtractionType,
+        normalized_facts: BaseModel,
+        requested_model: str,
+        resolved_model: str,
+        response_id: str,
+        prompt_version: str,
+    ) -> StructuredExtractionRecord:
+        extraction = StructuredExtractionRecord(
+            document_id=document.id,
+            extraction_type=extraction_type.value,
+            normalized_facts=normalized_facts.model_dump(mode="json"),
+            requested_model=requested_model,
+            resolved_model=resolved_model,
+            response_id=response_id,
+            prompt_version=prompt_version,
+        )
+        self.session.add(extraction)
+        document.status = DocumentStatus.COMPLETED.value
+        document.failure_reason = None
+        try:
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        self.session.refresh(extraction)
+        return extraction
+
+    def replace_case_findings(
+        self,
+        *,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        findings: list[RiskFinding],
+    ) -> list[RiskFindingRecord]:
+        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+            raise PermissionError("Analysis case is not owned by the current user")
+        existing = list(
+            self.session.scalars(
+                select(RiskFindingRecord).where(
+                    RiskFindingRecord.analysis_case_id == analysis_case_id
+                )
+            )
+        )
+        for record in existing:
+            self.session.delete(record)
+        records = [
+            RiskFindingRecord.from_finding(analysis_case_id=analysis_case_id, finding=finding)
+            for finding in findings
+        ]
+        self.session.add_all(records)
+        self.session.commit()
+        for record in records:
+            self.session.refresh(record)
+        return records
+
+    def list_case_findings(self, analysis_case_id: UUID, user_id: UUID) -> list[RiskFindingRecord]:
+        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+            return []
+        return list(
+            self.session.scalars(
+                select(RiskFindingRecord)
+                .where(RiskFindingRecord.analysis_case_id == analysis_case_id)
+                .order_by(
+                    case(
+                        (RiskFindingRecord.severity == "critical", 5),
+                        (RiskFindingRecord.severity == "high", 4),
+                        (RiskFindingRecord.severity == "medium", 3),
+                        (RiskFindingRecord.severity == "low", 2),
+                        else_=1,
+                    ).desc(),
+                    RiskFindingRecord.code,
+                    RiskFindingRecord.finding_key,
+                )
+            )
+        )
 
     def create_document(self, document: DocumentRecord, user_id: UUID) -> DocumentRecord:
         if self.get_owned_analysis_case(document.analysis_case_id, user_id) is None:

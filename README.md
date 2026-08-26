@@ -4,8 +4,8 @@ Production-oriented monorepo skeleton for a SaaS that helps home buyers in Franc
 
 The current implementation contains a Next.js upload flow, a typed FastAPI API,
 PostgreSQL persistence, private S3-compatible PDF storage, page-level PDF
-extraction through Xberg, document classification, and source-backed DPE fact
-extraction. Risk rules are intentionally not implemented yet.
+extraction through Xberg, document classification, source-backed structured fact
+extraction, deterministic risk rules, and cross-document reconciliation.
 
 ## Repository layout
 
@@ -132,6 +132,9 @@ POST /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/classify
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe
+POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-structured
+POST /api/v1/analysis-cases/{case_id}/findings/refresh
+GET  /api/v1/analysis-cases/{case_id}/findings
 ```
 
 Only PDFs are accepted. The API validates the declared MIME type, checks for a PDF
@@ -160,6 +163,22 @@ ratings, numeric ranges, dates, reversed cost ranges, and unsupported citations 
 explicit null values. It does not produce risks or infer absent facts. Both analysis
 operations are authenticated and idempotent.
 
+The structured extractor routes classified AG minutes, copropriété financial/charge
+documents, diagnostics, and ERP statements into separate strict schemas behind one
+small persistence boundary. AG items preserve meeting date, resolution, exact status,
+explicit total and lot-share amounts, and source page. Financial items preserve covered
+periods and due dates. Diagnostics cover asbestos, lead, electricity, gas, ERP, and
+Carrez without inferring legal consequences. Unsupported classifications return a
+conflict rather than being forced through the wrong schema.
+
+Refreshing case findings runs deterministic rules only. It evaluates DPE energy and
+validity facts; voted and repeatedly discussed copropriété work; recurring infiltration;
+explicit lot costs, unpaid charges, and upcoming payments; diagnostic facts; and
+cross-document inconsistencies. Findings distinguish `confirmed`, `likely`, `possible`,
+and `missing_information`, retain every supporting source, and are replaced atomically
+on refresh. The response also includes a chronological AG/financial timeline. No raw
+document text or LLM judgment is used by the rule or reconciliation engines.
+
 Ownership is checked in every case-scoped database query. For this pre-login MVP,
 `X-User-Id` represents an identity asserted by the authentication boundary; the
 frontend creates a local development identity. A production edge must authenticate
@@ -182,7 +201,7 @@ PDF upload
 -> source-backed report
 ```
 
-Background processing, production authentication, and business rules remain deferred.
+Background processing and production authentication remain deferred.
 Upload still stops at `uploaded`; callers explicitly advance each stage so the workflow
 remains visible.
 
@@ -196,7 +215,31 @@ is opt-in because it calls the API:
 cd backend
 uv run python -m evals.run_document_evals classification
 uv run python -m evals.run_document_evals dpe
+uv run python -m evals.run_document_evals ag_minutes
+uv run python -m evals.run_document_evals financials
+uv run python -m evals.run_document_evals diagnostics
 ```
+
+## Deterministic rule boundaries
+
+The initial thresholds are explicit product heuristics, not legal conclusions:
+
+- DPE rating E/F/G maps to medium/high/critical; consumption starts at 250, 330,
+  and 450 kWh/m²/year; the projected annual-cost rule starts at €2,000 and becomes
+  high at €3,000.
+- A DPE is expired only when its explicit validity date is before the analysis date.
+  Missing rating, consumption, issue date, or validity date is surfaced separately.
+- An explicit property share starts being highlighted at €5,000 and becomes high at
+  €10,000. Unpaid charges start being highlighted at €5,000. Discussed work is never
+  promoted to voted work.
+- An annual charge increase is material at 20% or €500. Upcoming exposure uses only
+  explicit amounts; the lot share is preferred and never estimated.
+- Surface differences require both more than 1 m² and more than 2%. They are described
+  as possible inconsistencies because DPE and Carrez measurements can use different
+  perimeters.
+
+These boundaries live in small pure functions with unit tests so they can evolve from
+real document evaluations without changing extraction prompts.
 
 ## Known PDF extraction limitations
 

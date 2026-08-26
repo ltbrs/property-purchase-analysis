@@ -1,0 +1,31 @@
+[
+  {
+    "id": "formal_resolutions",
+    "pages": [
+      "PROCÈS-VERBAL DE L'ASSEMBLÉE GÉNÉRALE DU 12 MAI 2025",
+      "Résolution n° 7 — L'assemblée vote la réfection complète de la toiture pour 120 000 €."
+    ],
+    "expected_items": [
+      {"kind": "roof", "status": "voted", "amount_eur": "120000.00", "property_share_amount_eur": null}
+    ]
+  },
+  {
+    "id": "discussion_not_vote",
+    "pages": [
+      "Assemblée générale du 18 juin 2024",
+      "La question du ravalement de façade est discutée. Aucun vote n'est soumis à l'assemblée."
+    ],
+    "expected_items": [
+      {"kind": "facade", "status": "discussed", "amount_eur": null, "property_share_amount_eur": null}
+    ]
+  },
+  {
+    "id": "explicit_lot_share",
+    "pages": [
+      "AG du 2 avril 2026 — Résolution 4 : travaux d'ascenseur votés. Coût total 45 000 €. Quote-part du lot 18 : 2 350 €."
+    ],
+    "expected_items": [
+      {"kind": "elevator", "status": "voted", "amount_eur": "45000.00", "property_share_amount_eur": "2350.00"}
+    ]
+  }
+]

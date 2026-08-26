@@ -1,7 +1,9 @@
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import CurrentUserId
@@ -28,15 +30,35 @@ from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
 from app.documents.validation import InvalidDocument, validate_pdf
 from app.llm import StructuredOutputClientDependency
-from app.property.normalization.dpe import DpeExtractionRead
+from app.property.normalization.ag_minutes import NormalizedAgMinutes
+from app.property.normalization.diagnostics import NormalizedDiagnostics
+from app.property.normalization.dpe import DpeExtractionRead, NormalizedDpeFacts
 from app.property.normalization.dpe_service import (
     DpeClassificationRequired,
     DpeExtractionFailed,
     DpeExtractionService,
 )
+from app.property.normalization.financials import NormalizedFinancials
+from app.property.normalization.structured import (
+    StructuredExtractionRead,
+    StructuredExtractionType,
+)
+from app.property.normalization.structured_service import (
+    StructuredExtractionFailed,
+    StructuredExtractionService,
+    UnsupportedStructuredDocument,
+)
+from app.property.reconciliation import TimelineEvent
+from app.risks.engine import evaluate_case_risks
+from app.risks.models import RiskFindingRead
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
+
+
+class CaseFindingsRefreshRead(BaseModel):
+    findings: list[RiskFindingRead]
+    timeline: list[TimelineEvent]
 
 
 @router.post("", response_model=AnalysisCaseRead, status_code=status.HTTP_201_CREATED)
@@ -260,3 +282,100 @@ async def extract_dpe_document(
             detail=str(error),
         ) from error
     return DpeExtractionRead.model_validate(dpe_extraction)
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/extract-structured",
+    response_model=StructuredExtractionRead,
+)
+async def extract_structured_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    llm_client: StructuredOutputClientDependency,
+) -> StructuredExtractionRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    extraction = repository.get_extraction(document.id)
+    classification = repository.get_classification(document.id)
+    if extraction is None or classification is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Extract and classify the document before structured extraction",
+        )
+    try:
+        result = await StructuredExtractionService(repository, llm_client).extract(
+            document, extraction, classification
+        )
+    except UnsupportedStructuredDocument as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except StructuredExtractionFailed as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+    return StructuredExtractionRead.model_validate(result)
+
+
+@router.post(
+    "/{analysis_case_id}/findings/refresh",
+    response_model=CaseFindingsRefreshRead,
+)
+def refresh_case_findings(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> CaseFindingsRefreshRead:
+    repository = DocumentRepository(session)
+    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+
+    dpe_documents = [
+        NormalizedDpeFacts.model_validate(record.normalized_facts)
+        for record in repository.list_case_dpe_extractions(analysis_case_id, current_user_id)
+    ]
+    minutes: list[NormalizedAgMinutes] = []
+    financials: list[NormalizedFinancials] = []
+    diagnostics: list[NormalizedDiagnostics] = []
+    for record in repository.list_case_structured_extractions(analysis_case_id, current_user_id):
+        if record.extraction_type == StructuredExtractionType.AG_MINUTES.value:
+            minutes.append(NormalizedAgMinutes.model_validate(record.normalized_facts))
+        elif record.extraction_type == StructuredExtractionType.FINANCIALS.value:
+            financials.append(NormalizedFinancials.model_validate(record.normalized_facts))
+        elif record.extraction_type == StructuredExtractionType.DIAGNOSTICS.value:
+            diagnostics.append(NormalizedDiagnostics.model_validate(record.normalized_facts))
+
+    evaluation = evaluate_case_risks(
+        dpe_documents=dpe_documents,
+        minutes=minutes,
+        financials=financials,
+        diagnostics=diagnostics,
+        as_of=date.today(),
+    )
+    records = repository.replace_case_findings(
+        analysis_case_id=analysis_case_id,
+        user_id=current_user_id,
+        findings=evaluation.findings,
+    )
+    return CaseFindingsRefreshRead(
+        findings=[RiskFindingRead.model_validate(record) for record in records],
+        timeline=evaluation.reconciliation.timeline,
+    )
+
+
+@router.get(
+    "/{analysis_case_id}/findings",
+    response_model=list[RiskFindingRead],
+)
+def list_case_findings(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> list[RiskFindingRead]:
+    repository = DocumentRepository(session)
+    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    return [
+        RiskFindingRead.model_validate(record)
+        for record in repository.list_case_findings(analysis_case_id, current_user_id)
+    ]
