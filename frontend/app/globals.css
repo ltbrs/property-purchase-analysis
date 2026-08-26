@@ -131,6 +131,257 @@ h1 {
   background: var(--surface);
 }
 
+.upload-page {
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.upload-heading {
+  max-width: 46rem;
+}
+
+.upload-heading > p:not(.eyebrow) {
+  max-width: 42rem;
+  margin: 1.5rem 0 0;
+  color: var(--muted);
+  font-size: 1.125rem;
+}
+
+.document-workspace {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+
+.upload-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.75rem;
+  border: 1px solid #cbd8cf;
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: 0 0.75rem 2.5rem rgba(24, 33, 27, 0.05);
+}
+
+.upload-card-copy {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload-icon,
+.document-type {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.4rem;
+  color: #8d332d;
+  background: #f8e9e7;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.upload-icon {
+  width: 3rem;
+  height: 3.5rem;
+}
+
+.upload-card h2,
+.document-list h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.upload-card p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.file-button,
+.refresh-button {
+  border: 1px solid var(--accent);
+  border-radius: 0.45rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.file-button {
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  background: var(--accent);
+}
+
+.file-button:hover {
+  background: #1f4b36;
+}
+
+.file-button:focus-within,
+.refresh-button:focus-visible {
+  outline: 3px solid rgba(40, 92, 67, 0.25);
+  outline-offset: 2px;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.file-button.is-disabled,
+.refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.privacy-note {
+  flex-basis: 100%;
+  font-size: 0.875rem;
+}
+
+.privacy-note span {
+  color: var(--accent);
+  font-size: 0.65rem;
+}
+
+.upload-error {
+  display: flex;
+  gap: 0.5rem 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e8c2bd;
+  border-radius: 0.55rem;
+  color: #762c27;
+  background: #fff4f2;
+}
+
+.upload-error span {
+  color: #753d38;
+}
+
+.document-list {
+  margin-top: 1.25rem;
+}
+
+.document-list-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.35rem;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.refresh-button {
+  padding: 0.5rem 0.75rem;
+  color: var(--accent);
+  background: transparent;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: #eaf0ec;
+}
+
+.document-empty {
+  display: grid;
+  gap: 0.35rem;
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed #cbd4cd;
+  border-radius: 0.65rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
+.document-empty strong {
+  color: var(--foreground);
+}
+
+.document-items {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  overflow: hidden;
+  background: var(--surface);
+  list-style: none;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.document-item + .document-item {
+  border-top: 1px solid var(--border);
+}
+
+.document-type {
+  width: 2.3rem;
+  height: 2.7rem;
+}
+
+.document-details {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 0.2rem;
+}
+
+.document-details strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-details > span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.document-details .document-failure {
+  color: #8d332d;
+}
+
+.status-badge {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.55rem;
+  border-radius: 100vmax;
+  color: #365544;
+  background: #e8f0eb;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-failed {
+  color: #8d332d;
+  background: #f8e9e7;
+}
+
+.status-completed {
+  color: #1f5d39;
+  background: #dff2e6;
+}
+
 @media (max-width: 36rem) {
   .shell-nav {
     align-items: flex-start;
@@ -142,5 +393,27 @@ h1 {
   .shell-main {
     padding: 3rem 0;
   }
-}
 
+  .upload-card {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .file-button {
+    text-align: center;
+  }
+
+  .upload-error {
+    flex-direction: column;
+  }
+
+  .document-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .status-badge {
+    margin-left: 3.3rem;
+  }
+}

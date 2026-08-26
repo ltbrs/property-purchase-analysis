@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,9 +19,18 @@ class Settings(BaseSettings):
     database_url: str | None = None
     object_storage_endpoint: str | None = None
     object_storage_bucket: str | None = None
+    object_storage_region: str = "eu-west-3"
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
+    max_upload_size_bytes: int = 25 * 1024 * 1024
     llm_api_key: SecretStr | None = None
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_three_driver(cls, value: object) -> object:
+        if isinstance(value, str) and value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
 
 @lru_cache
