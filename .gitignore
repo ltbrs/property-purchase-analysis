@@ -22,7 +22,7 @@ __pycache__/
 
 # Editors and operating systems
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .DS_Store
 Thumbs.db
-
