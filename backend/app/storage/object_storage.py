@@ -18,6 +18,8 @@ class PrivateObjectStorage(Protocol):
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None: ...
 
+    def download_pdf(self, bucket: str, key: str) -> bytes: ...
+
 
 class S3ObjectStorage:
     def __init__(self, settings: Settings) -> None:
@@ -48,6 +50,13 @@ class S3ObjectStorage:
             )
         except (BotoCoreError, ClientError, OSError) as error:
             raise ObjectStorageError("Could not store document") from error
+
+    def download_pdf(self, bucket: str, key: str) -> bytes:
+        try:
+            response = self._client.get_object(Bucket=bucket, Key=key)
+            return bytes(response["Body"].read())
+        except (BotoCoreError, ClientError, OSError) as error:
+            raise ObjectStorageError("Could not retrieve document") from error
 
 
 @lru_cache

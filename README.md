@@ -3,8 +3,9 @@
 Production-oriented monorepo skeleton for a SaaS that helps home buyers in France identify document-backed property risks before purchasing. The product is decision support, not legal, notarial, engineering, energy-audit, or financial advice.
 
 The current implementation contains a Next.js upload flow, a typed FastAPI API,
-PostgreSQL metadata persistence, and private S3-compatible PDF storage. PDF parsing
-and risk rules are intentionally not implemented yet.
+PostgreSQL persistence, private S3-compatible PDF storage, and page-level PDF
+extraction through Xberg. Classification, structured fact extraction, and risk
+rules are intentionally not implemented yet.
 
 ## Repository layout
 
@@ -125,12 +126,21 @@ The upload slice provides these case-scoped endpoints:
 POST /api/v1/analysis-cases
 GET  /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents
+POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract
 ```
 
 Only PDFs are accepted. The API validates the declared MIME type, checks for a PDF
 signature, enforces the configured size limit, stores the bytes outside PostgreSQL,
 and persists only metadata and processing state. Re-uploading identical bytes to
 the same case returns the existing document.
+
+Extraction is an explicit authenticated operation. It retrieves the PDF from
+private storage, runs Xberg behind the internal `PdfParser` interface, and persists
+one ordered record per page. Each page retains its one-based page number, text, and
+structured tables; document metadata, parser name/version, and extraction duration
+are stored on the parent extraction record. A successful retry returns the existing
+extraction rather than parsing the document again. Parser failures set the document
+to `failed` without saving partial page output and can be retried.
 
 Ownership is checked in every case-scoped database query. For this pre-login MVP,
 `X-User-Id` represents an identity asserted by the authentication boundary; the
@@ -154,6 +164,19 @@ PDF upload
 -> source-backed report
 ```
 
-Xberg integration, LLM-provider integration, background processing, production
-authentication, and business rules remain deferred. The upload endpoint deliberately
-stops at the `uploaded` state and does not parse document contents.
+LLM-provider integration, background processing, production authentication, and
+business rules remain deferred. Upload still stops at `uploaded`; callers explicitly
+start extraction through the extraction endpoint so the workflow remains visible.
+
+## Known PDF extraction limitations
+
+- Extraction currently runs synchronously in the API request. Moving it to a durable
+  worker is deferred until processing volume justifies job infrastructure.
+- No second parser or vision fallback is configured. Scanned or image-only pages may
+  therefore produce little or no text depending on Xberg's available local OCR support.
+- Password-protected PDFs are not supplied with passwords and will fail cleanly.
+- Complex or borderless tables are heuristic and may be incomplete or represented as
+  ordinary page text. The stored output preserves what Xberg reports without inventing
+  missing cells.
+- Only common document metadata is normalized. Parser-specific metadata is retained
+  only when Xberg exposes it through its additional metadata map.

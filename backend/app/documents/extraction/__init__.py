@@ -1,1 +1,1 @@
-"""Source-backed structured extraction boundary."""
+"""Document extraction workflow boundary."""

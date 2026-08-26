@@ -12,6 +12,7 @@ dependencies = [
     "python-multipart>=0.0.20,<1.0.0",
     "sqlalchemy>=2.0.0,<3.0.0",
     "uvicorn>=0.35.0,<1.0.0",
+    "xberg>=1.0.14,<2.0.0",
 ]
 
 [dependency-groups]

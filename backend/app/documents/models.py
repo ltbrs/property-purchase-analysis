@@ -5,11 +5,14 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
@@ -71,6 +74,66 @@ class DocumentRecord(Base):
     )
 
     analysis_case: Mapped["AnalysisCaseRecord"] = relationship(back_populates="documents")
+    extraction: Mapped["DocumentExtractionRecord | None"] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class DocumentExtractionRecord(Base):
+    __tablename__ = "document_extractions"
+    __table_args__ = (
+        CheckConstraint("duration_ms >= 0", name="ck_document_extractions_duration_nonnegative"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    document_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    parser_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    parser_version: Mapped[str | None] = mapped_column(String(100))
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    document_metadata: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSON, default=dict, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    document: Mapped[DocumentRecord] = relationship(back_populates="extraction")
+    pages: Mapped[list["DocumentExtractionPageRecord"]] = relationship(
+        back_populates="extraction",
+        cascade="all, delete-orphan",
+        order_by="DocumentExtractionPageRecord.page_number",
+    )
+
+
+class DocumentExtractionPageRecord(Base):
+    __tablename__ = "document_extraction_pages"
+    __table_args__ = (
+        UniqueConstraint(
+            "extraction_id", "page_number", name="uq_document_extraction_pages_number"
+        ),
+        CheckConstraint("page_number > 0", name="ck_document_extraction_pages_number_positive"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    extraction_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("document_extractions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    tables: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+
+    extraction: Mapped[DocumentExtractionRecord] = relationship(back_populates="pages")
 
 
 class DocumentRead(BaseModel):
@@ -85,6 +148,35 @@ class DocumentRead(BaseModel):
     failure_reason: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ExtractedTableRead(BaseModel):
+    cells: list[list[str]] = Field(default_factory=list)
+    markdown: str = ""
+    table_id: str | None = None
+    columns: list[str] | None = None
+    bounding_box: dict[str, float] | None = None
+
+
+class ExtractionPageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    page_number: int
+    text: str
+    tables: list[ExtractedTableRead]
+
+
+class DocumentExtractionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    document_id: UUID
+    parser_name: str
+    parser_version: str | None
+    duration_ms: int
+    metadata: dict[str, object] = Field(validation_alias="document_metadata")
+    pages: list[ExtractionPageRead]
+    created_at: datetime
 
 
 class AnalysisCaseCreate(BaseModel):

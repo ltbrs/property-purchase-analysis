@@ -7,13 +7,19 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import CurrentUserId
 from app.core.config import get_settings
 from app.core.database import DatabaseSession
+from app.documents.extraction.service import (
+    DocumentExtractionFailed,
+    DocumentExtractionService,
+)
 from app.documents.models import (
     AnalysisCaseCreate,
     AnalysisCaseRead,
+    DocumentExtractionRead,
     DocumentRead,
     DocumentRecord,
     DocumentStatus,
 )
+from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
 from app.documents.validation import InvalidDocument, validate_pdf
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
@@ -99,3 +105,54 @@ async def upload_document(
     )
     persisted = repository.create_document(document, current_user_id)
     return DocumentRead.model_validate(persisted)
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/extract",
+    response_model=DocumentExtractionRead,
+)
+async def extract_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+    parser: PdfParserDependency,
+) -> DocumentExtractionRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    existing = repository.get_extraction(document.id)
+    if existing is not None:
+        return DocumentExtractionRead.model_validate(existing)
+    if document.status == DocumentStatus.EXTRACTING.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document extraction is already in progress",
+        )
+
+    try:
+        pdf_bytes = await run_in_threadpool(
+            storage.download_pdf, document.storage_bucket, document.storage_key
+        )
+    except ObjectStorageError as error:
+        repository.mark_extraction_failed(
+            document, "Le document n’a pas pu être relu depuis le stockage privé."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le document n’a pas pu être relu depuis le stockage privé.",
+        ) from error
+
+    try:
+        extraction = await DocumentExtractionService(repository, parser).extract(
+            document, pdf_bytes
+        )
+    except DocumentExtractionFailed as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+    return DocumentExtractionRead.model_validate(extraction)
