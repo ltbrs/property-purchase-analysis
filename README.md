@@ -3,9 +3,9 @@
 Production-oriented monorepo skeleton for a SaaS that helps home buyers in France identify document-backed property risks before purchasing. The product is decision support, not legal, notarial, engineering, energy-audit, or financial advice.
 
 The current implementation contains a Next.js upload flow, a typed FastAPI API,
-PostgreSQL persistence, private S3-compatible PDF storage, and page-level PDF
-extraction through Xberg. Classification, structured fact extraction, and risk
-rules are intentionally not implemented yet.
+PostgreSQL persistence, private S3-compatible PDF storage, page-level PDF
+extraction through Xberg, document classification, and source-backed DPE fact
+extraction. Risk rules are intentionally not implemented yet.
 
 ## Repository layout
 
@@ -60,7 +60,10 @@ The initial scaffold recognizes these variables:
 | `OBJECT_STORAGE_ACCESS_KEY` | Object-storage access key |
 | `OBJECT_STORAGE_SECRET_KEY` | Object-storage secret key |
 | `MAX_UPLOAD_SIZE_BYTES` | Maximum PDF size (25 MiB by default) |
-| `LLM_API_KEY` | API key for the hosted LLM provider selected later |
+| `OPENAI_API_KEY` | Server-side OpenAI API key used for structured extraction |
+
+The model is deliberately fixed to `gpt-5.6-luna` in the server-side adapter; it
+cannot be selected by a request or changed through environment configuration.
 
 Never commit a populated `.env` file. Replace the example object-storage secret
 outside local development.
@@ -127,6 +130,8 @@ POST /api/v1/analysis-cases
 GET  /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract
+POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/classify
+POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe
 ```
 
 Only PDFs are accepted. The API validates the declared MIME type, checks for a PDF
@@ -141,6 +146,19 @@ structured tables; document metadata, parser name/version, and extraction durati
 are stored on the parent extraction record. A successful retry returns the existing
 extraction rather than parsing the document again. Parser failures set the document
 to `failed` without saving partial page output and can be retried.
+
+Classification is a separate operation after PDF extraction. Its version-controlled
+prompt requests one of the initial document categories, confidence, dates/covered
+period, issuer, and extraction strategy. A model confidence below `0.70` is
+deterministically stored as `unknown`; the original validated output and the requested
+and resolved model identifiers remain persisted for audit.
+
+DPE extraction is available only after the document is classified as `dpe`. Each
+non-null normalized fact contains the source document ID, one-based page number, and
+a short quote. Code verifies that the quote occurs on that page and converts invalid
+ratings, numeric ranges, dates, reversed cost ranges, and unsupported citations to
+explicit null values. It does not produce risks or infer absent facts. Both analysis
+operations are authenticated and idempotent.
 
 Ownership is checked in every case-scoped database query. For this pre-login MVP,
 `X-User-Id` represents an identity asserted by the authentication boundary; the
@@ -164,9 +182,21 @@ PDF upload
 -> source-backed report
 ```
 
-LLM-provider integration, background processing, production authentication, and
-business rules remain deferred. Upload still stops at `uploaded`; callers explicitly
-start extraction through the extraction endpoint so the workflow remains visible.
+Background processing, production authentication, and business rules remain deferred.
+Upload still stops at `uploaded`; callers explicitly advance each stage so the workflow
+remains visible.
+
+## Evaluation fixtures
+
+Golden classification and DPE fixtures live in `backend/evals/fixtures`. They include
+multiple DPE layouts, a copropriété AG example, and incomplete content. Live evaluation
+is opt-in because it calls the API:
+
+```bash
+cd backend
+uv run python -m evals.run_document_evals classification
+uv run python -m evals.run_document_evals dpe
+```
 
 ## Known PDF extraction limitations
 
@@ -180,3 +210,10 @@ start extraction through the extraction endpoint so the workflow remains visible
   missing cells.
 - Only common document metadata is normalized. Parser-specific metadata is retained
   only when Xberg exposes it through its additional metadata map.
+- Structured analysis currently runs synchronously and retries are manual. Provider
+  errors are stored as a generic failure reason; response content and full extracted
+  document text are not written to application logs.
+- Citation page numbers must exist in the Xberg output. A quote is retained only when
+  it is an exact normalized substring; otherwise the scalar value must itself be found
+  on that page and provenance falls back to page-only. This favors dropping a fact over
+  accepting an unverifiable claim.

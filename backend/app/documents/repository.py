@@ -4,6 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.documents.classification.models import (
+    DocumentClassificationCandidate,
+    DocumentClassificationRecord,
+    DocumentType,
+    ExtractionStrategy,
+)
 from app.documents.models import (
     DocumentExtractionPageRecord,
     DocumentExtractionRecord,
@@ -12,6 +18,10 @@ from app.documents.models import (
 )
 from app.documents.parsers.base import ParsedPdf
 from app.property.models import AnalysisCaseRecord, UserRecord
+from app.property.normalization.dpe import (
+    DpeExtractionRecord,
+    NormalizedDpeFacts,
+)
 
 
 class DocumentRepository:
@@ -92,12 +102,34 @@ class DocumentRepository:
             .where(DocumentExtractionRecord.document_id == document_id)
         )
 
+    def get_classification(self, document_id: UUID) -> DocumentClassificationRecord | None:
+        return self.session.scalar(
+            select(DocumentClassificationRecord).where(
+                DocumentClassificationRecord.document_id == document_id
+            )
+        )
+
+    def get_dpe_extraction(self, document_id: UUID) -> DpeExtractionRecord | None:
+        return self.session.scalar(
+            select(DpeExtractionRecord).where(DpeExtractionRecord.document_id == document_id)
+        )
+
     def mark_extracting(self, document: DocumentRecord) -> None:
         document.status = DocumentStatus.EXTRACTING.value
         document.failure_reason = None
         self.session.commit()
 
     def mark_extraction_failed(self, document: DocumentRecord, failure_reason: str) -> None:
+        document.status = DocumentStatus.FAILED.value
+        document.failure_reason = failure_reason[:500]
+        self.session.commit()
+
+    def mark_analyzing(self, document: DocumentRecord) -> None:
+        document.status = DocumentStatus.ANALYZING.value
+        document.failure_reason = None
+        self.session.commit()
+
+    def mark_analysis_failed(self, document: DocumentRecord, failure_reason: str) -> None:
         document.status = DocumentStatus.FAILED.value
         document.failure_reason = failure_reason[:500]
         self.session.commit()
@@ -136,6 +168,73 @@ class DocumentRepository:
         self.session.refresh(extraction)
         self.session.refresh(extraction, attribute_names=["pages"])
         return extraction
+
+    def save_classification(
+        self,
+        *,
+        document: DocumentRecord,
+        candidate: DocumentClassificationCandidate,
+        normalized_document_type: DocumentType,
+        normalized_strategy: ExtractionStrategy | None,
+        requested_model: str,
+        resolved_model: str,
+        response_id: str,
+        prompt_version: str,
+    ) -> DocumentClassificationRecord:
+        classification = DocumentClassificationRecord(
+            document_id=document.id,
+            document_type=normalized_document_type.value,
+            confidence=candidate.confidence,
+            document_date=candidate.document_date,
+            covered_period_start=candidate.covered_period_start,
+            covered_period_end=candidate.covered_period_end,
+            issuer=candidate.issuer,
+            extraction_strategy=(normalized_strategy.value if normalized_strategy else None),
+            requested_model=requested_model,
+            resolved_model=resolved_model,
+            response_id=response_id,
+            prompt_version=prompt_version,
+            raw_output=candidate.model_dump(mode="json"),
+        )
+        self.session.add(classification)
+        document.status = DocumentStatus.EXTRACTED.value
+        document.failure_reason = None
+        try:
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        self.session.refresh(classification)
+        return classification
+
+    def save_dpe_extraction(
+        self,
+        *,
+        document: DocumentRecord,
+        facts: NormalizedDpeFacts,
+        requested_model: str,
+        resolved_model: str,
+        response_id: str,
+        prompt_version: str,
+    ) -> DpeExtractionRecord:
+        dpe_extraction = DpeExtractionRecord(
+            document_id=document.id,
+            normalized_facts=facts.model_dump(mode="json"),
+            requested_model=requested_model,
+            resolved_model=resolved_model,
+            response_id=response_id,
+            prompt_version=prompt_version,
+        )
+        self.session.add(dpe_extraction)
+        document.status = DocumentStatus.COMPLETED.value
+        document.failure_reason = None
+        try:
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        self.session.refresh(dpe_extraction)
+        return dpe_extraction
 
     def create_document(self, document: DocumentRecord, user_id: UUID) -> DocumentRecord:
         if self.get_owned_analysis_case(document.analysis_case_id, user_id) is None:

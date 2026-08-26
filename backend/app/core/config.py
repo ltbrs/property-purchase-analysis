@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
     max_upload_size_bytes: int = 25 * 1024 * 1024
-    llm_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
 
     @field_validator("database_url", mode="before")
     @classmethod

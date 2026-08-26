@@ -7,6 +7,11 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import CurrentUserId
 from app.core.config import get_settings
 from app.core.database import DatabaseSession
+from app.documents.classification.models import DocumentClassificationRead
+from app.documents.classification.service import (
+    DocumentClassificationFailed,
+    DocumentClassificationService,
+)
 from app.documents.extraction.service import (
     DocumentExtractionFailed,
     DocumentExtractionService,
@@ -22,6 +27,13 @@ from app.documents.models import (
 from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
 from app.documents.validation import InvalidDocument, validate_pdf
+from app.llm import StructuredOutputClientDependency
+from app.property.normalization.dpe import DpeExtractionRead
+from app.property.normalization.dpe_service import (
+    DpeClassificationRequired,
+    DpeExtractionFailed,
+    DpeExtractionService,
+)
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -156,3 +168,95 @@ async def extract_document(
             detail=str(error),
         ) from error
     return DocumentExtractionRead.model_validate(extraction)
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/classify",
+    response_model=DocumentClassificationRead,
+)
+async def classify_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    llm_client: StructuredOutputClientDependency,
+) -> DocumentClassificationRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    extraction = repository.get_extraction(document.id)
+    if extraction is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Extract the document before classification",
+        )
+    if (
+        document.status == DocumentStatus.ANALYZING.value
+        and repository.get_classification(document.id) is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document analysis is already in progress",
+        )
+
+    try:
+        classification = await DocumentClassificationService(repository, llm_client).classify(
+            document, extraction
+        )
+    except DocumentClassificationFailed as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+    return DocumentClassificationRead.model_validate(classification)
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/extract-dpe",
+    response_model=DpeExtractionRead,
+)
+async def extract_dpe_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    llm_client: StructuredOutputClientDependency,
+) -> DpeExtractionRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    extraction = repository.get_extraction(document.id)
+    classification = repository.get_classification(document.id)
+    if extraction is None or classification is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Extract and classify the document before DPE extraction",
+        )
+    if (
+        document.status == DocumentStatus.ANALYZING.value
+        and repository.get_dpe_extraction(document.id) is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document analysis is already in progress",
+        )
+
+    try:
+        dpe_extraction = await DpeExtractionService(repository, llm_client).extract(
+            document, extraction, classification
+        )
+    except DpeClassificationRequired as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    except DpeExtractionFailed as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+    return DpeExtractionRead.model_validate(dpe_extraction)

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "modern_dpe",
+    "pages": [
+      "DIAGNOSTIC DE PERFORMANCE ÉNERGÉTIQUE (logement)",
+      "Montant estimé des dépenses annuelles d'énergie pour un usage standard"
+    ],
+    "expected_document_type": "dpe"
+  },
+  {
+    "id": "copro_ag_minutes",
+    "pages": [
+      "PROCÈS-VERBAL DE L'ASSEMBLÉE GÉNÉRALE DU 12 MAI 2025",
+      "Résolution n° 7 - Travaux de réfection de toiture"
+    ],
+    "expected_document_type": "ag_minutes"
+  },
+  {
+    "id": "insufficient_scan",
+    "pages": ["Document numérisé - contenu illisible"],
+    "expected_document_type": "unknown"
+  }
+]

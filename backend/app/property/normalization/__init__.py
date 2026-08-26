@@ -1,1 +1,1 @@
-"""Property fact normalization boundary."""
+"""Deterministic normalization of source-backed property facts."""

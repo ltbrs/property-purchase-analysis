@@ -1,0 +1,46 @@
+[
+  {
+    "id": "modern_compact_dpe",
+    "pages": [
+      "DPE établi le 15/06/2024. Classe énergie D. Classe climat B. Consommation 182 kWh/m²/an. Surface de référence 67,4 m².",
+      "Montant estimé des dépenses annuelles d'énergie : entre 980 € et 1 350 € par an."
+    ],
+    "expected": {
+      "dpe_rating": "D",
+      "ges_rating": "B",
+      "energy_consumption_kwh_m2_year": 182.0,
+      "estimated_annual_energy_cost_min": 980.0,
+      "estimated_annual_energy_cost_max": 1350.0,
+      "surface": 67.4,
+      "dpe_date": "2024-06-15"
+    }
+  },
+  {
+    "id": "older_label_without_costs",
+    "pages": [
+      "Diagnostic de performance énergétique. Date du diagnostic : 03/09/2019. Consommation conventionnelle : 245 kWhEP/m².an. Étiquette énergie E. Étiquette climat C."
+    ],
+    "expected": {
+      "dpe_rating": "E",
+      "ges_rating": "C",
+      "energy_consumption_kwh_m2_year": 245.0,
+      "estimated_annual_energy_cost_min": null,
+      "estimated_annual_energy_cost_max": null,
+      "dpe_date": "2019-09-03"
+    }
+  },
+  {
+    "id": "partial_dpe_missing_values",
+    "pages": [
+      "DIAGNOSTIC DE PERFORMANCE ÉNERGÉTIQUE. Installation de chauffage : chaudière collective au gaz. Les autres pages sont absentes."
+    ],
+    "expected": {
+      "dpe_rating": null,
+      "ges_rating": null,
+      "energy_consumption_kwh_m2_year": null,
+      "estimated_annual_energy_cost_min": null,
+      "estimated_annual_energy_cost_max": null,
+      "heating_type": "chaudière collective au gaz"
+    }
+  }
+]
