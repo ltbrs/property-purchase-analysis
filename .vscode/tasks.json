@@ -60,7 +60,7 @@
       "label": "Start Full Stack",
       "dependsOrder": "sequence",
       "dependsOn": [
-        "Start PostgreSQL",
+        "Start Services",
         "Start Backend",
         "Start Frontend"
       ],
