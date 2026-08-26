@@ -49,8 +49,10 @@ from app.property.normalization.structured_service import (
     UnsupportedStructuredDocument,
 )
 from app.property.reconciliation import TimelineEvent
+from app.reports import BuyerReport, build_buyer_report
 from app.risks.engine import evaluate_case_risks
 from app.risks.models import RiskFindingRead
+from app.risks.rules.missing_documents import AvailableDocument
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -59,6 +61,79 @@ router = APIRouter(prefix="/analysis-cases", tags=["documents"])
 class CaseFindingsRefreshRead(BaseModel):
     findings: list[RiskFindingRead]
     timeline: list[TimelineEvent]
+
+
+def _load_normalized_case_data(
+    repository: DocumentRepository,
+    analysis_case_id: UUID,
+    user_id: UUID,
+) -> tuple[
+    list[NormalizedDpeFacts],
+    list[NormalizedAgMinutes],
+    list[NormalizedFinancials],
+    list[NormalizedDiagnostics],
+    list[AvailableDocument],
+]:
+    dpe_documents = [
+        NormalizedDpeFacts.model_validate(record.normalized_facts)
+        for record in repository.list_case_dpe_extractions(analysis_case_id, user_id)
+    ]
+    minutes: list[NormalizedAgMinutes] = []
+    financials: list[NormalizedFinancials] = []
+    diagnostics: list[NormalizedDiagnostics] = []
+    for record in repository.list_case_structured_extractions(analysis_case_id, user_id):
+        if record.extraction_type == StructuredExtractionType.AG_MINUTES.value:
+            minutes.append(NormalizedAgMinutes.model_validate(record.normalized_facts))
+        elif record.extraction_type == StructuredExtractionType.FINANCIALS.value:
+            financials.append(NormalizedFinancials.model_validate(record.normalized_facts))
+        elif record.extraction_type == StructuredExtractionType.DIAGNOSTICS.value:
+            diagnostics.append(NormalizedDiagnostics.model_validate(record.normalized_facts))
+    available_documents = [
+        AvailableDocument.model_validate(
+            {
+                "document_id": record.document_id,
+                "document_type": record.document_type,
+                "document_date": record.document_date,
+                "covered_period_end": record.covered_period_end,
+            }
+        )
+        for record in repository.list_case_classifications(analysis_case_id, user_id)
+    ]
+    return dpe_documents, minutes, financials, diagnostics, available_documents
+
+
+def _refresh_case_findings(
+    repository: DocumentRepository,
+    analysis_case_id: UUID,
+    user_id: UUID,
+) -> tuple[
+    list[RiskFindingRead],
+    list[TimelineEvent],
+    list[NormalizedDpeFacts],
+    list[NormalizedDiagnostics],
+]:
+    dpe_documents, minutes, financials, diagnostics, available_documents = (
+        _load_normalized_case_data(repository, analysis_case_id, user_id)
+    )
+    evaluation = evaluate_case_risks(
+        dpe_documents=dpe_documents,
+        minutes=minutes,
+        financials=financials,
+        diagnostics=diagnostics,
+        available_documents=available_documents,
+        as_of=date.today(),
+    )
+    records = repository.replace_case_findings(
+        analysis_case_id=analysis_case_id,
+        user_id=user_id,
+        findings=evaluation.findings,
+    )
+    return (
+        [RiskFindingRead.model_validate(record) for record in records],
+        evaluation.reconciliation.timeline,
+        dpe_documents,
+        diagnostics,
+    )
 
 
 @router.post("", response_model=AnalysisCaseRead, status_code=status.HTTP_201_CREATED)
@@ -139,6 +214,36 @@ async def upload_document(
     )
     persisted = repository.create_document(document, current_user_id)
     return DocumentRead.model_validate(persisted)
+
+
+@router.delete(
+    "/{analysis_case_id}/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+) -> Response:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    try:
+        await run_in_threadpool(
+            storage.delete_pdf, document.storage_bucket, document.storage_key
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="La suppression du document a échoué. Veuillez réessayer.",
+        ) from error
+
+    repository.delete_document(document)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -330,37 +435,8 @@ def refresh_case_findings(
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
 
-    dpe_documents = [
-        NormalizedDpeFacts.model_validate(record.normalized_facts)
-        for record in repository.list_case_dpe_extractions(analysis_case_id, current_user_id)
-    ]
-    minutes: list[NormalizedAgMinutes] = []
-    financials: list[NormalizedFinancials] = []
-    diagnostics: list[NormalizedDiagnostics] = []
-    for record in repository.list_case_structured_extractions(analysis_case_id, current_user_id):
-        if record.extraction_type == StructuredExtractionType.AG_MINUTES.value:
-            minutes.append(NormalizedAgMinutes.model_validate(record.normalized_facts))
-        elif record.extraction_type == StructuredExtractionType.FINANCIALS.value:
-            financials.append(NormalizedFinancials.model_validate(record.normalized_facts))
-        elif record.extraction_type == StructuredExtractionType.DIAGNOSTICS.value:
-            diagnostics.append(NormalizedDiagnostics.model_validate(record.normalized_facts))
-
-    evaluation = evaluate_case_risks(
-        dpe_documents=dpe_documents,
-        minutes=minutes,
-        financials=financials,
-        diagnostics=diagnostics,
-        as_of=date.today(),
-    )
-    records = repository.replace_case_findings(
-        analysis_case_id=analysis_case_id,
-        user_id=current_user_id,
-        findings=evaluation.findings,
-    )
-    return CaseFindingsRefreshRead(
-        findings=[RiskFindingRead.model_validate(record) for record in records],
-        timeline=evaluation.reconciliation.timeline,
-    )
+    findings, timeline, _, _ = _refresh_case_findings(repository, analysis_case_id, current_user_id)
+    return CaseFindingsRefreshRead(findings=findings, timeline=timeline)
 
 
 @router.get(
@@ -379,3 +455,51 @@ def list_case_findings(
         RiskFindingRead.model_validate(record)
         for record in repository.list_case_findings(analysis_case_id, current_user_id)
     ]
+
+
+@router.post("/{analysis_case_id}/report/refresh", response_model=BuyerReport)
+def refresh_case_report(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> BuyerReport:
+    repository = DocumentRepository(session)
+    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
+    if analysis_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    _, _, dpe_documents, diagnostics = _refresh_case_findings(
+        repository, analysis_case_id, current_user_id
+    )
+    documents = repository.list_documents(analysis_case_id, current_user_id)
+    report = build_buyer_report(
+        analysis_case_id=analysis_case_id,
+        title=analysis_case.title,
+        findings=[
+            record.to_finding()
+            for record in repository.list_case_findings(analysis_case_id, current_user_id)
+        ],
+        document_names={document.id: document.original_filename for document in documents},
+        dpe_documents=dpe_documents,
+        diagnostics=diagnostics,
+    )
+    repository.save_case_report(
+        analysis_case_id=analysis_case_id,
+        user_id=current_user_id,
+        report=report,
+    )
+    return report
+
+
+@router.get("/{analysis_case_id}/report", response_model=BuyerReport)
+def get_case_report(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> BuyerReport:
+    repository = DocumentRepository(session)
+    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    record = repository.get_case_report(analysis_case_id, current_user_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not generated")
+    return record.to_report()

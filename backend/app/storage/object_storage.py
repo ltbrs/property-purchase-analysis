@@ -20,6 +20,8 @@ class PrivateObjectStorage(Protocol):
 
     def download_pdf(self, bucket: str, key: str) -> bytes: ...
 
+    def delete_pdf(self, bucket: str, key: str) -> None: ...
+
 
 class S3ObjectStorage:
     def __init__(self, settings: Settings) -> None:
@@ -57,6 +59,12 @@ class S3ObjectStorage:
             return bytes(response["Body"].read())
         except (BotoCoreError, ClientError, OSError) as error:
             raise ObjectStorageError("Could not retrieve document") from error
+
+    def delete_pdf(self, bucket: str, key: str) -> None:
+        try:
+            self._client.delete_object(Bucket=bucket, Key=key)
+        except (BotoCoreError, ClientError, OSError) as error:
+            raise ObjectStorageError("Could not delete document") from error
 
 
 @lru_cache

@@ -10,6 +10,11 @@ from app.risks.rules.coproperty import evaluate_coproperty_risks
 from app.risks.rules.diagnostics import evaluate_diagnostic_risks
 from app.risks.rules.dpe import evaluate_dpe_risks
 from app.risks.rules.financials import evaluate_financial_risks
+from app.risks.rules.missing_documents import (
+    AvailableDocument,
+    MissingDocumentContext,
+    evaluate_missing_documents,
+)
 
 
 class CaseRiskEvaluation:
@@ -24,6 +29,8 @@ def evaluate_case_risks(
     minutes: list[NormalizedAgMinutes],
     financials: list[NormalizedFinancials],
     diagnostics: list[NormalizedDiagnostics],
+    available_documents: list[AvailableDocument] | None = None,
+    missing_document_context: MissingDocumentContext | None = None,
     as_of: date,
 ) -> CaseRiskEvaluation:
     reconciliation = reconcile_case(
@@ -38,6 +45,18 @@ def evaluate_case_risks(
         *evaluate_financial_risks(financials, as_of=as_of),
         *evaluate_diagnostic_risks(diagnostics, as_of=as_of),
         *reconciliation.findings,
+        *(
+            evaluate_missing_documents(
+                available_documents=available_documents,
+                dpe_documents=dpe_documents,
+                minutes=minutes,
+                financials=financials,
+                as_of=as_of,
+                context=missing_document_context,
+            )
+            if available_documents is not None
+            else []
+        ),
     ]
     # Finding keys are persistence identities. Preserve the first deterministic
     # result if duplicate source material was uploaded in multiple formats.

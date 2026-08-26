@@ -27,6 +27,10 @@ class MemoryObjectStorage:
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
         self.objects[key] = file.read()
 
+    def delete_pdf(self, bucket: str, key: str) -> None:
+        assert bucket == self.bucket
+        self.objects.pop(key, None)
+
 
 @pytest.fixture
 def session() -> Generator[Session]:
@@ -213,3 +217,82 @@ def test_storage_failure_does_not_persist_metadata(
 
     assert response.status_code == 502
     assert session.scalar(select(DocumentRecord)) is None
+
+
+def test_delete_removes_document_metadata_and_private_file(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    analysis_case_id = create_case(client, user_id)
+    uploaded = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(user_id),
+        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    )
+    document_id = uploaded.json()["id"]
+
+    response = client.delete(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}",
+        headers=auth(user_id),
+    )
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert session.scalar(select(DocumentRecord)) is None
+    assert storage.objects == {}
+
+
+def test_a_user_cannot_delete_another_users_document(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    owner_id = uuid4()
+    analysis_case_id = create_case(client, owner_id)
+    uploaded = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(owner_id),
+        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    )
+
+    response = client.delete(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}",
+        headers=auth(uuid4()),
+    )
+
+    assert response.status_code == 404
+    assert session.scalar(select(DocumentRecord)) is not None
+    assert len(storage.objects) == 1
+
+
+def test_storage_delete_failure_keeps_document_metadata(
+    client: TestClient,
+    session: Session,
+) -> None:
+    class FailingDeleteStorage:
+        bucket = "private-test-documents"
+
+        def upload_pdf(self, file: BinaryIO, key: str) -> None:
+            pass
+
+        def delete_pdf(self, bucket: str, key: str) -> None:
+            raise ObjectStorageError("storage unavailable")
+
+    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = FailingDeleteStorage
+    user_id = uuid4()
+    analysis_case_id = create_case(client, user_id)
+    uploaded = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(user_id),
+        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    )
+
+    response = client.delete(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}",
+        headers=auth(user_id),
+    )
+
+    assert response.status_code == 502
+    assert session.scalar(select(DocumentRecord)) is not None

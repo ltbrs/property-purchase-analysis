@@ -1,7 +1,9 @@
 """Risk and evidence models."""
 
 from app.risks.models.findings import (
+    DocumentExpectation,
     FindingStatus,
+    MissingDocumentReason,
     RiskCategory,
     RiskFinding,
     RiskFindingRead,
@@ -10,6 +12,8 @@ from app.risks.models.findings import (
 
 __all__ = [
     "FindingStatus",
+    "DocumentExpectation",
+    "MissingDocumentReason",
     "RiskCategory",
     "RiskFinding",
     "RiskFindingRead",

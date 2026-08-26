@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+import {
+  API_URL,
+  getOrCreateWorkspace,
+  readApiError,
+  resetWorkspace,
+  type Workspace,
+} from "@/lib/workspace";
+
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
-const USER_STORAGE_KEY = "property-analysis-user-id";
-const CASE_STORAGE_KEY = "property-analysis-case-id";
 
 type DocumentStatus =
   | "uploaded"
@@ -28,13 +32,6 @@ type UploadedDocument = {
   updated_at: string;
 };
 
-type Workspace = {
-  userId: string;
-  caseId: string;
-};
-
-let workspaceInitialization: Promise<Workspace> | null = null;
-
 const statusLabels: Record<DocumentStatus, string> = {
   uploaded: "Importé",
   extracting: "Extraction en cours",
@@ -54,54 +51,6 @@ function formatFileSize(bytes: number) {
     return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
-}
-
-async function readError(response: Response) {
-  try {
-    const body = (await response.json()) as { detail?: string };
-    return body.detail ?? "Une erreur inattendue est survenue.";
-  } catch {
-    return "Le service est temporairement indisponible.";
-  }
-}
-
-async function createWorkspace(userId: string): Promise<Workspace> {
-  const response = await fetch(`${API_URL}/analysis-cases`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-Id": userId,
-    },
-    body: JSON.stringify({ title: "Mon achat immobilier" }),
-  });
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-
-  const analysisCase = (await response.json()) as { id: string };
-  localStorage.setItem(CASE_STORAGE_KEY, analysisCase.id);
-  return { userId, caseId: analysisCase.id };
-}
-
-function getOrCreateWorkspace() {
-  if (workspaceInitialization) return workspaceInitialization;
-
-  workspaceInitialization = (async () => {
-    let userId = localStorage.getItem(USER_STORAGE_KEY);
-    if (!userId) {
-      userId = crypto.randomUUID();
-      localStorage.setItem(USER_STORAGE_KEY, userId);
-    }
-
-    const savedCaseId = localStorage.getItem(CASE_STORAGE_KEY);
-    return savedCaseId
-      ? { userId, caseId: savedCaseId }
-      : createWorkspace(userId);
-  })().catch((initializationError: unknown) => {
-    workspaceInitialization = null;
-    throw initializationError;
-  });
-  return workspaceInitialization;
 }
 
 async function fetchDocuments(workspace: Workspace) {
@@ -129,15 +78,12 @@ export function DocumentUpload() {
         let response = await fetchDocuments(currentWorkspace);
 
         if (response.status === 404) {
-          if (localStorage.getItem(CASE_STORAGE_KEY) === currentWorkspace.caseId) {
-            localStorage.removeItem(CASE_STORAGE_KEY);
-            workspaceInitialization = null;
-          }
+          resetWorkspace(currentWorkspace.caseId);
           currentWorkspace = await getOrCreateWorkspace();
           response = await fetchDocuments(currentWorkspace);
         }
         if (!response.ok) {
-          throw new Error(await readError(response));
+          throw new Error(await readApiError(response));
         }
 
         const uploadedDocuments = (await response.json()) as UploadedDocument[];
@@ -173,7 +119,7 @@ export function DocumentUpload() {
     setError(null);
     try {
       const response = await fetchDocuments(workspace);
-      if (!response.ok) throw new Error(await readError(response));
+      if (!response.ok) throw new Error(await readApiError(response));
       setDocuments((await response.json()) as UploadedDocument[]);
     } catch (refreshError) {
       setError(
@@ -215,7 +161,9 @@ export function DocumentUpload() {
             body: formData,
           },
         );
-        if (!response.ok) throw new Error(`${file.name} : ${await readError(response)}`);
+        if (!response.ok) {
+          throw new Error(`${file.name} : ${await readApiError(response)}`);
+        }
         return (await response.json()) as UploadedDocument;
       }),
     );

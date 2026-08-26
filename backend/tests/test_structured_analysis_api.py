@@ -29,6 +29,7 @@ from app.property.normalization.ag_minutes import (
     AgMinutesExtractionCandidate,
 )
 from app.property.normalization.structured import StructuredExtractionRecord
+from app.reports.models import ReportRecord
 from app.risks.models.findings import RiskFindingRecord
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -164,6 +165,14 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
         second = client.post(extraction_url, headers=headers)
         refresh = client.post(f"/api/v1/analysis-cases/{case_id}/findings/refresh", headers=headers)
         listed = client.get(f"/api/v1/analysis-cases/{case_id}/findings", headers=headers)
+        report_refresh = client.post(
+            f"/api/v1/analysis-cases/{case_id}/report/refresh", headers=headers
+        )
+        report_get = client.get(f"/api/v1/analysis-cases/{case_id}/report", headers=headers)
+        forbidden_report = client.get(
+            f"/api/v1/analysis-cases/{case_id}/report",
+            headers={"X-User-Id": str(uuid4())},
+        )
 
     assert first.status_code == 200
     assert first.json()["normalized_facts"]["items"][0]["status"] == "voted"
@@ -177,7 +186,28 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
         finding["finding_key"] for finding in refresh.json()["findings"]
     }
     assert session.scalar(select(StructuredExtractionRecord)) is not None
-    assert len(list(session.scalars(select(RiskFindingRecord)))) == 2
+    assert len(list(session.scalars(select(RiskFindingRecord)))) == len(listed.json())
+    assert {finding["code"] for finding in listed.json()} >= {
+        "MISSING_DPE_DOCUMENT",
+        "MISSING_COPROPERTY_FINANCIALS",
+        "MISSING_WORKS_SUPPORTING_DOCUMENT",
+    }
+    assert report_refresh.status_code == 200
+    assert report_get.json() == report_refresh.json()
+    assert forbidden_report.status_code == 404
+    assert [section["code"] for section in report_refresh.json()["sections"]] == [
+        "financial",
+        "building_coproperty",
+        "energy",
+        "diagnostics_safety",
+        "inconsistencies",
+        "missing_information",
+        "reassuring",
+    ]
+    copro_finding = report_refresh.json()["sections"][1]["findings"][0]
+    assert copro_finding["sources"][0]["document_name"] == "ag.pdf"
+    assert copro_finding["sources"][0]["page_number"] == 1
+    assert session.scalar(select(ReportRecord)) is not None
 
 
 def test_structured_analysis_enforces_ownership(session: Session) -> None:

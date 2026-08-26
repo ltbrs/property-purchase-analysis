@@ -6,6 +6,8 @@ The current implementation contains a Next.js upload flow, a typed FastAPI API,
 PostgreSQL persistence, private S3-compatible PDF storage, page-level PDF
 extraction through Xberg, document classification, source-backed structured fact
 extraction, deterministic risk rules, and cross-document reconciliation.
+It also detects missing or insufficient documents and generates a persisted,
+buyer-facing report organized by decision priority.
 
 ## Repository layout
 
@@ -135,6 +137,8 @@ POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-structured
 POST /api/v1/analysis-cases/{case_id}/findings/refresh
 GET  /api/v1/analysis-cases/{case_id}/findings
+POST /api/v1/analysis-cases/{case_id}/report/refresh
+GET  /api/v1/analysis-cases/{case_id}/report
 ```
 
 Only PDFs are accepted. The API validates the declared MIME type, checks for a PDF
@@ -178,6 +182,21 @@ cross-document inconsistencies. Findings distinguish `confirmed`, `likely`, `pos
 and `missing_information`, retain every supporting source, and are replaced atomically
 on refresh. The response also includes a chronological AG/financial timeline. No raw
 document text or LLM judgment is used by the rule or reconciliation engines.
+
+The same refresh now checks whether the dossier contains a usable DPE, recent AG
+minutes, copropriété financial information, and supporting financial documents for
+mentioned works. Every missing-document finding distinguishes an absent document from
+an insufficient one and labels it as `definitely_expected`, `usually_useful`, or
+`context_dependent`. These are product completeness rules, not assertions that a
+document is legally mandatory.
+
+Report refresh persists a deterministic snapshot assembled from validated facts and
+findings. Sections are ordered for a buyer: financial, building/copropriété, energy,
+diagnostics, inconsistencies, missing information, then explicit reassuring facts.
+Every source-backed item includes the original filename and page. Reassuring items are
+created only from explicit favorable DPE or diagnostic facts; the report does not infer
+that silence means safety. The `/analysis` route renders this structured report without
+a chatbot. Secure source-document links and in-document page inspection remain step 14.
 
 Ownership is checked in every case-scoped database query. For this pre-login MVP,
 `X-User-Id` represents an identity asserted by the authentication boundary; the
@@ -237,6 +256,9 @@ The initial thresholds are explicit product heuristics, not legal conclusions:
 - Surface differences require both more than 1 m² and more than 2%. They are described
   as possible inconsistencies because DPE and Carrez measurements can use different
   perimeters.
+- AG minutes are treated as recent at the inclusive three-year boundary. Their absence
+  is described as a usually useful gap, while an absent DPE is marked definitely
+  expected without making a legal-mandatory claim.
 
 These boundaries live in small pure functions with unit tests so they can evolve from
 real document evaluations without changing extraction prompts.

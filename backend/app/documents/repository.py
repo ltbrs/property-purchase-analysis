@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import case, select
+from sqlalchemy import case, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -27,6 +27,7 @@ from app.property.normalization.structured import (
     StructuredExtractionRecord,
     StructuredExtractionType,
 )
+from app.reports.models import BuyerReport, ReportRecord
 from app.risks.models.findings import RiskFinding, RiskFindingRecord
 
 
@@ -112,6 +113,22 @@ class DocumentRepository:
         return self.session.scalar(
             select(DocumentClassificationRecord).where(
                 DocumentClassificationRecord.document_id == document_id
+            )
+        )
+
+    def list_case_classifications(
+        self, analysis_case_id: UUID, user_id: UUID
+    ) -> list[DocumentClassificationRecord]:
+        return list(
+            self.session.scalars(
+                select(DocumentClassificationRecord)
+                .join(DocumentRecord, DocumentRecord.id == DocumentClassificationRecord.document_id)
+                .join(DocumentRecord.analysis_case)
+                .where(
+                    DocumentRecord.analysis_case_id == analysis_case_id,
+                    AnalysisCaseRecord.user_id == user_id,
+                )
+                .order_by(DocumentClassificationRecord.created_at)
             )
         )
 
@@ -332,6 +349,8 @@ class DocumentRepository:
         )
         for record in existing:
             self.session.delete(record)
+        # Flush removals before inserting identical deterministic keys on refresh.
+        self.session.flush()
         records = [
             RiskFindingRecord.from_finding(analysis_case_id=analysis_case_id, finding=finding)
             for finding in findings
@@ -363,6 +382,30 @@ class DocumentRepository:
             )
         )
 
+    def save_case_report(
+        self, *, analysis_case_id: UUID, user_id: UUID, report: BuyerReport
+    ) -> ReportRecord:
+        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+            raise PermissionError("Analysis case is not owned by the current user")
+        record = self.session.scalar(
+            select(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case_id)
+        )
+        if record is None:
+            record = ReportRecord.from_report(report)
+            self.session.add(record)
+        else:
+            record.update_from_report(report)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def get_case_report(self, analysis_case_id: UUID, user_id: UUID) -> ReportRecord | None:
+        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+            return None
+        return self.session.scalar(
+            select(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case_id)
+        )
+
     def create_document(self, document: DocumentRecord, user_id: UUID) -> DocumentRecord:
         if self.get_owned_analysis_case(document.analysis_case_id, user_id) is None:
             raise PermissionError("Analysis case is not owned by the current user")
@@ -379,3 +422,29 @@ class DocumentRepository:
 
         self.session.refresh(document)
         return document
+
+    def delete_document(self, document: DocumentRecord) -> None:
+        """Delete a document and invalidate case-level results derived from it."""
+        self.session.execute(
+            delete(DocumentClassificationRecord).where(
+                DocumentClassificationRecord.document_id == document.id
+            )
+        )
+        self.session.execute(
+            delete(DpeExtractionRecord).where(DpeExtractionRecord.document_id == document.id)
+        )
+        self.session.execute(
+            delete(StructuredExtractionRecord).where(
+                StructuredExtractionRecord.document_id == document.id
+            )
+        )
+        self.session.execute(
+            delete(RiskFindingRecord).where(
+                RiskFindingRecord.analysis_case_id == document.analysis_case_id
+            )
+        )
+        self.session.execute(
+            delete(ReportRecord).where(ReportRecord.analysis_case_id == document.analysis_case_id)
+        )
+        self.session.delete(document)
+        self.session.commit()
