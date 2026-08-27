@@ -382,6 +382,33 @@ h1 {
   background: #dff2e6;
 }
 
+.delete-document-button {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #c87970;
+  border-radius: 0.4rem;
+  color: #8d332d;
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.delete-document-button:hover:not(:disabled) {
+  background: #fff4f2;
+}
+
+.delete-document-button:focus-visible {
+  outline: 3px solid rgba(141, 51, 45, 0.2);
+  outline-offset: 2px;
+}
+
+.delete-document-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .analysis-page {
   max-width: 62rem;
   margin: 0 auto;
@@ -737,5 +764,9 @@ h1 {
 
   .status-badge {
     margin-left: 3.3rem;
+  }
+
+  .delete-document-button {
+    margin-left: auto;
   }
 }

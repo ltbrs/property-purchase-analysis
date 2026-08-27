@@ -66,6 +66,7 @@ export function DocumentUpload() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -191,6 +192,40 @@ export function DocumentUpload() {
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  async function deleteDocument(document: UploadedDocument) {
+    if (!workspace || deletingDocumentId) return;
+
+    const shouldDelete = window.confirm(
+      `Supprimer définitivement « ${document.original_filename} » ?\n\nLe fichier sera supprimé et le rapport du dossier devra être recalculé.`,
+    );
+    if (!shouldDelete) return;
+
+    setDeletingDocumentId(document.id);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}`,
+        {
+          method: "DELETE",
+          headers: { "X-User-Id": workspace.userId },
+        },
+      );
+      if (!response.ok) throw new Error(await readApiError(response));
+
+      setDocuments((currentDocuments) =>
+        currentDocuments.filter(({ id }) => id !== document.id),
+      );
+    } catch (deletionError) {
+      setError(
+        deletionError instanceof Error
+          ? deletionError.message
+          : "Impossible de supprimer ce document.",
+      );
+    } finally {
+      setDeletingDocumentId(null);
+    }
+  }
+
   return (
     <div className="document-workspace">
       <div className="upload-card">
@@ -223,7 +258,7 @@ export function DocumentUpload() {
 
       {error ? (
         <div className="upload-error" role="alert">
-          <strong>Import interrompu</strong>
+          <strong>Action interrompue</strong>
           <span>{error}</span>
         </div>
       ) : null}
@@ -269,6 +304,15 @@ export function DocumentUpload() {
                 <span className={`status-badge status-${document.status}`}>
                   {statusLabels[document.status]}
                 </span>
+                <button
+                  className="delete-document-button"
+                  type="button"
+                  disabled={deletingDocumentId !== null}
+                  aria-label={`Supprimer ${document.original_filename}`}
+                  onClick={() => void deleteDocument(document)}
+                >
+                  {deletingDocumentId === document.id ? "Suppression…" : "Supprimer"}
+                </button>
               </li>
             ))}
           </ul>
