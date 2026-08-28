@@ -207,6 +207,7 @@ Prioritize:
 Each finding should show its source.
 
 The product should feel like a trustworthy inspection report, not an AI demo.
+In the UI, never set accent border.
 
 ## Dependency policy
 
