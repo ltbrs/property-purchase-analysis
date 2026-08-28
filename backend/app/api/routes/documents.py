@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -26,6 +26,7 @@ from app.documents.models import (
     DocumentRead,
     DocumentRecord,
     DocumentStatus,
+    DocumentViewUrlRead,
 )
 from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
@@ -225,6 +226,46 @@ def list_documents(
         )
         for document in repository.list_documents(analysis_case_id, current_user_id)
     ]
+
+
+@router.get(
+    "/{analysis_case_id}/documents/{document_id}/view-url",
+    response_model=DocumentViewUrlRead,
+)
+async def create_document_view_url(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+) -> DocumentViewUrlRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(
+        analysis_case_id, document_id, current_user_id
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+
+    ttl_seconds = get_settings().document_view_url_ttl_seconds
+    try:
+        url = await run_in_threadpool(
+            storage.create_pdf_view_url,
+            document.storage_bucket,
+            document.storage_key,
+            ttl_seconds,
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le document ne peut pas être affiché pour le moment.",
+        ) from error
+
+    return DocumentViewUrlRead(
+        url=url,
+        expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
 
 
 @router.post(

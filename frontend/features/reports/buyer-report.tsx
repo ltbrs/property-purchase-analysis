@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
 import {
+  PdfViewer,
+  type PdfDocumentSelection,
+} from "@/features/documents/pdf-viewer";
+import {
   API_URL,
   getWorkspace,
   readApiError,
@@ -175,7 +179,15 @@ function Metric({ value, label }: { value: number; label: string }) {
   );
 }
 
-function DetailDrawer({ finding, onClose }: { finding: ReportFinding; onClose: () => void }) {
+function DetailDrawer({
+  finding,
+  onClose,
+  onViewSource,
+}: {
+  finding: ReportFinding;
+  onClose: () => void;
+  onViewSource: (source: ReportSource) => void;
+}) {
   return (
     <div className="detail-layer">
       <button type="button" className="detail-backdrop" aria-label="Fermer le détail" onClick={onClose} />
@@ -221,6 +233,13 @@ function DetailDrawer({ finding, onClose }: { finding: ReportFinding; onClose: (
                         <strong>{source.document_name}</strong>
                         <small>Page {source.page_number}</small>
                       </div>
+                      <button
+                        type="button"
+                        className="source-view-button"
+                        onClick={() => onViewSource(source)}
+                      >
+                        Voir la page <Icon name="arrow" />
+                      </button>
                     </div>
                     {source.quote ? <blockquote>« {source.quote} »</blockquote> : null}
                   </article>
@@ -239,6 +258,7 @@ function DetailDrawer({ finding, onClose }: { finding: ReportFinding; onClose: (
 export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [report, setReport] = useState<BuyerReportData | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<ReportFinding | null>(null);
+  const [viewingSource, setViewingSource] = useState<PdfDocumentSelection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,13 +300,13 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   }, []);
 
   useEffect(() => {
-    if (selectedFinding === null) return;
+    if (selectedFinding === null || viewingSource !== null) return;
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setSelectedFinding(null);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedFinding]);
+  }, [selectedFinding, viewingSource]);
 
   if (isLoading && report === null) {
     return (
@@ -419,7 +439,23 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       )}
 
       <p className="report-disclaimer">{report.disclaimer}</p>
-      {selectedFinding ? <DetailDrawer finding={selectedFinding} onClose={() => setSelectedFinding(null)} /> : null}
+      {selectedFinding ? (
+        <DetailDrawer
+          finding={selectedFinding}
+          onClose={() => setSelectedFinding(null)}
+          onViewSource={(source) => setViewingSource({
+            documentId: source.document_id,
+            filename: source.document_name,
+            pageNumber: source.page_number,
+          })}
+        />
+      ) : null}
+      {viewingSource ? (
+        <PdfViewer
+          document={viewingSource}
+          onClose={() => setViewingSource(null)}
+        />
+      ) : null}
     </div>
   );
 }

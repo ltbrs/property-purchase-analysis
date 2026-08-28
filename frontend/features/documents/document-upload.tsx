@@ -13,6 +13,10 @@ import {
   type PropertyType,
 } from "@/features/documents/document-catalog";
 import {
+  PdfViewer,
+  type PdfDocumentSelection,
+} from "@/features/documents/pdf-viewer";
+import {
   API_URL,
   getWorkspace,
   readApiError,
@@ -152,11 +156,13 @@ function DocumentFile({
   deletingDocumentId,
   showType,
   onDelete,
+  onView,
 }: {
   document: UploadedDocument;
   deletingDocumentId: string | null;
   showType?: boolean;
   onDelete: (document: UploadedDocument) => void;
+  onView: (document: UploadedDocument) => void;
 }) {
   return (
     <div className="document-file">
@@ -177,6 +183,14 @@ function DocumentFile({
         {statusLabels[document.status]}
       </span>
       <button
+        className="view-document-button"
+        type="button"
+        aria-label={`Visualiser ${document.original_filename}`}
+        onClick={() => onView(document)}
+      >
+        Visualiser
+      </button>
+      <button
         className="delete-document-button"
         type="button"
         disabled={deletingDocumentId !== null}
@@ -195,12 +209,14 @@ function ExpectedDocumentRow({
   propertyType,
   deletingDocumentId,
   onDelete,
+  onView,
 }: {
   expectation: ExpectedDocument;
   documents: UploadedDocument[];
   propertyType: PropertyType;
   deletingDocumentId: string | null;
   onDelete: (document: UploadedDocument) => void;
+  onView: (document: UploadedDocument) => void;
 }) {
   const isPresent = documents.length > 0;
   const state = isPresent ? "present" : propertyType === "unknown" ? "pending" : "missing";
@@ -229,6 +245,7 @@ function ExpectedDocumentRow({
               document={document}
               deletingDocumentId={deletingDocumentId}
               onDelete={onDelete}
+              onView={onView}
             />
           ))}
         </div>
@@ -247,6 +264,7 @@ export function DocumentUpload() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<PdfDocumentSelection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -541,6 +559,10 @@ export function DocumentUpload() {
                 propertyType={propertyType}
                 deletingDocumentId={deletingDocumentId}
                 onDelete={(document) => void deleteDocument(document)}
+                onView={(document) => setViewingDocument({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
               />
             ))}
           </ul>
@@ -563,10 +585,20 @@ export function DocumentUpload() {
                 deletingDocumentId={deletingDocumentId}
                 showType
                 onDelete={(item) => void deleteDocument(item)}
+                onView={(document) => setViewingDocument({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
               />
             ))}
           </div>
         </section>
+      ) : null}
+      {viewingDocument ? (
+        <PdfViewer
+          document={viewingDocument}
+          onClose={() => setViewingDocument(null)}
+        />
       ) : null}
     </div>
   );

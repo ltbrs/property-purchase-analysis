@@ -20,6 +20,10 @@ class PrivateObjectStorage(Protocol):
 
     def download_pdf(self, bucket: str, key: str) -> bytes: ...
 
+    def create_pdf_view_url(
+        self, bucket: str, key: str, expires_in_seconds: int
+    ) -> str: ...
+
     def delete_pdf(self, bucket: str, key: str) -> None: ...
 
 
@@ -59,6 +63,26 @@ class S3ObjectStorage:
             return bytes(response["Body"].read())
         except (BotoCoreError, ClientError, OSError) as error:
             raise ObjectStorageError("Could not retrieve document") from error
+
+    def create_pdf_view_url(
+        self, bucket: str, key: str, expires_in_seconds: int
+    ) -> str:
+        try:
+            return str(
+                self._client.generate_presigned_url(
+                    "get_object",
+                    Params={
+                        "Bucket": bucket,
+                        "Key": key,
+                        "ResponseContentType": "application/pdf",
+                        "ResponseContentDisposition": "inline",
+                        "ResponseCacheControl": "private, no-store",
+                    },
+                    ExpiresIn=expires_in_seconds,
+                )
+            )
+        except (BotoCoreError, ClientError, OSError) as error:
+            raise ObjectStorageError("Could not create document view URL") from error
 
     def delete_pdf(self, bucket: str, key: str) -> None:
         try:

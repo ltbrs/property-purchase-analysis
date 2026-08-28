@@ -153,6 +153,11 @@ class DocumentRead(BaseModel):
     updated_at: datetime
 
 
+class DocumentViewUrlRead(BaseModel):
+    url: str
+    expires_at: datetime
+
+
 class ExtractedTableRead(BaseModel):
     cells: list[list[str]] = Field(default_factory=list)
     markdown: str = ""

@@ -24,9 +24,16 @@ class MemoryObjectStorage:
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.view_url_requests: list[tuple[str, str, int]] = []
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
         self.objects[key] = file.read()
+
+    def create_pdf_view_url(
+        self, bucket: str, key: str, expires_in_seconds: int
+    ) -> str:
+        self.view_url_requests.append((bucket, key, expires_in_seconds))
+        return f"https://storage.test/{bucket}/{key}?signed=true"
 
     def delete_pdf(self, bucket: str, key: str) -> None:
         assert bucket == self.bucket
@@ -340,6 +347,72 @@ def test_upload_is_idempotent_for_the_same_file(
     assert second.json()["id"] == first.json()["id"]
     assert len(list(session.scalars(select(DocumentRecord)))) == 1
     assert len(storage.objects) == 1
+
+
+def test_document_view_url_is_short_lived_and_requires_ownership(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    owner_id = uuid4()
+    analysis_case_id = create_case(client, owner_id)
+    uploaded = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(owner_id),
+        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    )
+    document_id = uploaded.json()["id"]
+
+    forbidden = client.get(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}/view-url",
+        headers=auth(uuid4()),
+    )
+    response = client.get(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}/view-url",
+        headers=auth(owner_id),
+    )
+
+    assert forbidden.status_code == 404
+    assert response.status_code == 200
+    assert response.json()["url"].endswith("?signed=true")
+    assert response.json()["expires_at"]
+    persisted = session.get(DocumentRecord, UUID(document_id))
+    assert persisted is not None
+    assert storage.view_url_requests == [
+        (persisted.storage_bucket, persisted.storage_key, 300)
+    ]
+
+
+def test_document_view_url_reports_storage_failure(
+    client: TestClient,
+) -> None:
+    class FailingViewUrlStorage(MemoryObjectStorage):
+        def create_pdf_view_url(
+            self, bucket: str, key: str, expires_in_seconds: int
+        ) -> str:
+            raise ObjectStorageError("storage unavailable")
+
+    failing_storage = FailingViewUrlStorage()
+    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = (
+        lambda: failing_storage
+    )
+    user_id = uuid4()
+    analysis_case_id = create_case(client, user_id)
+    uploaded = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(user_id),
+        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    )
+
+    response = client.get(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}/view-url",
+        headers=auth(user_id),
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == (
+        "Le document ne peut pas être affiché pour le moment."
+    )
 
 
 def test_storage_failure_does_not_persist_metadata(

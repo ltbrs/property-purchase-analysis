@@ -61,6 +61,7 @@ The initial scaffold recognizes these variables:
 | `OBJECT_STORAGE_REGION` | S3 signing region (`eu-west-3` by default) |
 | `OBJECT_STORAGE_ACCESS_KEY` | Object-storage access key |
 | `OBJECT_STORAGE_SECRET_KEY` | Object-storage secret key |
+| `DOCUMENT_VIEW_URL_TTL_SECONDS` | Lifetime of private PDF viewing links (5 minutes by default) |
 | `MAX_UPLOAD_SIZE_BYTES` | Maximum PDF size (25 MiB by default) |
 | `OPENAI_API_KEY` | Server-side OpenAI API key used for structured extraction |
 
