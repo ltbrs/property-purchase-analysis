@@ -132,6 +132,8 @@ The upload slice provides these case-scoped endpoints:
 POST /api/v1/analysis-cases
 GET  /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents
+GET  /api/v1/analysis-cases/{case_id}/documents/{document_id}/extraction
+POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/process
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/classify
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe
@@ -221,9 +223,9 @@ PDF upload
 -> source-backed report
 ```
 
-Background processing and production authentication remain deferred.
-Upload still stops at `uploaded`; callers explicitly advance each stage so the workflow
-remains visible.
+Background processing and production authentication remain deferred. The frontend calls
+the synchronous, idempotent `/process` workflow after upload; the individual stage
+endpoints remain available for retries and diagnostics.
 
 ## Evaluation fixtures
 

@@ -146,6 +146,8 @@ def test_dpe_rule_boundaries_and_missing_information() -> None:
     missing_risk = next(risk for risk in missing if risk.code == "DPE_MISSING_CRITICAL_INFORMATION")
     assert missing_risk.status == FindingStatus.MISSING_INFORMATION
     assert missing_risk.sources == []
+    assert missing_risk.title == "DPE présent, données énergétiques non extraites"
+    assert "Le document DPE est bien présent" in missing_risk.description
 
 
 @pytest.mark.parametrize(

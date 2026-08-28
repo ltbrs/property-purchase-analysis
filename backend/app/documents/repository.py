@@ -241,6 +241,13 @@ class DocumentRepository:
         document.failure_reason = failure_reason[:500]
         self.session.commit()
 
+    def mark_completed(self, document: DocumentRecord) -> None:
+        """Finish documents that do not have a dedicated structured extractor."""
+        document.status = DocumentStatus.COMPLETED.value
+        document.failure_reason = None
+        self.session.commit()
+        self.session.refresh(document)
+
     def save_extraction(
         self,
         document: DocumentRecord,

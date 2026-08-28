@@ -17,6 +17,10 @@ import {
   type PdfDocumentSelection,
 } from "@/features/documents/pdf-viewer";
 import {
+  RawExtractionViewer,
+  type RawExtractionSelection,
+} from "@/features/documents/raw-extraction-viewer";
+import {
   API_URL,
   getWorkspace,
   readApiError,
@@ -156,14 +160,20 @@ function DocumentFile({
   deletingDocumentId,
   showType,
   onDelete,
+  onViewExtraction,
   onView,
 }: {
   document: UploadedDocument;
   deletingDocumentId: string | null;
   showType?: boolean;
   onDelete: (document: UploadedDocument) => void;
+  onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
+  const canViewExtraction = ["extracted", "analyzing", "completed"].includes(
+    document.status,
+  );
+
   return (
     <div className="document-file">
       <span className="document-type" aria-hidden="true"><Icon name="document" /></span>
@@ -190,6 +200,16 @@ function DocumentFile({
       >
         Visualiser
       </button>
+      {canViewExtraction ? (
+        <button
+          className="raw-extraction-button"
+          type="button"
+          aria-label={`Voir l’extraction brute de ${document.original_filename}`}
+          onClick={() => onViewExtraction(document)}
+        >
+          Extraction
+        </button>
+      ) : null}
       <button
         className="delete-document-button"
         type="button"
@@ -209,6 +229,7 @@ function ExpectedDocumentRow({
   propertyType,
   deletingDocumentId,
   onDelete,
+  onViewExtraction,
   onView,
 }: {
   expectation: ExpectedDocument;
@@ -216,6 +237,7 @@ function ExpectedDocumentRow({
   propertyType: PropertyType;
   deletingDocumentId: string | null;
   onDelete: (document: UploadedDocument) => void;
+  onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
   const isPresent = documents.length > 0;
@@ -245,6 +267,7 @@ function ExpectedDocumentRow({
               document={document}
               deletingDocumentId={deletingDocumentId}
               onDelete={onDelete}
+              onViewExtraction={onViewExtraction}
               onView={onView}
             />
           ))}
@@ -261,10 +284,13 @@ export function DocumentUpload() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [viewingDocument, setViewingDocument] = useState<PdfDocumentSelection | null>(null);
+  const [viewingExtraction, setViewingExtraction] =
+    useState<RawExtractionSelection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -414,7 +440,7 @@ export function DocumentUpload() {
       }),
     );
 
-    const failures = results.flatMap((result) =>
+    const uploadFailures = results.flatMap((result) =>
       result.status === "rejected" ? [String(result.reason)] : [],
     );
     const successfulDocuments = results.flatMap((result) =>
@@ -429,8 +455,66 @@ export function DocumentUpload() {
         (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at),
       );
     });
-    setError(failures.length > 0 ? failures.join(" ") : null);
     setIsUploading(false);
+
+    setIsProcessing(successfulDocuments.length > 0);
+    setDocuments((currentDocuments) =>
+      currentDocuments.map((document) =>
+        successfulDocuments.some(
+          (uploadedDocument) =>
+            uploadedDocument.id === document.id &&
+            uploadedDocument.status !== "completed",
+        )
+          ? { ...document, status: "extracting" }
+          : document,
+      ),
+    );
+    const processingResults = await Promise.allSettled(
+      successfulDocuments.map(async (document) => {
+        const response = await fetch(
+          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}/process`,
+          { method: "POST", headers: workspaceHeaders(workspace) },
+        );
+        if (!response.ok) {
+          throw new Error(
+            `${document.original_filename} : ${await readApiError(response)}`,
+          );
+        }
+        return (await response.json()) as UploadedDocument;
+      }),
+    );
+    const processingFailures = processingResults.flatMap((result) =>
+      result.status === "rejected" ? [String(result.reason)] : [],
+    );
+    try {
+      const refreshedDocuments = await fetchDocuments(workspace);
+      if (!refreshedDocuments.ok) {
+        throw new Error(await readApiError(refreshedDocuments));
+      }
+      setDocuments((await refreshedDocuments.json()) as UploadedDocument[]);
+    } catch (refreshError) {
+      const processedDocuments = processingResults.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      setDocuments((currentDocuments) => {
+        const documentsById = new Map(
+          currentDocuments.map((document) => [document.id, document]),
+        );
+        for (const document of processedDocuments) {
+          documentsById.set(document.id, document);
+        }
+        return Array.from(documentsById.values());
+      });
+      processingFailures.push(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Impossible d’actualiser les documents.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+    const failures = [...uploadFailures, ...processingFailures];
+    setError(failures.length > 0 ? failures.join(" ") : null);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -497,9 +581,13 @@ export function DocumentUpload() {
             <p>PDF uniquement, 25 Mo maximum par fichier.</p>
           </div>
         </div>
-        <label className={`file-button${isUploading || isInitializing ? " is-disabled" : ""}`}>
+        <label className={`file-button${isUploading || isProcessing || isInitializing ? " is-disabled" : ""}`}>
           <Icon name="upload" />
-          {isUploading ? "Import en cours…" : "Choisir des fichiers"}
+          {isUploading
+            ? "Import en cours…"
+            : isProcessing
+              ? "Analyse en cours…"
+              : "Choisir des fichiers"}
           <input
             ref={inputRef}
             type="file"
@@ -507,7 +595,7 @@ export function DocumentUpload() {
             aria-label="Choisir des documents PDF"
             accept="application/pdf,.pdf"
             multiple
-            disabled={!workspace || isUploading || isInitializing}
+            disabled={!workspace || isUploading || isProcessing || isInitializing}
             onChange={(event) =>
               void uploadFiles(Array.from(event.currentTarget.files ?? []))
             }
@@ -559,6 +647,10 @@ export function DocumentUpload() {
                 propertyType={propertyType}
                 deletingDocumentId={deletingDocumentId}
                 onDelete={(document) => void deleteDocument(document)}
+                onViewExtraction={(document) => setViewingExtraction({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
                 onView={(document) => setViewingDocument({
                   documentId: document.id,
                   filename: document.original_filename,
@@ -585,6 +677,10 @@ export function DocumentUpload() {
                 deletingDocumentId={deletingDocumentId}
                 showType
                 onDelete={(item) => void deleteDocument(item)}
+                onViewExtraction={(document) => setViewingExtraction({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
                 onView={(document) => setViewingDocument({
                   documentId: document.id,
                   filename: document.original_filename,
@@ -598,6 +694,12 @@ export function DocumentUpload() {
         <PdfViewer
           document={viewingDocument}
           onClose={() => setViewingDocument(null)}
+        />
+      ) : null}
+      {viewingExtraction ? (
+        <RawExtractionViewer
+          document={viewingExtraction}
+          onClose={() => setViewingExtraction(null)}
         />
       ) : null}
     </div>

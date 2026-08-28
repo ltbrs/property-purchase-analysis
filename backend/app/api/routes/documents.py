@@ -31,6 +31,7 @@ from app.documents.models import (
 from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
 from app.documents.validation import InvalidDocument, validate_pdf
+from app.jobs.document_processing import DocumentProcessingService
 from app.llm import StructuredOutputClientDependency
 from app.property.models import PropertyType
 from app.property.normalization.ag_minutes import NormalizedAgMinutes
@@ -268,6 +269,33 @@ async def create_document_view_url(
     )
 
 
+@router.get(
+    "/{analysis_case_id}/documents/{document_id}/extraction",
+    response_model=DocumentExtractionRead,
+)
+def get_document_extraction(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> DocumentExtractionRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(
+        analysis_case_id, document_id, current_user_id
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+    extraction = repository.get_extraction(document.id)
+    if extraction is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucune extraction brute n’est disponible pour ce document.",
+        )
+    return DocumentExtractionRead.model_validate(extraction)
+
+
 @router.post(
     "/{analysis_case_id}/documents",
     response_model=DocumentRead,
@@ -319,6 +347,69 @@ async def upload_document(
     )
     persisted = repository.create_document(document, current_user_id)
     return DocumentRead.model_validate(persisted)
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/process",
+    response_model=DocumentRead,
+)
+async def process_document(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+    parser: PdfParserDependency,
+    llm_client: StructuredOutputClientDependency,
+) -> DocumentRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(
+        analysis_case_id, document_id, current_user_id
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+    if document.status in {
+        DocumentStatus.EXTRACTING.value,
+        DocumentStatus.ANALYZING.value,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document processing is already in progress",
+        )
+
+    try:
+        classification = await DocumentProcessingService(
+            repository, storage, parser, llm_client
+        ).process(document)
+    except ObjectStorageError as error:
+        repository.mark_extraction_failed(
+            document, "Le document n’a pas pu être relu depuis le stockage privé."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le document n’a pas pu être relu depuis le stockage privé.",
+        ) from error
+    except DocumentExtractionFailed as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+    except (
+        DocumentClassificationFailed,
+        DpeExtractionFailed,
+        StructuredExtractionFailed,
+    ) as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+    session.refresh(document)
+    return DocumentRead.model_validate(document).model_copy(
+        update={"document_type": classification.document_type}
+    )
 
 
 @router.delete(

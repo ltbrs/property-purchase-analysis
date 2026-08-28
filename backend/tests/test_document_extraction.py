@@ -161,6 +161,42 @@ def test_extraction_is_idempotent(client: TestClient, parser: FakePdfParser) -> 
     assert parser.parse_count == 1
 
 
+def test_raw_extraction_can_be_read_without_running_the_parser_again(
+    client: TestClient, parser: FakePdfParser
+) -> None:
+    user_id = uuid4()
+    analysis_case_id, document_id = upload_document(client, user_id)
+    client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}/extract",
+        headers=auth(user_id),
+    )
+
+    response = client.get(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}/extraction",
+        headers=auth(user_id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["parser_name"] == "fake-xberg"
+    assert [page["text"] for page in response.json()["pages"]] == [
+        "Classe energie E",
+        "Cout annuel 1500 EUR",
+    ]
+    assert parser.parse_count == 1
+
+
+def test_raw_extraction_enforces_document_ownership(client: TestClient) -> None:
+    owner_id = uuid4()
+    analysis_case_id, document_id = upload_document(client, owner_id)
+
+    response = client.get(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/{document_id}/extraction",
+        headers=auth(uuid4()),
+    )
+
+    assert response.status_code == 404
+
+
 def test_extraction_enforces_document_ownership(
     client: TestClient,
     storage: MemoryObjectStorage,

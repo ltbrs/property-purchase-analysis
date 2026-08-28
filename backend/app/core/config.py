@@ -36,6 +36,13 @@ class Settings(BaseSettings):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
 
+    @field_validator("openai_api_key", mode="before")
+    @classmethod
+    def empty_openai_api_key_is_unconfigured(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:

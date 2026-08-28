@@ -147,10 +147,11 @@ def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFi
                 code="DPE_MISSING_CRITICAL_INFORMATION",
                 finding_key=_finding_key("DPE_MISSING_CRITICAL_INFORMATION", facts),
                 category=RiskCategory.ENERGY,
-                title="Informations DPE incomplètes",
+                title="DPE présent, données énergétiques non extraites",
                 severity=RiskSeverity.MEDIUM,
                 description=(
-                    "Informations absentes ou non vérifiables : " + ", ".join(missing) + "."
+                    "Le document DPE est bien présent, mais certaines valeurs n’ont pas "
+                    "pu être vérifiées dans son extraction : " + ", ".join(missing) + "."
                 ),
                 status=FindingStatus.MISSING_INFORMATION,
                 sources=[],
