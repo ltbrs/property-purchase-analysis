@@ -4,12 +4,11 @@ export default function UploadPage() {
   return (
     <section className="upload-page">
       <div className="upload-heading">
-        <p className="eyebrow">Documents du bien</p>
-        <h1>Constituez votre dossier d’analyse</h1>
-        <p>
-          Ajoutez les diagnostics, procès-verbaux et documents financiers dont
-          vous disposez. Ils restent privés et chaque constat conservera sa source.
-        </p>
+        <div>
+          <p className="eyebrow">Bibliothèque</p>
+          <h1>Documents</h1>
+        </div>
+        <p>Ajoutez les pièces disponibles. PDF uniquement, 25 Mo maximum.</p>
       </div>
       <DocumentUpload />
     </section>

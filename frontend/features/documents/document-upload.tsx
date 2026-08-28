@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Icon } from "@/components/icons";
 import {
   API_URL,
   getOrCreateWorkspace,
@@ -230,16 +231,17 @@ export function DocumentUpload() {
     <div className="document-workspace">
       <div className="upload-card">
         <div className="upload-card-copy">
-          <span className="upload-icon" aria-hidden="true">PDF</span>
+          <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
           <div>
-            <h2>Ajoutez vos fichiers PDF</h2>
-            <p>Plusieurs fichiers possibles, 25 Mo maximum par document.</p>
+            <h2>Déposer des PDF</h2>
+            <p>Diagnostics, PV d’AG, charges ou travaux.</p>
           </div>
         </div>
         <label
           className={`file-button${isUploading || isInitializing ? " is-disabled" : ""}`}
         >
-          {isUploading ? "Import en cours…" : "Choisir des documents"}
+          <Icon name="upload" />
+          {isUploading ? "Import en cours…" : "Choisir des fichiers"}
           <input
             ref={inputRef}
             type="file"
@@ -252,7 +254,7 @@ export function DocumentUpload() {
           />
         </label>
         <p className="privacy-note">
-          <span aria-hidden="true">●</span> Stockage privé — aucun document n’est public.
+          <Icon name="shield" /> Stockage privé
         </p>
       </div>
 
@@ -267,7 +269,9 @@ export function DocumentUpload() {
         <div className="document-list-heading">
           <div>
             <p className="section-kicker">Dossier en cours</p>
-            <h2 id="document-list-title">Documents ajoutés</h2>
+            <h2 id="document-list-title">
+              Documents <span>{documents.length}</span>
+            </h2>
           </div>
           <button
             className="refresh-button"
@@ -275,7 +279,8 @@ export function DocumentUpload() {
             disabled={!workspace || isRefreshing}
             onClick={() => void refreshDocuments()}
           >
-            {isRefreshing ? "Actualisation…" : "Actualiser"}
+            <Icon name="refresh" />
+            <span>{isRefreshing ? "Actualisation…" : "Actualiser"}</span>
           </button>
         </div>
 
@@ -290,7 +295,7 @@ export function DocumentUpload() {
           <ul className="document-items">
             {documents.map((document) => (
               <li key={document.id} className="document-item">
-                <span className="document-type" aria-hidden="true">PDF</span>
+                <span className="document-type" aria-hidden="true"><Icon name="document" /></span>
                 <div className="document-details">
                   <strong>{document.original_filename}</strong>
                   <span>

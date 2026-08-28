@@ -6,7 +6,7 @@ import { ApplicationShell } from "@/components/application-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Analyse immobilière",
+  title: "Clairimmo — Analyse immobilière",
   description: "Analyse documentée des risques d'un achat immobilier en France.",
 };
 
@@ -23,4 +23,3 @@ export default function RootLayout({ children }: RootLayoutProps) {
     </html>
   );
 }
-
