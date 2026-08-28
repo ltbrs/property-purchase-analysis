@@ -5,10 +5,10 @@ export default function UploadPage() {
     <section className="upload-page">
       <div className="upload-heading">
         <div>
-          <p className="eyebrow">Bibliothèque</p>
-          <h1>Documents</h1>
+          <p className="eyebrow">Dossier d’achat</p>
+          <h1>Documents du bien</h1>
         </div>
-        <p>Ajoutez les pièces disponibles. PDF uniquement, 25 Mo maximum.</p>
+        <p>Vérifiez ce qui est reçu, attendu ou encore manquant.</p>
       </div>
       <DocumentUpload />
     </section>

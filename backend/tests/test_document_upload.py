@@ -73,6 +73,55 @@ def create_case(client: TestClient, user_id: UUID) -> UUID:
     return UUID(response.json()["id"])
 
 
+def test_property_type_updates_the_expected_coproperty_documents(client: TestClient) -> None:
+    user_id = uuid4()
+    created = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={
+            "title": "Maison à tester",
+            "property_type": "house",
+        },
+    )
+    case_id = created.json()["id"]
+
+    house_report = client.post(
+        f"/api/v1/analysis-cases/{case_id}/report/refresh",
+        headers=auth(user_id),
+    )
+    updated = client.patch(
+        f"/api/v1/analysis-cases/{case_id}",
+        headers=auth(user_id),
+        json={"property_type": "apartment_coproperty"},
+    )
+    apartment_report = client.post(
+        f"/api/v1/analysis-cases/{case_id}/report/refresh",
+        headers=auth(user_id),
+    )
+
+    assert created.status_code == 201
+    assert created.json()["property_type"] == "house"
+    assert house_report.status_code == 200
+    house_codes = {
+        finding["code"]
+        for section in house_report.json()["sections"]
+        for finding in section["findings"]
+    }
+    assert house_codes == {"MISSING_DPE_DOCUMENT"}
+    assert updated.status_code == 200
+    assert updated.json()["property_type"] == "apartment_coproperty"
+    apartment_codes = {
+        finding["code"]
+        for section in apartment_report.json()["sections"]
+        for finding in section["findings"]
+    }
+    assert apartment_codes >= {
+        "MISSING_DPE_DOCUMENT",
+        "MISSING_RECENT_AG_MINUTES",
+        "MISSING_COPROPERTY_FINANCIALS",
+    }
+
+
 def test_upload_requires_an_authenticated_identity(client: TestClient) -> None:
     response = client.post(
         f"/api/v1/analysis-cases/{uuid4()}/documents",

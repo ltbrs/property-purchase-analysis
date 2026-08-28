@@ -4,6 +4,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
 import {
+  documentTypeLabels,
+  expectedDocumentsFor,
+  propertyTypeLabels,
+  type DocumentType,
+  type ExpectedDocument,
+  type PropertyType,
+} from "@/features/documents/document-catalog";
+import {
   API_URL,
   getOrCreateWorkspace,
   readApiError,
@@ -29,8 +37,15 @@ type UploadedDocument = {
   size_bytes: number;
   status: DocumentStatus;
   failure_reason: string | null;
+  document_type: DocumentType | null;
   created_at: string;
   updated_at: string;
+};
+
+type AnalysisCase = {
+  id: string;
+  title: string;
+  property_type: PropertyType;
 };
 
 const statusLabels: Record<DocumentStatus, string> = {
@@ -38,13 +53,12 @@ const statusLabels: Record<DocumentStatus, string> = {
   extracting: "Extraction en cours",
   extracted: "Extrait",
   analyzing: "Analyse en cours",
-  completed: "Terminé",
+  completed: "Analysé",
   failed: "Échec",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
   dateStyle: "medium",
-  timeStyle: "short",
 });
 
 function formatFileSize(bytes: number) {
@@ -54,19 +68,182 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
 }
 
+function workspaceHeaders(workspace: Workspace) {
+  return { "X-User-Id": workspace.userId };
+}
+
 async function fetchDocuments(workspace: Workspace) {
-  return fetch(
-    `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
-    { headers: { "X-User-Id": workspace.userId } },
+  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents`, {
+    headers: workspaceHeaders(workspace),
+  });
+}
+
+async function fetchAnalysisCase(workspace: Workspace) {
+  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}`, {
+    headers: workspaceHeaders(workspace),
+  });
+}
+
+function PropertyTypeSelector({
+  value,
+  isSaving,
+  onChange,
+}: {
+  value: PropertyType;
+  isSaving: boolean;
+  onChange: (value: Exclude<PropertyType, "unknown">) => void;
+}) {
+  const choices: {
+    value: Exclude<PropertyType, "unknown">;
+    label: string;
+    description: string;
+    icon: "building" | "home";
+  }[] = [
+    {
+      value: "apartment_coproperty",
+      label: "Appartement en copropriété",
+      description: "Inclut les pièces de l’immeuble et de la copropriété.",
+      icon: "building",
+    },
+    {
+      value: "house",
+      label: "Maison individuelle",
+      description: "Exclut les PV d’AG et les comptes de copropriété.",
+      icon: "home",
+    },
+  ];
+
+  return (
+    <fieldset className="property-type-fieldset" disabled={isSaving}>
+      <legend>Type de logement</legend>
+      <p>Cette information adapte automatiquement les documents à demander.</p>
+      <div className="property-type-options">
+        {choices.map((choice) => (
+          <label
+            key={choice.value}
+            className={`property-type-option${value === choice.value ? " is-selected" : ""}`}
+          >
+            <input
+              type="radio"
+              name="property-type"
+              value={choice.value}
+              checked={value === choice.value}
+              onChange={() => onChange(choice.value)}
+            />
+            <span className="property-type-icon"><Icon name={choice.icon} /></span>
+            <span>
+              <strong>{choice.label}</strong>
+              <small>{choice.description}</small>
+            </span>
+            <span className="radio-indicator" aria-hidden="true" />
+          </label>
+        ))}
+      </div>
+      <span className="property-save-status" aria-live="polite">
+        {isSaving ? "Mise à jour du dossier…" : ""}
+      </span>
+    </fieldset>
+  );
+}
+
+function DocumentFile({
+  document,
+  deletingDocumentId,
+  showType,
+  onDelete,
+}: {
+  document: UploadedDocument;
+  deletingDocumentId: string | null;
+  showType?: boolean;
+  onDelete: (document: UploadedDocument) => void;
+}) {
+  return (
+    <div className="document-file">
+      <span className="document-type" aria-hidden="true"><Icon name="document" /></span>
+      <div className="document-details">
+        <strong>{document.original_filename}</strong>
+        <span>
+          {showType
+            ? `${documentTypeLabels[document.document_type ?? "unknown"]} · `
+            : ""}
+          {formatFileSize(document.size_bytes)} · {dateFormatter.format(new Date(document.created_at))}
+        </span>
+        {document.failure_reason ? (
+          <span className="document-failure">{document.failure_reason}</span>
+        ) : null}
+      </div>
+      <span className={`status-badge status-${document.status}`}>
+        {statusLabels[document.status]}
+      </span>
+      <button
+        className="delete-document-button"
+        type="button"
+        disabled={deletingDocumentId !== null}
+        aria-label={`Supprimer ${document.original_filename}`}
+        onClick={() => onDelete(document)}
+      >
+        {deletingDocumentId === document.id ? "Suppression…" : "Supprimer"}
+      </button>
+    </div>
+  );
+}
+
+function ExpectedDocumentRow({
+  expectation,
+  documents,
+  propertyType,
+  deletingDocumentId,
+  onDelete,
+}: {
+  expectation: ExpectedDocument;
+  documents: UploadedDocument[];
+  propertyType: PropertyType;
+  deletingDocumentId: string | null;
+  onDelete: (document: UploadedDocument) => void;
+}) {
+  const isPresent = documents.length > 0;
+  const state = isPresent ? "present" : propertyType === "unknown" ? "pending" : "missing";
+  const stateLabel = isPresent ? "Reçu" : propertyType === "unknown" ? "À confirmer" : "Manquant";
+
+  return (
+    <li className={`coverage-item is-${state}`}>
+      <div className="coverage-summary">
+        <span className="coverage-state" aria-hidden="true">
+          <Icon name={isPresent ? "check" : "document"} />
+        </span>
+        <div className="coverage-copy">
+          <div>
+            <strong>{expectation.label}</strong>
+            <span className={`coverage-badge is-${state}`}>{stateLabel}</span>
+          </div>
+          <p>{expectation.description}</p>
+          <small>{expectation.priority === "essential" ? "Prioritaire pour l’analyse" : "Utile avant l’achat"}</small>
+        </div>
+      </div>
+      {documents.length > 0 ? (
+        <div className="coverage-files">
+          {documents.map((document) => (
+            <DocumentFile
+              key={document.id}
+              document={document}
+              deletingDocumentId={deletingDocumentId}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      ) : null}
+    </li>
   );
 }
 
 export function DocumentUpload() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,21 +254,30 @@ export function DocumentUpload() {
     async function initialize() {
       try {
         let currentWorkspace = await getOrCreateWorkspace();
-        let response = await fetchDocuments(currentWorkspace);
+        let [documentsResponse, caseResponse] = await Promise.all([
+          fetchDocuments(currentWorkspace),
+          fetchAnalysisCase(currentWorkspace),
+        ]);
 
-        if (response.status === 404) {
+        if (documentsResponse.status === 404 || caseResponse.status === 404) {
           resetWorkspace(currentWorkspace.caseId);
           currentWorkspace = await getOrCreateWorkspace();
-          response = await fetchDocuments(currentWorkspace);
+          [documentsResponse, caseResponse] = await Promise.all([
+            fetchDocuments(currentWorkspace),
+            fetchAnalysisCase(currentWorkspace),
+          ]);
         }
-        if (!response.ok) {
-          throw new Error(await readApiError(response));
-        }
+        if (!documentsResponse.ok) throw new Error(await readApiError(documentsResponse));
+        if (!caseResponse.ok) throw new Error(await readApiError(caseResponse));
 
-        const uploadedDocuments = (await response.json()) as UploadedDocument[];
+        const [uploadedDocuments, analysisCase] = await Promise.all([
+          documentsResponse.json() as Promise<UploadedDocument[]>,
+          caseResponse.json() as Promise<AnalysisCase>,
+        ]);
         if (!cancelled) {
           setWorkspace(currentWorkspace);
           setDocuments(uploadedDocuments);
+          setPropertyType(analysisCase.property_type);
         }
       } catch (initializationError) {
         if (!cancelled) {
@@ -102,9 +288,7 @@ export function DocumentUpload() {
           );
         }
       } finally {
-        if (!cancelled) {
-          setIsInitializing(false);
-        }
+        if (!cancelled) setIsInitializing(false);
       }
     }
 
@@ -134,6 +318,34 @@ export function DocumentUpload() {
     }
   }
 
+  async function updatePropertyType(nextPropertyType: Exclude<PropertyType, "unknown">) {
+    if (!workspace || nextPropertyType === propertyType) return;
+
+    setIsSavingPropertyType(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/analysis-cases/${workspace.caseId}`, {
+        method: "PATCH",
+        headers: {
+          ...workspaceHeaders(workspace),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ property_type: nextPropertyType }),
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const analysisCase = (await response.json()) as AnalysisCase;
+      setPropertyType(analysisCase.property_type);
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Impossible de mettre à jour le type de logement.",
+      );
+    } finally {
+      setIsSavingPropertyType(false);
+    }
+  }
+
   async function uploadFiles(files: File[]) {
     if (!workspace || files.length === 0) return;
 
@@ -159,7 +371,7 @@ export function DocumentUpload() {
           `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
           {
             method: "POST",
-            headers: { "X-User-Id": workspace.userId },
+            headers: workspaceHeaders(workspace),
             body: formData,
           },
         );
@@ -180,12 +392,9 @@ export function DocumentUpload() {
       const documentsById = new Map(
         currentDocuments.map((document) => [document.id, document]),
       );
-      for (const document of successfulDocuments) {
-        documentsById.set(document.id, document);
-      }
+      for (const document of successfulDocuments) documentsById.set(document.id, document);
       return Array.from(documentsById.values()).sort(
-        (left, right) =>
-          Date.parse(right.created_at) - Date.parse(left.created_at),
+        (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at),
       );
     });
     setError(failures.length > 0 ? failures.join(" ") : null);
@@ -206,13 +415,9 @@ export function DocumentUpload() {
     try {
       const response = await fetch(
         `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}`,
-        {
-          method: "DELETE",
-          headers: { "X-User-Id": workspace.userId },
-        },
+        { method: "DELETE", headers: workspaceHeaders(workspace) },
       );
       if (!response.ok) throw new Error(await readApiError(response));
-
       setDocuments((currentDocuments) =>
         currentDocuments.filter(({ id }) => id !== document.id),
       );
@@ -227,24 +432,47 @@ export function DocumentUpload() {
     }
   }
 
+  const expectedDocuments = expectedDocumentsFor(propertyType);
+  const matchedDocumentIds = new Set<string>();
+  const coverage = expectedDocuments.map((expectation) => {
+    const matchingDocuments = documents.filter(
+      (document) =>
+        document.status !== "failed" &&
+        document.document_type !== null &&
+        expectation.acceptedTypes.includes(document.document_type),
+    );
+    for (const document of matchingDocuments) matchedDocumentIds.add(document.id);
+    return { expectation, documents: matchingDocuments };
+  });
+  const otherDocuments = documents.filter((document) => !matchedDocumentIds.has(document.id));
+  const missingCount = propertyType === "unknown"
+    ? 0
+    : coverage.filter(({ documents: matchingDocuments }) => matchingDocuments.length === 0).length;
+
   return (
     <div className="document-workspace">
+      <PropertyTypeSelector
+        value={propertyType}
+        isSaving={isSavingPropertyType}
+        onChange={(value) => void updatePropertyType(value)}
+      />
+
       <div className="upload-card">
         <div className="upload-card-copy">
           <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
           <div>
-            <h2>Déposer des PDF</h2>
-            <p>Diagnostics, PV d’AG, charges ou travaux.</p>
+            <h2>Ajouter des documents</h2>
+            <p>PDF uniquement, 25 Mo maximum par fichier.</p>
           </div>
         </div>
-        <label
-          className={`file-button${isUploading || isInitializing ? " is-disabled" : ""}`}
-        >
+        <label className={`file-button${isUploading || isInitializing ? " is-disabled" : ""}`}>
           <Icon name="upload" />
           {isUploading ? "Import en cours…" : "Choisir des fichiers"}
           <input
             ref={inputRef}
             type="file"
+            name="property-documents"
+            aria-label="Choisir des documents PDF"
             accept="application/pdf,.pdf"
             multiple
             disabled={!workspace || isUploading || isInitializing}
@@ -253,9 +481,7 @@ export function DocumentUpload() {
             }
           />
         </label>
-        <p className="privacy-note">
-          <Icon name="shield" /> Stockage privé
-        </p>
+        <p className="privacy-note"><Icon name="shield" /> Stockage privé</p>
       </div>
 
       {error ? (
@@ -265,13 +491,18 @@ export function DocumentUpload() {
         </div>
       ) : null}
 
-      <section className="document-list" aria-labelledby="document-list-title">
+      <section className="document-coverage" aria-labelledby="document-coverage-title">
         <div className="document-list-heading">
           <div>
-            <p className="section-kicker">Dossier en cours</p>
-            <h2 id="document-list-title">
-              Documents <span>{documents.length}</span>
-            </h2>
+            <p className="section-kicker">{propertyTypeLabels[propertyType]}</p>
+            <h2 id="document-coverage-title">Documents à réunir</h2>
+            <p>
+              {propertyType === "unknown"
+                ? "Choisissez le type de logement pour identifier précisément les pièces manquantes."
+                : missingCount === 0
+                  ? "Toutes les catégories attendues sont couvertes."
+                  : `${missingCount} catégorie${missingCount === 1 ? "" : "s"} de documents à compléter.`}
+            </p>
           </div>
           <button
             className="refresh-button"
@@ -286,43 +517,43 @@ export function DocumentUpload() {
 
         {isInitializing ? (
           <div className="document-empty">Chargement de votre dossier…</div>
-        ) : documents.length === 0 ? (
-          <div className="document-empty">
-            <strong>Votre dossier est encore vide.</strong>
-            <span>Commencez par le DPE ou les derniers procès-verbaux d’AG.</span>
-          </div>
         ) : (
-          <ul className="document-items">
-            {documents.map((document) => (
-              <li key={document.id} className="document-item">
-                <span className="document-type" aria-hidden="true"><Icon name="document" /></span>
-                <div className="document-details">
-                  <strong>{document.original_filename}</strong>
-                  <span>
-                    {formatFileSize(document.size_bytes)} · ajouté le{" "}
-                    {dateFormatter.format(new Date(document.created_at))}
-                  </span>
-                  {document.failure_reason ? (
-                    <span className="document-failure">{document.failure_reason}</span>
-                  ) : null}
-                </div>
-                <span className={`status-badge status-${document.status}`}>
-                  {statusLabels[document.status]}
-                </span>
-                <button
-                  className="delete-document-button"
-                  type="button"
-                  disabled={deletingDocumentId !== null}
-                  aria-label={`Supprimer ${document.original_filename}`}
-                  onClick={() => void deleteDocument(document)}
-                >
-                  {deletingDocumentId === document.id ? "Suppression…" : "Supprimer"}
-                </button>
-              </li>
+          <ul className="coverage-list">
+            {coverage.map(({ expectation, documents: matchingDocuments }) => (
+              <ExpectedDocumentRow
+                key={expectation.key}
+                expectation={expectation}
+                documents={matchingDocuments}
+                propertyType={propertyType}
+                deletingDocumentId={deletingDocumentId}
+                onDelete={(document) => void deleteDocument(document)}
+              />
             ))}
           </ul>
         )}
       </section>
+
+      {!isInitializing && otherDocuments.length > 0 ? (
+        <section className="other-documents" aria-labelledby="other-documents-title">
+          <div className="document-list-heading">
+            <div>
+              <p className="section-kicker">Autres fichiers</p>
+              <h2 id="other-documents-title">À classer ou complémentaires <span>{otherDocuments.length}</span></h2>
+            </div>
+          </div>
+          <div className="other-document-list">
+            {otherDocuments.map((document) => (
+              <DocumentFile
+                key={document.id}
+                document={document}
+                deletingDocumentId={deletingDocumentId}
+                showType
+                onDelete={(item) => void deleteDocument(item)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

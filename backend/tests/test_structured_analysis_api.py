@@ -169,6 +169,9 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
             f"/api/v1/analysis-cases/{case_id}/report/refresh", headers=headers
         )
         report_get = client.get(f"/api/v1/analysis-cases/{case_id}/report", headers=headers)
+        listed_documents = client.get(
+            f"/api/v1/analysis-cases/{case_id}/documents", headers=headers
+        )
         forbidden_report = client.get(
             f"/api/v1/analysis-cases/{case_id}/report",
             headers={"X-User-Id": str(uuid4())},
@@ -194,6 +197,7 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
     }
     assert report_refresh.status_code == 200
     assert report_get.json() == report_refresh.json()
+    assert listed_documents.json()[0]["document_type"] == "ag_minutes"
     assert forbidden_report.status_code == 404
     assert [section["code"] for section in report_refresh.json()["sections"]] == [
         "financial",

@@ -21,6 +21,7 @@ from app.documents.extraction.service import (
 from app.documents.models import (
     AnalysisCaseCreate,
     AnalysisCaseRead,
+    AnalysisCaseUpdate,
     DocumentExtractionRead,
     DocumentRead,
     DocumentRecord,
@@ -30,6 +31,7 @@ from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
 from app.documents.validation import InvalidDocument, validate_pdf
 from app.llm import StructuredOutputClientDependency
+from app.property.models import PropertyType
 from app.property.normalization.ag_minutes import NormalizedAgMinutes
 from app.property.normalization.diagnostics import NormalizedDiagnostics
 from app.property.normalization.dpe import DpeExtractionRead, NormalizedDpeFacts
@@ -52,7 +54,7 @@ from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
 from app.risks.engine import evaluate_case_risks
 from app.risks.models import RiskFindingRead
-from app.risks.rules.missing_documents import AvailableDocument
+from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -115,12 +117,21 @@ def _refresh_case_findings(
     dpe_documents, minutes, financials, diagnostics, available_documents = (
         _load_normalized_case_data(repository, analysis_case_id, user_id)
     )
+    analysis_case = repository.get_owned_analysis_case(analysis_case_id, user_id)
+    missing_document_context = MissingDocumentContext(
+        is_coproperty=(
+            None
+            if analysis_case is None or analysis_case.property_type == PropertyType.UNKNOWN.value
+            else analysis_case.property_type == PropertyType.APARTMENT_COPROPERTY.value
+        )
+    )
     evaluation = evaluate_case_risks(
         dpe_documents=dpe_documents,
         minutes=minutes,
         financials=financials,
         diagnostics=diagnostics,
         available_documents=available_documents,
+        missing_document_context=missing_document_context,
         as_of=date.today(),
     )
     records = repository.replace_case_findings(
@@ -143,9 +154,40 @@ def create_analysis_case(
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
     analysis_case = DocumentRepository(session).create_analysis_case(
-        current_user_id, payload.title.strip()
+        current_user_id, payload.title.strip(), payload.property_type
     )
     return AnalysisCaseRead.model_validate(analysis_case)
+
+
+@router.get("/{analysis_case_id}", response_model=AnalysisCaseRead)
+def get_analysis_case(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> AnalysisCaseRead:
+    analysis_case = DocumentRepository(session).get_owned_analysis_case(
+        analysis_case_id, current_user_id
+    )
+    if analysis_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    return AnalysisCaseRead.model_validate(analysis_case)
+
+
+@router.patch("/{analysis_case_id}", response_model=AnalysisCaseRead)
+def update_analysis_case(
+    analysis_case_id: UUID,
+    payload: AnalysisCaseUpdate,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> AnalysisCaseRead:
+    repository = DocumentRepository(session)
+    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
+    if analysis_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    updated = repository.update_analysis_case_property_type(
+        analysis_case, payload.property_type
+    )
+    return AnalysisCaseRead.model_validate(updated)
 
 
 @router.get("/{analysis_case_id}/documents", response_model=list[DocumentRead])
@@ -157,8 +199,16 @@ def list_documents(
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    classifications = {
+        classification.document_id: classification.document_type
+        for classification in repository.list_case_classifications(
+            analysis_case_id, current_user_id
+        )
+    }
     return [
-        DocumentRead.model_validate(document)
+        DocumentRead.model_validate(document).model_copy(
+            update={"document_type": classifications.get(document.id)}
+        )
         for document in repository.list_documents(analysis_case_id, current_user_id)
     ]
 

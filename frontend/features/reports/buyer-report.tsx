@@ -304,23 +304,28 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
   if (report === null) return null;
 
-  const populatedSections = report.sections.filter((section) => section.findings.length > 0);
-  const missingSection = report.sections.find((section) => section.code === "missing_information");
+  const visibleSections = report.sections
+    .filter((section) => section.code !== "reassuring")
+    .map((section) => ({
+      ...section,
+      findings: section.findings.filter(
+        (finding) => finding.expectation_level === null,
+      ),
+    }));
+  const populatedSections = visibleSections.filter((section) => section.findings.length > 0);
   const riskFindings = report.sections
-    .filter((section) => !["missing_information", "reassuring"].includes(section.code))
+    .filter((section) => section.code !== "reassuring")
     .flatMap((section) => section.findings)
+    .filter((finding) => finding.expectation_level === null)
     .toSorted((left, right) => severityRank[right.severity] - severityRank[left.severity]);
-  const priorityFindings = riskFindings.slice(0, 3);
-  const categorySections = report.sections.filter((section) =>
-    ["building_coproperty", "energy", "financial", "diagnostics_safety"].includes(section.code),
-  );
+  const priorityFindings = riskFindings.slice(0, 4);
 
   return (
     <div className={`buyer-report report-${variant}`}>
       <header className="report-page-heading">
         <div>
           <p className="report-updated">Analyse mise à jour le {dateFormatter.format(new Date(report.generated_at))}</p>
-          <h1>{variant === "overview" ? "Ce qui mérite votre attention." : "Toutes les alertes"}</h1>
+          <h1>{variant === "overview" ? "Votre dossier, en clair" : "Alertes du dossier"}</h1>
         </div>
         <div className="report-heading-actions">
           <span className="attention-count">
@@ -339,7 +344,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <div className="overview-grid">
             <section className="panel priority-panel">
               <div className="panel-heading">
-                <div><p className="section-kicker">Prioritaire</p><h2>Alertes</h2></div>
+                <div><p className="section-kicker">À traiter en premier</p><h2>Alertes prioritaires</h2></div>
                 <Link className="text-link" href="/analysis">Tout voir <Icon name="arrow" /></Link>
               </div>
               {priorityFindings.length > 0 ? (
@@ -355,59 +360,15 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
             <section className="dossier-card">
               <div className="dossier-card-heading">
-                <div><p className="section-kicker">Dossier</p><strong>{report.summary.finding_count}</strong><span>constats documentés</span></div>
+                <div><p className="section-kicker">Synthèse</p><strong>{report.summary.finding_count}</strong><span>points analysés</span></div>
                 <Icon name="document" />
               </div>
               <div className="dossier-metrics">
-                <Metric value={report.summary.high_or_critical_count} label="prioritaires" />
-                <Metric value={report.summary.missing_information_count} label="manquants" />
-                <Metric value={report.summary.reassuring_count} label="rassurants" />
+                <Metric value={report.summary.high_or_critical_count} label="alertes fortes" />
+                <Metric value={report.summary.missing_information_count} label="infos à compléter" />
+                <Metric value={report.summary.reassuring_count} label="points rassurants" />
               </div>
-            </section>
-          </div>
-
-          <section className="category-grid" aria-label="Alertes par catégorie">
-            {categorySections.map((section) => {
-              const criticalCount = section.findings.filter((finding) => ["critical", "high"].includes(finding.severity)).length;
-              return (
-                <Link key={section.code} href={`/analysis#${section.code}`} className="category-card">
-                  <span className={`category-icon${criticalCount > 0 ? " is-critical" : ""}`}><Icon name={sectionIcons[section.code] ?? "document"} /></span>
-                  <span className="category-copy">
-                    <strong>{section.title}</strong>
-                    <small>{section.findings.length === 0 ? "Aucun constat" : `${section.findings.length} constat${section.findings.length === 1 ? "" : "s"}`}</small>
-                  </span>
-                  <Icon className="row-chevron" name="chevron" />
-                </Link>
-              );
-            })}
-          </section>
-
-          <div className="lower-grid">
-            <section className="panel missing-panel">
-              <div className="panel-heading">
-                <div><p className="section-kicker">Avant compromis</p><h2>Informations manquantes</h2></div>
-                <span className="count-badge">{missingSection?.findings.length ?? 0}</span>
-              </div>
-              {missingSection && missingSection.findings.length > 0 ? (
-                <div className="missing-list">
-                  {missingSection.findings.slice(0, 3).map((finding) => (
-                    <button key={finding.finding_key} type="button" onClick={() => setSelectedFinding(finding)}>
-                      <span /><strong>{finding.title}</strong><Icon name="chevron" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="panel-empty">Aucune information manquante signalée.</p>
-              )}
-            </section>
-
-            <section className="panel trust-panel">
-              <div className="trust-icon"><Icon name="check" /></div>
-              <div>
-                <p className="section-kicker">Traçabilité</p>
-                <h2>{report.summary.reassuring_count} élément{report.summary.reassuring_count === 1 ? "" : "s"} rassurant{report.summary.reassuring_count === 1 ? "" : "s"}</h2>
-                <p>Les faits utiles restent liés au document et à la page qui les justifient.</p>
-              </div>
+              <Link className="dossier-card-link" href="/upload">Voir les documents <Icon name="arrow" /></Link>
             </section>
           </div>
         </>
@@ -433,9 +394,9 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       ) : (
         <div className="report-state">
           <span className="state-icon"><Icon name="document" /></span>
-          <strong>Aucun constat pour le moment</strong>
-          <span>Ajoutez des documents pour commencer l’analyse.</span>
-          <Link href="/upload">Ajouter des documents</Link>
+          <strong>Aucune alerte détectée</strong>
+          <span>Consultez la page Documents pour vérifier les pièces encore attendues.</span>
+          <Link href="/upload">Voir les documents</Link>
         </div>
       )}
 

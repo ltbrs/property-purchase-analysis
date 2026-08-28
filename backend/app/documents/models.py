@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.property.models.analysis_case import PropertyType
 
 if TYPE_CHECKING:
     from app.property.models import AnalysisCaseRecord
@@ -146,6 +147,7 @@ class DocumentRead(BaseModel):
     size_bytes: int
     status: DocumentStatus
     failure_reason: str | None
+    document_type: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -181,6 +183,7 @@ class DocumentExtractionRead(BaseModel):
 
 class AnalysisCaseCreate(BaseModel):
     title: str = Field(default="Mon achat immobilier", min_length=1, max_length=200)
+    property_type: PropertyType = PropertyType.UNKNOWN
 
     @field_validator("title")
     @classmethod
@@ -191,10 +194,15 @@ class AnalysisCaseCreate(BaseModel):
         return title
 
 
+class AnalysisCaseUpdate(BaseModel):
+    property_type: PropertyType
+
+
 class AnalysisCaseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     title: str
+    property_type: PropertyType
     created_at: datetime
     updated_at: datetime

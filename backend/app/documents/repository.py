@@ -18,7 +18,7 @@ from app.documents.models import (
     DocumentStatus,
 )
 from app.documents.parsers.base import ParsedPdf
-from app.property.models import AnalysisCaseRecord, UserRecord
+from app.property.models import AnalysisCaseRecord, PropertyType, UserRecord
 from app.property.normalization.dpe import (
     DpeExtractionRecord,
     NormalizedDpeFacts,
@@ -45,10 +45,37 @@ class DocumentRepository:
                 # identity already exists, so only the losing transaction rolls back.
                 self.session.rollback()
 
-    def create_analysis_case(self, user_id: UUID, title: str) -> AnalysisCaseRecord:
+    def create_analysis_case(
+        self,
+        user_id: UUID,
+        title: str,
+        property_type: PropertyType = PropertyType.UNKNOWN,
+    ) -> AnalysisCaseRecord:
         self.ensure_user(user_id)
-        analysis_case = AnalysisCaseRecord(user_id=user_id, title=title)
+        analysis_case = AnalysisCaseRecord(
+            user_id=user_id,
+            title=title,
+            property_type=property_type.value,
+        )
         self.session.add(analysis_case)
+        self.session.commit()
+        self.session.refresh(analysis_case)
+        return analysis_case
+
+    def update_analysis_case_property_type(
+        self,
+        analysis_case: AnalysisCaseRecord,
+        property_type: PropertyType,
+    ) -> AnalysisCaseRecord:
+        analysis_case.property_type = property_type.value
+        self.session.execute(
+            delete(RiskFindingRecord).where(
+                RiskFindingRecord.analysis_case_id == analysis_case.id
+            )
+        )
+        self.session.execute(
+            delete(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case.id)
+        )
         self.session.commit()
         self.session.refresh(analysis_case)
         return analysis_case

@@ -20,6 +20,9 @@ backend/htmlcov/
 __pycache__/
 *.py[cod]
 
+
+data*
+
 # Editors and operating systems
 .idea/
 .vscode/*
