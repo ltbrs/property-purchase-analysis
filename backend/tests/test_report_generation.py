@@ -2,6 +2,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+from app.property.normalization.dpe import (
+    AdemeVerificationStatus,
+    DpeAdemeVerification,
+    DpeTextFact,
+)
 from app.reports import build_buyer_report
 from app.risks.models import (
     DocumentExpectation,
@@ -74,3 +79,37 @@ def test_report_orders_sections_enriches_sources_and_keeps_uncertainty() -> None
     assert report.summary.high_or_critical_count == 1
     assert report.summary.missing_information_count == 1
     assert report.summary.reassuring_count == 1
+
+
+def test_report_exposes_verified_ademe_registration() -> None:
+    document_id = uuid4()
+    dpe = dpe_facts(rating="D")
+    number_source = dpe.dpe_rating.source
+    assert number_source is not None
+    number_source = number_source.model_copy(update={"document_id": document_id})
+    dpe = dpe.model_copy(
+        update={
+            "dpe_number": DpeTextFact(
+                value="2475E4333306Q", source=number_source
+            ),
+            "ademe_verification": DpeAdemeVerification(
+                status=AdemeVerificationStatus.VERIFIED,
+                dpe_number="2475E4333306Q",
+            ),
+        }
+    )
+
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=[],
+        document_names={document_id: "DPE_D.pdf"},
+        dpe_documents=[dpe],
+        diagnostics=[],
+    )
+
+    reassuring = report.sections[-1].findings
+    assert reassuring[0].code == "REASSURING_DPE_ADEME_VERIFIED"
+    assert reassuring[0].title == "Enregistrement ADEME vérifié"
+    assert reassuring[0].sources[0].page_number == number_source.page_number
+    assert report.summary.reassuring_count == 2

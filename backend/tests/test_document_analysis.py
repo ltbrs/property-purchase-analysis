@@ -150,6 +150,7 @@ def dpe_candidate() -> DpeExtractionCandidate:
         energy_consumption_kwh_m2_year=DpeNumberFactCandidate(
             value=182, page_number=1, quote="Consommation 182 kWh/m²/an"
         ),
+        greenhouse_gas_emissions_kg_co2_m2_year=null_number(),
         estimated_annual_energy_cost_min=DpeNumberFactCandidate(
             value=980, page_number=2, quote="entre 980 € et 1 350 €"
         ),
@@ -216,9 +217,15 @@ def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Ses
             f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe",
             headers=auth(user_id),
         )
+        read_response = client.get(
+            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/dpe-extraction",
+            headers=auth(user_id),
+        )
 
     assert classify_response.status_code == 200
     assert response.status_code == 200
+    assert read_response.status_code == 200
+    assert read_response.json()["id"] == response.json()["id"]
     facts = response.json()["normalized_facts"]
     assert facts["dpe_rating"]["value"] == "D"
     assert facts["dpe_rating"]["source"] == {
@@ -237,11 +244,14 @@ def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Ses
     assert document is not None and document.status == DocumentStatus.COMPLETED.value
 
 
-def test_analysis_endpoints_are_idempotent(session: Session) -> None:
+def test_analysis_endpoints_are_idempotent(
+    session: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
     llm_client = FakeStructuredOutputClient([classification_candidate(), dpe_candidate()])
 
+    caplog.set_level("INFO", logger="uvicorn.error")
     with make_client(session, llm_client) as client:
         classify_url = f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/classify"
         dpe_url = f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe"
@@ -253,6 +263,8 @@ def test_analysis_endpoints_are_idempotent(session: Session) -> None:
     assert first_classification.json()["id"] == second_classification.json()["id"]
     assert first_dpe.json()["id"] == second_dpe.json()["id"]
     assert llm_client.calls == 2
+    assert "DPE extraction reused" in caplog.text
+    assert "api_call=false" in caplog.text
 
 
 def test_dpe_extraction_rejects_non_dpe_classification(session: Session) -> None:
@@ -289,3 +301,17 @@ def test_analysis_enforces_ownership_before_calling_the_model(session: Session) 
 
     assert response.status_code == 404
     assert llm_client.calls == 0
+
+
+def test_dpe_extraction_read_enforces_ownership(session: Session) -> None:
+    owner_id = uuid4()
+    case_id, document_id = seed_extracted_dpe(session, owner_id)
+    llm_client = FakeStructuredOutputClient([])
+
+    with make_client(session, llm_client) as client:
+        response = client.get(
+            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/dpe-extraction",
+            headers=auth(uuid4()),
+        )
+
+    assert response.status_code == 404

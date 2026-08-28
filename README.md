@@ -133,6 +133,7 @@ POST /api/v1/analysis-cases
 GET  /api/v1/analysis-cases/{case_id}/documents
 POST /api/v1/analysis-cases/{case_id}/documents
 GET  /api/v1/analysis-cases/{case_id}/documents/{document_id}/extraction
+GET  /api/v1/analysis-cases/{case_id}/documents/{document_id}/dpe-extraction
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/process
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extract
 POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/classify
@@ -167,8 +168,16 @@ DPE extraction is available only after the document is classified as `dpe`. Each
 non-null normalized fact contains the source document ID, one-based page number, and
 a short quote. Code verifies that the quote occurs on that page and converts invalid
 ratings, numeric ranges, dates, reversed cost ranges, and unsupported citations to
-explicit null values. It does not produce risks or infer absent facts. Both analysis
-operations are authenticated and idempotent.
+explicit null values. The service also detects the modern DPE number without OCR and
+queries ADEME's public `dpe03existant` dataset. An exact registry match exposes the
+ADEME snapshot and verification status, fills a missing energy/GES label, and compares
+all locally available values with explicit tolerances. A mismatch is retained as a
+consistency finding instead of being silently overwritten. If ADEME is unavailable or
+does not contain the number, the energy label can be calculated deterministically from
+the extracted energy and GES values for post-July-2021 dwellings over 40 m²; otherwise
+the label stays missing. Both analysis operations are authenticated and idempotent.
+ADEME lookups emit start, completion/not-found, failure, and skipped events in the API
+logs with the document ID and request duration, without logging document text.
 
 The structured extractor routes classified AG minutes, copropriété financial/charge
 documents, diagnostics, and ERP statements into separate strict schemas behind one
@@ -199,7 +208,9 @@ diagnostics, inconsistencies, missing information, then explicit reassuring fact
 Every source-backed item includes the original filename and page. Reassuring items are
 created only from explicit favorable DPE or diagnostic facts; the report does not infer
 that silence means safety. The `/analysis` route renders this structured report without
-a chatbot. Secure source-document links and in-document page inspection remain step 14.
+a chatbot. The document list exposes a dedicated DPE detail view containing normalized
+facts, provenance pages, the ADEME verification result, and the origin of the rating.
+Secure source-document links and in-document page inspection remain step 14.
 
 Ownership is checked in every case-scoped database query. For this pre-login MVP,
 `X-User-Id` represents an identity asserted by the authentication boundary; the
@@ -249,6 +260,9 @@ The initial thresholds are explicit product heuristics, not legal conclusions:
 - DPE rating E/F/G maps to medium/high/critical; consumption starts at 250, 330,
   and 450 kWh/m²/year; the projected annual-cost rule starts at €2,000 and becomes
   high at €3,000.
+- The no-OCR DPE-label fallback uses the regulatory double threshold (the worse of
+  energy and GES), floors published values before classification, and deliberately
+  refuses surfaces at or below 40 m² where surface-dependent thresholds apply.
 - A DPE is expired only when its explicit validity date is before the analysis date.
   Missing rating, consumption, issue date, or validity date is surfaced separately.
 - An explicit property share starts being highlighted at €5,000 and becomes high at
@@ -270,8 +284,8 @@ real document evaluations without changing extraction prompts.
 
 - Extraction currently runs synchronously in the API request. Moving it to a durable
   worker is deferred until processing volume justifies job infrastructure.
-- No second parser or vision fallback is configured. Scanned or image-only pages may
-  therefore produce little or no text depending on Xberg's available local OCR support.
+- No OCR, second parser, or vision fallback is configured. Xberg inline-image OCR is
+  explicitly disabled, so scanned or image-only pages may produce little or no text.
 - Password-protected PDFs are not supplied with passwords and will fail cleanly.
 - Complex or borderless tables are heuristic and may be incomplete or represented as
   ordinary page text. The stored output preserves what Xberg reports without inventing

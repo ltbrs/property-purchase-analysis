@@ -1,6 +1,7 @@
 import re
 import unicodedata
 from datetime import date, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +9,22 @@ from sqlalchemy import JSON, DateTime, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+
+DPE_NUMBER_PATTERN = re.compile(r"\b\d{4}[A-Z]\d{7}[A-Z]\b")
+DPE_NUMBER_WITH_LAYOUT_SPACES_PATTERN = re.compile(
+    r"(?<![A-Z0-9])((?:\d\s*){4}[A-Z]\s*(?:\d\s*){7}[A-Z])(?![A-Z0-9])"
+)
+
+
+def extract_dpe_number(text: str) -> str | None:
+    """Return the modern ADEME DPE identifier, tolerating layout whitespace."""
+
+    normalized = unicodedata.normalize("NFKC", text).upper()
+    match = DPE_NUMBER_PATTERN.search(normalized)
+    if match is not None:
+        return match.group(0)
+    layout_match = DPE_NUMBER_WITH_LAYOUT_SPACES_PATTERN.search(normalized)
+    return re.sub(r"\s+", "", layout_match.group(1)) if layout_match else None
 
 
 class DpeTextFactCandidate(BaseModel):
@@ -50,6 +67,7 @@ class DpeExtractionCandidate(BaseModel):
     dpe_rating: DpeTextFactCandidate
     ges_rating: DpeTextFactCandidate
     energy_consumption_kwh_m2_year: DpeNumberFactCandidate
+    greenhouse_gas_emissions_kg_co2_m2_year: DpeNumberFactCandidate
     estimated_annual_energy_cost_min: DpeNumberFactCandidate
     estimated_annual_energy_cost_max: DpeNumberFactCandidate
     surface: DpeNumberFactCandidate
@@ -86,10 +104,51 @@ class DpeRecommendation(BaseModel):
     source: SourceReference
 
 
+class DpeRatingMethod(StrEnum):
+    DOCUMENT = "document"
+    ADEME = "ademe"
+    CALCULATED = "calculated"
+    MISSING = "missing"
+
+
+class AdemeVerificationStatus(StrEnum):
+    NOT_ATTEMPTED = "not_attempted"
+    VERIFIED = "verified"
+    VERIFIED_WITH_INCONSISTENCIES = "verified_with_inconsistencies"
+    NOT_FOUND = "not_found"
+    UNAVAILABLE = "unavailable"
+
+
+class AdemeDpeData(BaseModel):
+    dpe_rating: str | None = None
+    ges_rating: str | None = None
+    energy_consumption_kwh_m2_year: float | None = None
+    greenhouse_gas_emissions_kg_co2_m2_year: float | None = None
+    surface: float | None = None
+    dpe_date: date | None = None
+    dpe_valid_until: date | None = None
+
+
+class DpeAdemeVerification(BaseModel):
+    status: AdemeVerificationStatus = AdemeVerificationStatus.NOT_ATTEMPTED
+    dpe_number: str | None = None
+    dataset: str = "dpe03existant"
+    data: AdemeDpeData | None = None
+    consistent_fields: list[str] = Field(default_factory=list)
+    inconsistent_fields: list[str] = Field(default_factory=list)
+
+
 class NormalizedDpeFacts(BaseModel):
+    dpe_number: DpeTextFact = Field(
+        default_factory=lambda: DpeTextFact(value=None, source=None)
+    )
     dpe_rating: DpeTextFact
+    dpe_rating_method: DpeRatingMethod = DpeRatingMethod.MISSING
     ges_rating: DpeTextFact
     energy_consumption_kwh_m2_year: DpeNumberFact
+    greenhouse_gas_emissions_kg_co2_m2_year: DpeNumberFact = Field(
+        default_factory=lambda: DpeNumberFact(value=None, source=None)
+    )
     estimated_annual_energy_cost_min: DpeNumberFact
     estimated_annual_energy_cost_max: DpeNumberFact
     surface: DpeNumberFact
@@ -98,6 +157,7 @@ class NormalizedDpeFacts(BaseModel):
     dpe_date: DpeDateFact
     dpe_valid_until: DpeDateFact
     recommendations: list[DpeRecommendation]
+    ademe_verification: DpeAdemeVerification = Field(default_factory=DpeAdemeVerification)
 
 
 class DpeExtractionRecord(Base):
@@ -318,12 +378,18 @@ def normalize_dpe_candidate(
         ):
             recommendations.append(DpeRecommendation(description=description, source=source))
 
+    dpe_rating = _text_fact(
+        candidate.dpe_rating,
+        document_id=document_id,
+        pages=pages,
+        rating=True,
+    )
     return NormalizedDpeFacts(
-        dpe_rating=_text_fact(
-            candidate.dpe_rating,
-            document_id=document_id,
-            pages=pages,
-            rating=True,
+        dpe_rating=dpe_rating,
+        dpe_rating_method=(
+            DpeRatingMethod.DOCUMENT
+            if dpe_rating.value is not None
+            else DpeRatingMethod.MISSING
         ),
         ges_rating=_text_fact(
             candidate.ges_rating,
@@ -333,6 +399,14 @@ def normalize_dpe_candidate(
         ),
         energy_consumption_kwh_m2_year=_number_fact(
             candidate.energy_consumption_kwh_m2_year,
+            document_id=document_id,
+            pages=pages,
+            minimum=0,
+            maximum=10_000,
+            precision=2,
+        ),
+        greenhouse_gas_emissions_kg_co2_m2_year=_number_fact(
+            candidate.greenhouse_gas_emissions_kg_co2_m2_year,
             document_id=document_id,
             pages=pages,
             minimum=0,

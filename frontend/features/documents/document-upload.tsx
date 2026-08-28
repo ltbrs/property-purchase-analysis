@@ -13,6 +13,10 @@ import {
   type PropertyType,
 } from "@/features/documents/document-catalog";
 import {
+  DpeExtractionViewer,
+  type DpeExtractionSelection,
+} from "@/features/documents/dpe-extraction-viewer";
+import {
   PdfViewer,
   type PdfDocumentSelection,
 } from "@/features/documents/pdf-viewer";
@@ -160,6 +164,7 @@ function DocumentFile({
   deletingDocumentId,
   showType,
   onDelete,
+  onViewDpe,
   onViewExtraction,
   onView,
 }: {
@@ -167,6 +172,7 @@ function DocumentFile({
   deletingDocumentId: string | null;
   showType?: boolean;
   onDelete: (document: UploadedDocument) => void;
+  onViewDpe: (document: UploadedDocument) => void;
   onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
@@ -200,6 +206,16 @@ function DocumentFile({
       >
         Visualiser
       </button>
+      {document.document_type === "dpe" && document.status === "completed" ? (
+        <button
+          className="dpe-data-button"
+          type="button"
+          aria-label={`Voir les données DPE de ${document.original_filename}`}
+          onClick={() => onViewDpe(document)}
+        >
+          Données DPE
+        </button>
+      ) : null}
       {canViewExtraction ? (
         <button
           className="raw-extraction-button"
@@ -229,6 +245,7 @@ function ExpectedDocumentRow({
   propertyType,
   deletingDocumentId,
   onDelete,
+  onViewDpe,
   onViewExtraction,
   onView,
 }: {
@@ -237,6 +254,7 @@ function ExpectedDocumentRow({
   propertyType: PropertyType;
   deletingDocumentId: string | null;
   onDelete: (document: UploadedDocument) => void;
+  onViewDpe: (document: UploadedDocument) => void;
   onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
@@ -267,6 +285,7 @@ function ExpectedDocumentRow({
               document={document}
               deletingDocumentId={deletingDocumentId}
               onDelete={onDelete}
+              onViewDpe={onViewDpe}
               onViewExtraction={onViewExtraction}
               onView={onView}
             />
@@ -289,6 +308,7 @@ export function DocumentUpload() {
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [viewingDocument, setViewingDocument] = useState<PdfDocumentSelection | null>(null);
+  const [viewingDpe, setViewingDpe] = useState<DpeExtractionSelection | null>(null);
   const [viewingExtraction, setViewingExtraction] =
     useState<RawExtractionSelection | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -647,6 +667,10 @@ export function DocumentUpload() {
                 propertyType={propertyType}
                 deletingDocumentId={deletingDocumentId}
                 onDelete={(document) => void deleteDocument(document)}
+                onViewDpe={(document) => setViewingDpe({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
                 onViewExtraction={(document) => setViewingExtraction({
                   documentId: document.id,
                   filename: document.original_filename,
@@ -677,6 +701,10 @@ export function DocumentUpload() {
                 deletingDocumentId={deletingDocumentId}
                 showType
                 onDelete={(item) => void deleteDocument(item)}
+                onViewDpe={(document) => setViewingDpe({
+                  documentId: document.id,
+                  filename: document.original_filename,
+                })}
                 onViewExtraction={(document) => setViewingExtraction({
                   documentId: document.id,
                   filename: document.original_filename,
@@ -700,6 +728,12 @@ export function DocumentUpload() {
         <RawExtractionViewer
           document={viewingExtraction}
           onClose={() => setViewingExtraction(null)}
+        />
+      ) : null}
+      {viewingDpe ? (
+        <DpeExtractionViewer
+          document={viewingDpe}
+          onClose={() => setViewingDpe(null)}
         />
       ) : null}
     </div>

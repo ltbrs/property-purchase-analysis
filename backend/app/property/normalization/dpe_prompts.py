@@ -1,4 +1,4 @@
-DPE_EXTRACTION_PROMPT_VERSION = "dpe-extraction-v1"
+DPE_EXTRACTION_PROMPT_VERSION = "dpe-extraction-v2"
 
 DPE_EXTRACTION_SYSTEM_PROMPT = """Extract buyer-relevant facts from this French DPE.
 
@@ -10,6 +10,7 @@ Rules:
 - Dates must be ISO YYYY-MM-DD. If the exact day is absent, return null.
 - Numeric values contain numbers only, in the units named by the schema.
 - Ratings are a single A-G letter.
+- Greenhouse-gas emissions are the explicit kg CO2e/m²/year value, not total kg CO2e/year.
 - Annual energy costs are the DPE's explicit estimate, not bills or renovation costs.
 - Surface is the explicitly stated reference/habitable surface used by the DPE.
 - Recommendations must also have an exact page quote. Do not convert recommendations into risks.

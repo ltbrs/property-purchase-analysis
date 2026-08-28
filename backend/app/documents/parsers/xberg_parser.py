@@ -34,7 +34,11 @@ class XbergPdfParser:
                 ExtractionConfig(
                     use_cache=False,
                     pages=PageConfig(extract_pages=True, insert_page_markers=False),
-                    pdf_options=PdfConfig(extract_tables=True, extract_metadata=True),
+                    pdf_options=PdfConfig(
+                        extract_tables=True,
+                        extract_metadata=True,
+                        ocr_inline_images=False,
+                    ),
                 ),
             )
         except Exception as error:

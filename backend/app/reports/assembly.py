@@ -6,7 +6,12 @@ from app.property.normalization.diagnostics import (
     DiagnosticResult,
     NormalizedDiagnostics,
 )
-from app.property.normalization.dpe import NormalizedDpeFacts, SourceReference
+from app.property.normalization.dpe import (
+    AdemeVerificationStatus,
+    DpeRatingMethod,
+    NormalizedDpeFacts,
+    SourceReference,
+)
 from app.reports.models import (
     BuyerReport,
     ReportFinding,
@@ -74,16 +79,49 @@ def _reassuring_findings(
 ) -> list[ReportFinding]:
     findings: list[ReportFinding] = []
     for facts in dpe_documents:
+        if (
+            facts.ademe_verification.status == AdemeVerificationStatus.VERIFIED
+            and facts.dpe_number.value is not None
+            and facts.dpe_number.source is not None
+        ):
+            findings.append(
+                ReportFinding(
+                    code="REASSURING_DPE_ADEME_VERIFIED",
+                    finding_key=(
+                        "REASSURING_DPE_ADEME_VERIFIED:"
+                        f"{facts.dpe_number.source.document_id}"
+                    ),
+                    severity=RiskSeverity.INFO,
+                    title="Enregistrement ADEME vérifié",
+                    explanation=(
+                        f"Le DPE n° {facts.dpe_number.value} a été retrouvé dans le registre "
+                        "public de l’ADEME et les données comparables sont cohérentes."
+                    ),
+                    status=FindingStatus.CONFIRMED,
+                    sources=_report_sources([facts.dpe_number.source], document_names),
+                )
+            )
         rating = facts.dpe_rating.value
         source = facts.dpe_rating.source
         if rating in {"A", "B", "C", "D"} and source is not None:
+            explanation = f"Le DPE fourni indique une classe énergétique {rating}."
+            if facts.dpe_rating_method == DpeRatingMethod.ADEME:
+                explanation = (
+                    f"Le registre ADEME associé au numéro du document indique une classe "
+                    f"énergétique {rating}."
+                )
+            elif facts.dpe_rating_method == DpeRatingMethod.CALCULATED:
+                explanation = (
+                    f"La classe énergétique {rating} a été recalculée à partir des valeurs "
+                    "énergie et GES extraites du document."
+                )
             findings.append(
                 ReportFinding(
                     code="REASSURING_DPE_RATING",
                     finding_key=f"REASSURING_DPE_RATING:{source.document_id}",
                     severity=RiskSeverity.INFO,
                     title=f"Classe énergétique {rating}",
-                    explanation=f"Le DPE fourni indique une classe énergétique {rating}.",
+                    explanation=explanation,
                     status=FindingStatus.CONFIRMED,
                     sources=_report_sources([source], document_names),
                 )

@@ -27,6 +27,7 @@ def empty_candidate(**changes: object) -> DpeExtractionCandidate:
         "dpe_rating": absent_text(),
         "ges_rating": absent_text(),
         "energy_consumption_kwh_m2_year": absent_number(),
+        "greenhouse_gas_emissions_kg_co2_m2_year": absent_number(),
         "estimated_annual_energy_cost_min": absent_number(),
         "estimated_annual_energy_cost_max": absent_number(),
         "surface": absent_number(),

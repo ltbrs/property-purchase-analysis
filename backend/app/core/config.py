@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     document_view_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
     max_upload_size_bytes: int = 25 * 1024 * 1024
     openai_api_key: SecretStr | None = None
+    ademe_dpe_api_url: str = (
+        "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
+    )
+    ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
 
     @field_validator("database_url", mode="before")
     @classmethod

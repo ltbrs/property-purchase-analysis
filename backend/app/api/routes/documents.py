@@ -296,6 +296,33 @@ def get_document_extraction(
     return DocumentExtractionRead.model_validate(extraction)
 
 
+@router.get(
+    "/{analysis_case_id}/documents/{document_id}/dpe-extraction",
+    response_model=DpeExtractionRead,
+)
+def get_dpe_extraction(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> DpeExtractionRead:
+    repository = DocumentRepository(session)
+    document = repository.get_owned_document(
+        analysis_case_id, document_id, current_user_id
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+    extraction = repository.get_dpe_extraction(document.id)
+    if extraction is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucune donnée DPE structurée n’est disponible pour ce document.",
+        )
+    return DpeExtractionRead.model_validate(extraction)
+
+
 @router.post(
     "/{analysis_case_id}/documents",
     response_model=DocumentRead,

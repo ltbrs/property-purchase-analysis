@@ -134,6 +134,7 @@ def dpe_outputs() -> list[BaseModel]:
                 page_number=1,
                 quote="Consommation 182 kWh/m²/an",
             ),
+            greenhouse_gas_emissions_kg_co2_m2_year=null_number(),
             estimated_annual_energy_cost_min=null_number(),
             estimated_annual_energy_cost_max=null_number(),
             surface=null_number(),

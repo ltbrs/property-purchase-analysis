@@ -1,7 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
-from app.property.normalization.dpe import NormalizedDpeFacts, SourceReference
+from app.property.normalization.dpe import (
+    AdemeVerificationStatus,
+    NormalizedDpeFacts,
+    SourceReference,
+)
 from app.risks.models import (
     FindingStatus,
     RiskCategory,
@@ -31,6 +35,34 @@ def _finding_key(
 
 def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFinding]:
     risks: list[RiskFinding] = []
+    if (
+        facts.ademe_verification.status
+        == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES
+    ):
+        fields = ", ".join(facts.ademe_verification.inconsistent_fields)
+        risks.append(
+            RiskFinding(
+                code="DPE_ADEME_INCONSISTENCY",
+                finding_key=_finding_key(
+                    "DPE_ADEME_INCONSISTENCY", facts, facts.dpe_number.source
+                ),
+                category=RiskCategory.CONSISTENCY,
+                title="Écart avec le registre ADEME",
+                severity=(
+                    RiskSeverity.HIGH
+                    if {"dpe_rating", "dpe_date"}
+                    & set(facts.ademe_verification.inconsistent_fields)
+                    else RiskSeverity.MEDIUM
+                ),
+                description=(
+                    "Le numéro DPE existe dans le registre ADEME, mais certaines données "
+                    f"diffèrent du document extrait : {fields}. Le document et sa version "
+                    "doivent être contrôlés."
+                ),
+                status=FindingStatus.POSSIBLE,
+                sources=_sources(facts.dpe_number.source),
+            )
+        )
     rating = facts.dpe_rating.value
     rating_severity = {
         "E": RiskSeverity.MEDIUM,
@@ -56,6 +88,14 @@ def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFi
         )
 
     consumption = facts.energy_consumption_kwh_m2_year.value
+    consumption_source = facts.energy_consumption_kwh_m2_year.source
+    if (
+        consumption is None
+        and facts.ademe_verification.status == AdemeVerificationStatus.VERIFIED
+        and facts.ademe_verification.data is not None
+    ):
+        consumption = facts.ademe_verification.data.energy_consumption_kwh_m2_year
+        consumption_source = facts.dpe_number.source
     if consumption is not None and consumption >= 250:
         severity = RiskSeverity.MEDIUM
         if consumption >= 330:
@@ -68,14 +108,14 @@ def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFi
                 finding_key=_finding_key(
                     "DPE_HIGH_ENERGY_CONSUMPTION",
                     facts,
-                    facts.energy_consumption_kwh_m2_year.source,
+                    consumption_source,
                 ),
                 category=RiskCategory.ENERGY,
                 title="Consommation énergétique élevée",
                 severity=severity,
                 description=f"La consommation indiquée est de {consumption:g} kWh/m²/an.",
                 status=FindingStatus.CONFIRMED,
-                sources=_sources(facts.energy_consumption_kwh_m2_year.source),
+                sources=_sources(consumption_source),
             )
         )
 
