@@ -309,28 +309,15 @@ svg {
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0 0.5rem;
-  color: #fff;
-  font-size: 1.02rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  width: fit-content;
+  min-height: 2.25rem;
+  padding: 0 0.35rem;
   text-decoration: none;
 }
 
-.brand-mark {
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  place-items: center;
-  border-radius: 0.75rem;
-  color: var(--green-950);
-  background: var(--lime);
-}
-
-.brand-mark svg {
-  width: 1rem;
-  height: 1rem;
+.brand img {
+  width: 8.5rem;
+  height: auto;
 }
 
 .sidebar-nav {

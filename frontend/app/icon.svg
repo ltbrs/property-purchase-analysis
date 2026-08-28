@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Acquora</title>
+  <rect width="64" height="64" rx="17" fill="#D8FF72"/>
+  <path fill="#102B25" fill-rule="evenodd" d="M32 12c-2.3 0-4.2 1.3-5.1 3.4L14.2 47.5h9.2l3-8h11.2l3 8h9.2L37.1 15.4A5.5 5.5 0 0 0 32 12Zm-2.9 20.3L32 24.5l2.9 7.8h-5.8Z"/>
+</svg>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -72,9 +73,19 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
   return (
     <div className="app-frame">
       <aside className={`sidebar${isMenuOpen ? " is-open" : ""}`}>
-        <Link className="brand" href="/" onClick={() => setIsMenuOpen(false)}>
-          <span className="brand-mark"><Icon name="home" /></span>
-          <span>Clairimmo</span>
+        <Link
+          className="brand"
+          href="/"
+          aria-label="Acquora — accueil"
+          onClick={() => setIsMenuOpen(false)}
+        >
+          <Image
+            src="/brand/acquora-wordmark-dark.svg"
+            alt="Acquora"
+            width={520}
+            height={150}
+            priority
+          />
         </Link>
 
         <nav className="sidebar-nav sidebar-global-nav" aria-label="Navigation globale">

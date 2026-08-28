@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">Acquora</title>
+  <desc id="desc">Logo Acquora pour fond sombre, avec le slogan Achetez en sachant.</desc>
+  <rect width="1200" height="320" fill="none"/>
+  <text x="72" y="180" fill="#FCFDFC" font-family="Inter, Arial, sans-serif" font-size="138" font-weight="750" letter-spacing="-6">Acqu<tspan fill="#D8FF72">o</tspan>ra</text>
+  <text x="80" y="250" fill="#B8C5C0" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="600" letter-spacing="5">ACHETEZ EN SACHANT</text>
+</svg>

@@ -6,8 +6,9 @@ import { ApplicationShell } from "@/components/application-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clairimmo — Analyse immobilière",
-  description: "Analyse documentée des risques d'un achat immobilier en France.",
+  applicationName: "Acquora",
+  title: "Acquora — Achetez en sachant",
+  description: "Analyse documentée des risques d’un achat immobilier en France.",
 };
 
 type RootLayoutProps = Readonly<{
