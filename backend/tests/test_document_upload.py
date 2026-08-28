@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_db_session
 from app.documents.models import DocumentRecord
 from app.main import create_app
+from app.property.models import AnalysisCaseRecord
 from app.storage.object_storage import ObjectStorageError, get_object_storage
 
 PDF_CONTENT = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
@@ -120,6 +121,103 @@ def test_property_type_updates_the_expected_coproperty_documents(client: TestCli
         "MISSING_RECENT_AG_MINUTES",
         "MISSING_COPROPERTY_FINANCIALS",
     }
+
+
+def test_create_case_persists_the_property_details(
+    client: TestClient, session: Session
+) -> None:
+    user_id = uuid4()
+
+    response = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={
+            "title": "  24 rue des Lilas, Nantes  ",
+            "property_type": "apartment_coproperty",
+            "price_eur": "425000.50",
+            "surface_m2": "67.40",
+            "lot_count": 3,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "id": response.json()["id"],
+        "title": "24 rue des Lilas, Nantes",
+        "property_type": "apartment_coproperty",
+        "price_eur": "425000.50",
+        "surface_m2": "67.40",
+        "lot_count": 3,
+        "created_at": response.json()["created_at"],
+        "updated_at": response.json()["updated_at"],
+    }
+    persisted = session.get(AnalysisCaseRecord, UUID(response.json()["id"]))
+    assert persisted is not None
+    assert persisted.title == "24 rue des Lilas, Nantes"
+    assert persisted.price_eur is not None
+    assert str(persisted.price_eur) == "425000.50"
+    assert persisted.surface_m2 is not None
+    assert str(persisted.surface_m2) == "67.40"
+    assert persisted.lot_count == 3
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("price_eur", 0),
+        ("surface_m2", -1),
+        ("lot_count", 0),
+        ("lot_count", 1.5),
+    ],
+)
+def test_create_case_rejects_invalid_optional_property_details(
+    client: TestClient, field: str, value: int | float
+) -> None:
+    response = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(uuid4()),
+        json={
+            "title": "Bien test",
+            "property_type": "house",
+            field: value,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_list_cases_only_returns_the_current_users_cases(client: TestClient) -> None:
+    user_id = uuid4()
+    other_user_id = uuid4()
+    first_case_id = create_case(client, user_id)
+    second = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Maison de campagne", "property_type": "house"},
+    )
+    client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(other_user_id),
+        json={"title": "Dossier privé", "property_type": "house"},
+    )
+
+    response = client.get("/api/v1/analysis-cases", headers=auth(user_id))
+
+    assert response.status_code == 200
+    assert {item["id"] for item in response.json()} == {
+        str(first_case_id),
+        second.json()["id"],
+    }
+    assert {item["title"] for item in response.json()} == {
+        "Appartement rue de Rivoli",
+        "Maison de campagne",
+    }
+
+
+def test_list_cases_requires_an_authenticated_identity(client: TestClient) -> None:
+    response = client.get("/api/v1/analysis-cases")
+
+    assert response.status_code == 401
 
 
 def test_upload_requires_an_authenticated_identity(client: TestClient) -> None:

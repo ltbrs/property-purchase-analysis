@@ -1,9 +1,5 @@
-import { BuyerReport } from "@/features/reports/buyer-report";
+import { CaseDashboard } from "@/features/cases/case-dashboard";
 
 export default function HomePage() {
-  return (
-    <div className="overview-page">
-      <BuyerReport variant="overview" />
-    </div>
-  );
+  return <CaseDashboard />;
 }

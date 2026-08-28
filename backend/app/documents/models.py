@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -184,6 +185,13 @@ class DocumentExtractionRead(BaseModel):
 class AnalysisCaseCreate(BaseModel):
     title: str = Field(default="Mon achat immobilier", min_length=1, max_length=200)
     property_type: PropertyType = PropertyType.UNKNOWN
+    price_eur: Decimal | None = Field(
+        default=None, gt=0, max_digits=14, decimal_places=2
+    )
+    surface_m2: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=2
+    )
+    lot_count: int | None = Field(default=None, gt=0)
 
     @field_validator("title")
     @classmethod
@@ -204,5 +212,8 @@ class AnalysisCaseRead(BaseModel):
     id: UUID
     title: str
     property_type: PropertyType
+    price_eur: Decimal | None
+    surface_m2: Decimal | None
+    lot_count: int | None
     created_at: datetime
     updated_at: datetime

@@ -154,9 +154,23 @@ def create_analysis_case(
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
     analysis_case = DocumentRepository(session).create_analysis_case(
-        current_user_id, payload.title.strip(), payload.property_type
+        current_user_id,
+        payload.title.strip(),
+        payload.property_type,
+        price_eur=payload.price_eur,
+        surface_m2=payload.surface_m2,
+        lot_count=payload.lot_count,
     )
     return AnalysisCaseRead.model_validate(analysis_case)
+
+
+@router.get("", response_model=list[AnalysisCaseRead])
+def list_analysis_cases(
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> list[AnalysisCaseRead]:
+    analysis_cases = DocumentRepository(session).list_analysis_cases(current_user_id)
+    return [AnalysisCaseRead.model_validate(item) for item in analysis_cases]
 
 
 @router.get("/{analysis_case_id}", response_model=AnalysisCaseRead)

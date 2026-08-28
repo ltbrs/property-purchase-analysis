@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -50,12 +51,18 @@ class DocumentRepository:
         user_id: UUID,
         title: str,
         property_type: PropertyType = PropertyType.UNKNOWN,
+        price_eur: Decimal | None = None,
+        surface_m2: Decimal | None = None,
+        lot_count: int | None = None,
     ) -> AnalysisCaseRecord:
         self.ensure_user(user_id)
         analysis_case = AnalysisCaseRecord(
             user_id=user_id,
             title=title,
             property_type=property_type.value,
+            price_eur=price_eur,
+            surface_m2=surface_m2,
+            lot_count=lot_count,
         )
         self.session.add(analysis_case)
         self.session.commit()
@@ -87,6 +94,15 @@ class DocumentRepository:
             select(AnalysisCaseRecord).where(
                 AnalysisCaseRecord.id == analysis_case_id,
                 AnalysisCaseRecord.user_id == user_id,
+            )
+        )
+
+    def list_analysis_cases(self, user_id: UUID) -> list[AnalysisCaseRecord]:
+        return list(
+            self.session.scalars(
+                select(AnalysisCaseRecord)
+                .where(AnalysisCaseRecord.user_id == user_id)
+                .order_by(AnalysisCaseRecord.updated_at.desc())
             )
         )
 

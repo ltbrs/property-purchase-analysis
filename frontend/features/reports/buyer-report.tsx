@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/icons";
 import {
   API_URL,
-  getOrCreateWorkspace,
+  getWorkspace,
   readApiError,
   resetWorkspace,
   type Workspace,
@@ -121,12 +121,13 @@ async function requestReport(workspace: Workspace) {
 }
 
 async function loadReport() {
-  let workspace = await getOrCreateWorkspace();
-  let response = await requestReport(workspace);
+  const workspace = getWorkspace();
+  if (!workspace) return null;
+
+  const response = await requestReport(workspace);
   if (response.status === 404) {
     resetWorkspace(workspace.caseId);
-    workspace = await getOrCreateWorkspace();
-    response = await requestReport(workspace);
+    return null;
   }
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as BuyerReportData;
@@ -239,13 +240,16 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [report, setReport] = useState<BuyerReportData | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<ReportFinding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     setIsLoading(true);
     setError(null);
     try {
-      setReport(await loadReport());
+      const loadedReport = await loadReport();
+      setNeedsWorkspace(loadedReport === null);
+      setReport(loadedReport);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Le rapport n’a pas pu être généré.");
     } finally {
@@ -257,7 +261,10 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     let cancelled = false;
     void loadReport()
       .then((loadedReport) => {
-        if (!cancelled) setReport(loadedReport);
+        if (!cancelled) {
+          setNeedsWorkspace(loadedReport === null);
+          setReport(loadedReport);
+        }
       })
       .catch((loadError: unknown) => {
         if (!cancelled) {
@@ -287,6 +294,17 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         <span className="state-icon is-loading"><Icon name="refresh" /></span>
         <strong>Analyse du dossier…</strong>
         <span>Les constats et leurs sources sont en cours de préparation.</span>
+      </div>
+    );
+  }
+
+  if (needsWorkspace) {
+    return (
+      <div className="report-state">
+        <span className="state-icon"><Icon name="folder" /></span>
+        <strong>Créez d’abord votre dossier</strong>
+        <span>Renseignez le bien avant d’ajouter des documents ou de lancer l’analyse.</span>
+        <Link href="/">Créer mon dossier</Link>
       </div>
     );
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
@@ -13,7 +14,7 @@ import {
 } from "@/features/documents/document-catalog";
 import {
   API_URL,
-  getOrCreateWorkspace,
+  getWorkspace,
   readApiError,
   resetWorkspace,
   type Workspace,
@@ -241,6 +242,7 @@ export function DocumentUpload() {
   const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
@@ -253,19 +255,20 @@ export function DocumentUpload() {
 
     async function initialize() {
       try {
-        let currentWorkspace = await getOrCreateWorkspace();
-        let [documentsResponse, caseResponse] = await Promise.all([
+        const currentWorkspace = getWorkspace();
+        if (!currentWorkspace) {
+          setNeedsWorkspace(true);
+          return;
+        }
+        const [documentsResponse, caseResponse] = await Promise.all([
           fetchDocuments(currentWorkspace),
           fetchAnalysisCase(currentWorkspace),
         ]);
 
         if (documentsResponse.status === 404 || caseResponse.status === 404) {
           resetWorkspace(currentWorkspace.caseId);
-          currentWorkspace = await getOrCreateWorkspace();
-          [documentsResponse, caseResponse] = await Promise.all([
-            fetchDocuments(currentWorkspace),
-            fetchAnalysisCase(currentWorkspace),
-          ]);
+          setNeedsWorkspace(true);
+          return;
         }
         if (!documentsResponse.ok) throw new Error(await readApiError(documentsResponse));
         if (!caseResponse.ok) throw new Error(await readApiError(caseResponse));
@@ -297,6 +300,17 @@ export function DocumentUpload() {
       cancelled = true;
     };
   }, []);
+
+  if (needsWorkspace) {
+    return (
+      <div className="report-state">
+        <span className="state-icon"><Icon name="folder" /></span>
+        <strong>Créez d’abord votre dossier</strong>
+        <span>Le type du bien permettra d’adapter la liste des pièces attendues.</span>
+        <Link href="/">Créer mon dossier</Link>
+      </div>
+    );
+  }
 
   async function refreshDocuments() {
     if (!workspace) return;

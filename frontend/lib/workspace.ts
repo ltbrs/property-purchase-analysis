@@ -3,13 +3,24 @@ export const API_URL =
 
 const USER_STORAGE_KEY = "property-analysis-user-id";
 const CASE_STORAGE_KEY = "property-analysis-case-id";
+export const WORKSPACE_CHANGE_EVENT = "property-analysis-workspace-change";
+export const CASE_CREATION_REQUEST_EVENT = "property-analysis-case-creation-request";
 
 export type Workspace = {
   userId: string;
   caseId: string;
 };
 
-let workspaceInitialization: Promise<Workspace> | null = null;
+export type AnalysisCase = {
+  id: string;
+  title: string;
+  property_type: "unknown" | "apartment_coproperty" | "house";
+  price_eur: string | null;
+  surface_m2: string | null;
+  lot_count: number | null;
+  created_at: string;
+  updated_at: string;
+};
 
 export async function readApiError(response: Response) {
   try {
@@ -20,48 +31,40 @@ export async function readApiError(response: Response) {
   }
 }
 
-async function createWorkspace(userId: string): Promise<Workspace> {
-  const response = await fetch(`${API_URL}/analysis-cases`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-Id": userId,
-    },
-    body: JSON.stringify({ title: "Mon achat immobilier" }),
-  });
-  if (!response.ok) {
-    throw new Error(await readApiError(response));
+export function getOrCreateUserId() {
+  let userId = localStorage.getItem(USER_STORAGE_KEY);
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem(USER_STORAGE_KEY, userId);
   }
-
-  const analysisCase = (await response.json()) as { id: string };
-  localStorage.setItem(CASE_STORAGE_KEY, analysisCase.id);
-  return { userId, caseId: analysisCase.id };
+  return userId;
 }
 
-export function getOrCreateWorkspace() {
-  if (workspaceInitialization) return workspaceInitialization;
+export function getWorkspace(): Workspace | null {
+  const caseId = localStorage.getItem(CASE_STORAGE_KEY);
+  if (!caseId) return null;
+  return { userId: getOrCreateUserId(), caseId };
+}
 
-  workspaceInitialization = (async () => {
-    let userId = localStorage.getItem(USER_STORAGE_KEY);
-    if (!userId) {
-      userId = crypto.randomUUID();
-      localStorage.setItem(USER_STORAGE_KEY, userId);
-    }
-
-    const savedCaseId = localStorage.getItem(CASE_STORAGE_KEY);
-    return savedCaseId
-      ? { userId, caseId: savedCaseId }
-      : createWorkspace(userId);
-  })().catch((initializationError: unknown) => {
-    workspaceInitialization = null;
-    throw initializationError;
+export async function fetchAnalysisCases() {
+  const response = await fetch(`${API_URL}/analysis-cases`, {
+    cache: "no-store",
+    headers: { "X-User-Id": getOrCreateUserId() },
   });
-  return workspaceInitialization;
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as AnalysisCase[];
+}
+
+export function saveWorkspace(caseId: string): Workspace {
+  const workspace = { userId: getOrCreateUserId(), caseId };
+  localStorage.setItem(CASE_STORAGE_KEY, caseId);
+  window.dispatchEvent(new Event(WORKSPACE_CHANGE_EVENT));
+  return workspace;
 }
 
 export function resetWorkspace(caseId: string) {
   if (localStorage.getItem(CASE_STORAGE_KEY) === caseId) {
     localStorage.removeItem(CASE_STORAGE_KEY);
+    window.dispatchEvent(new Event(WORKSPACE_CHANGE_EVENT));
   }
-  workspaceInitialization = null;
 }
