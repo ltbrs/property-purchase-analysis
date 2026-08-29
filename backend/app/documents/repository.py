@@ -97,6 +97,24 @@ class DocumentRepository:
             )
         )
 
+    def _lock_owned_analysis_case(
+        self, analysis_case_id: UUID, user_id: UUID
+    ) -> AnalysisCaseRecord | None:
+        """Serialize writes derived from one analysis case.
+
+        Report refreshes can arrive concurrently (for example from React Strict
+        Mode). Locking the parent row prevents two transactions from replacing
+        the same findings or creating the same report at the same time.
+        """
+        return self.session.scalar(
+            select(AnalysisCaseRecord)
+            .where(
+                AnalysisCaseRecord.id == analysis_case_id,
+                AnalysisCaseRecord.user_id == user_id,
+            )
+            .with_for_update()
+        )
+
     def list_analysis_cases(self, user_id: UUID) -> list[AnalysisCaseRecord]:
         return list(
             self.session.scalars(
@@ -388,7 +406,7 @@ class DocumentRepository:
         user_id: UUID,
         findings: list[RiskFinding],
     ) -> list[RiskFindingRecord]:
-        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+        if self._lock_owned_analysis_case(analysis_case_id, user_id) is None:
             raise PermissionError("Analysis case is not owned by the current user")
         existing = list(
             self.session.scalars(
@@ -406,9 +424,14 @@ class DocumentRepository:
             for finding in findings
         ]
         self.session.add_all(records)
-        self.session.commit()
+        # Load server-generated fields while the case lock is still held. Once
+        # committed, another refresh may replace these rows immediately, so the
+        # returned instances must no longer depend on a database refresh.
+        self.session.flush()
         for record in records:
             self.session.refresh(record)
+            self.session.expunge(record)
+        self.session.commit()
         return records
 
     def list_case_findings(self, analysis_case_id: UUID, user_id: UUID) -> list[RiskFindingRecord]:
@@ -435,7 +458,7 @@ class DocumentRepository:
     def save_case_report(
         self, *, analysis_case_id: UUID, user_id: UUID, report: BuyerReport
     ) -> ReportRecord:
-        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+        if self._lock_owned_analysis_case(analysis_case_id, user_id) is None:
             raise PermissionError("Analysis case is not owned by the current user")
         record = self.session.scalar(
             select(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case_id)

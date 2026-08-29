@@ -2,9 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Start Docker",
+      "type": "shell",
+      "command": "if ! docker info >/dev/null 2>&1; then open -a Docker; until docker info >/dev/null 2>&1; do sleep 1; done; fi",
+      "problemMatcher": []
+    },
+    {
       "label": "Start Services",
       "type": "shell",
       "command": "docker compose up -d",
+      "dependsOn": "Start Docker",
       "options": {
         "cwd": "${workspaceFolder}"
       },

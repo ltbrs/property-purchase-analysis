@@ -124,10 +124,7 @@ async function requestReport(workspace: Workspace) {
   });
 }
 
-async function loadReport() {
-  const workspace = getWorkspace();
-  if (!workspace) return null;
-
+async function fetchReport(workspace: Workspace): Promise<BuyerReportData | null> {
   const response = await requestReport(workspace);
   if (response.status === 404) {
     resetWorkspace(workspace.caseId);
@@ -135,6 +132,25 @@ async function loadReport() {
   }
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as BuyerReportData;
+}
+
+const pendingReportLoads = new Map<string, Promise<BuyerReportData | null>>();
+
+function loadReport(): Promise<BuyerReportData | null> {
+  const workspace = getWorkspace();
+  if (!workspace) return Promise.resolve(null);
+
+  const requestKey = `${workspace.userId}:${workspace.caseId}`;
+  const pendingLoad = pendingReportLoads.get(requestKey);
+  if (pendingLoad) return pendingLoad;
+
+  const load = fetchReport(workspace).finally(() => {
+    if (pendingReportLoads.get(requestKey) === load) {
+      pendingReportLoads.delete(requestKey);
+    }
+  });
+  pendingReportLoads.set(requestKey, load);
+  return load;
 }
 
 function FindingRow({
