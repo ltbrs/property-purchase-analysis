@@ -191,6 +191,13 @@ def build_buyer_report(
         document_names=document_names,
     )
     grouped[ReportSectionCode.REASSURING] = reassuring
+    risk_findings = [
+        finding
+        for finding in findings
+        if finding.category != RiskCategory.MISSING_INFORMATION
+        and finding.status != FindingStatus.MISSING_INFORMATION
+    ]
+    missing_information_count = len(findings) - len(risk_findings)
     high_severities = {RiskSeverity.HIGH, RiskSeverity.CRITICAL}
     return BuyerReport(
         analysis_case_id=analysis_case_id,
@@ -198,11 +205,17 @@ def build_buyer_report(
         generated_at=generated_at or report_generated_at(),
         summary=ReportSummary(
             finding_count=len(findings),
-            high_or_critical_count=sum(finding.severity in high_severities for finding in findings),
-            missing_information_count=sum(
-                finding.status == FindingStatus.MISSING_INFORMATION for finding in findings
+            analyzed_count=len(risk_findings) + len(reassuring),
+            risk_count=len(risk_findings),
+            high_or_critical_count=sum(
+                finding.severity in high_severities for finding in risk_findings
             ),
+            missing_information_count=missing_information_count,
             reassuring_count=len(reassuring),
+            risk_severity_counts={
+                severity: sum(finding.severity == severity for finding in risk_findings)
+                for severity in RiskSeverity
+            },
         ),
         sections=[
             ReportSection(code=code, title=SECTION_TITLES[code], findings=grouped[code])

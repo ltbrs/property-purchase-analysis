@@ -76,9 +76,72 @@ def test_report_orders_sections_enriches_sources_and_keeps_uncertainty() -> None
         DocumentExpectation.CONTEXT_DEPENDENT
     )
     assert report.sections[6].findings[0].title == "Classe énergétique B"
+    assert report.summary.finding_count == 2
+    assert report.summary.analyzed_count == 2
+    assert report.summary.risk_count == 1
     assert report.summary.high_or_critical_count == 1
     assert report.summary.missing_information_count == 1
     assert report.summary.reassuring_count == 1
+    assert report.summary.risk_severity_counts == {
+        RiskSeverity.INFO: 0,
+        RiskSeverity.LOW: 0,
+        RiskSeverity.MEDIUM: 0,
+        RiskSeverity.HIGH: 1,
+        RiskSeverity.CRITICAL: 0,
+    }
+
+
+def test_missing_information_is_not_counted_as_analyzed_or_as_a_strong_alert() -> None:
+    missing_findings = [
+        RiskFinding(
+            code="MISSING_DPE_DOCUMENT",
+            finding_key="MISSING_DPE_DOCUMENT",
+            category=RiskCategory.MISSING_INFORMATION,
+            title="DPE non fourni",
+            severity=RiskSeverity.HIGH,
+            description="Aucun DPE n'a été identifié.",
+            status=FindingStatus.MISSING_INFORMATION,
+            expectation_level=DocumentExpectation.DEFINITELY_EXPECTED,
+            missing_reason=MissingDocumentReason.ABSENT,
+        ),
+        RiskFinding(
+            code="MISSING_RECENT_AG_MINUTES",
+            finding_key="MISSING_RECENT_AG_MINUTES",
+            category=RiskCategory.MISSING_INFORMATION,
+            title="PV d'AG non fournis",
+            severity=RiskSeverity.MEDIUM,
+            description="Aucun PV d'AG n'a été identifié.",
+            status=FindingStatus.MISSING_INFORMATION,
+            expectation_level=DocumentExpectation.USUALLY_USEFUL,
+            missing_reason=MissingDocumentReason.ABSENT,
+        ),
+        RiskFinding(
+            code="MISSING_COPROPERTY_FINANCIALS",
+            finding_key="MISSING_COPROPERTY_FINANCIALS",
+            category=RiskCategory.MISSING_INFORMATION,
+            title="Informations financières absentes",
+            severity=RiskSeverity.MEDIUM,
+            description="Aucune information financière n'a été identifiée.",
+            status=FindingStatus.MISSING_INFORMATION,
+            expectation_level=DocumentExpectation.USUALLY_USEFUL,
+            missing_reason=MissingDocumentReason.ABSENT,
+        ),
+    ]
+
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement vide",
+        findings=missing_findings,
+        document_names={},
+        dpe_documents=[],
+        diagnostics=[],
+    )
+
+    assert report.summary.analyzed_count == 0
+    assert report.summary.risk_count == 0
+    assert report.summary.high_or_critical_count == 0
+    assert report.summary.missing_information_count == 3
+    assert all(count == 0 for count in report.summary.risk_severity_counts.values())
 
 
 def test_report_exposes_verified_ademe_registration() -> None:

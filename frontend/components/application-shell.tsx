@@ -194,7 +194,12 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
             </Link>
           )}
         </header>
-        <main className="workspace-main">{children}</main>
+        <main
+          key={activeCaseId ?? "no-active-case"}
+          className="workspace-main"
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

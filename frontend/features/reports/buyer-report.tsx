@@ -53,9 +53,12 @@ type BuyerReportData = {
   generated_at: string;
   summary: {
     finding_count: number;
+    analyzed_count: number;
+    risk_count: number;
     high_or_critical_count: number;
     missing_information_count: number;
     reassuring_count: number;
+    risk_severity_counts: Record<Severity, number>;
   };
   sections: ReportSection[];
   disclaimer: string;
@@ -191,6 +194,77 @@ function Metric({ value, label }: { value: number; label: string }) {
     <div className="report-metric">
       <strong>{value}</strong>
       <span>{label}</span>
+    </div>
+  );
+}
+
+const distributionLabels: Record<Severity, string> = {
+  info: "Informations",
+  low: "Risques faibles",
+  medium: "Risques à vérifier",
+  high: "Risques importants",
+  critical: "Risques critiques",
+};
+
+function SummaryDistribution({ summary }: { summary: BuyerReportData["summary"] }) {
+  const segments = [
+    {
+      key: "reassuring",
+      count: summary.reassuring_count,
+      label: "Points rassurants",
+      className: "is-reassuring",
+    },
+    ...(["info", "low", "medium", "high", "critical"] as const).map(
+      (severity) => ({
+        key: severity,
+        count: summary.risk_severity_counts[severity],
+        label: distributionLabels[severity],
+        className: `severity-${severity}`,
+      }),
+    ),
+    {
+      key: "missing",
+      count: summary.missing_information_count,
+      label: "Informations à compléter",
+      className: "is-missing",
+    },
+  ].filter((segment) => segment.count > 0);
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+
+  if (total === 0) {
+    return <p className="dossier-distribution-empty">Ajoutez des documents pour commencer l’analyse.</p>;
+  }
+
+  return (
+    <div className="dossier-distribution">
+      <div
+        className="dossier-distribution-bar"
+        role="img"
+        aria-label={
+          `Répartition de ${total} points : ${summary.risk_count} alertes, `
+          + `${summary.missing_information_count} informations à compléter et `
+          + `${summary.reassuring_count} points rassurants.`
+        }
+      >
+        {segments.map((segment) => {
+          const percentage = (segment.count / total) * 100;
+          return (
+            <span
+              key={segment.key}
+              className={`dossier-distribution-segment ${segment.className}`}
+              style={{ width: `${percentage}%` }}
+              title={`${segment.label} : ${segment.count} (${Math.round(percentage)} %)`}
+            />
+          );
+        })}
+      </div>
+      <div className="dossier-distribution-legend" aria-hidden="true">
+        {segments.map((segment) => (
+          <span key={segment.key} className={segment.className}>
+            <i /> {segment.label} · {segment.count}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -359,18 +433,20 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   if (report === null) return null;
 
   const visibleSections = report.sections
-    .filter((section) => section.code !== "reassuring")
+    .filter(
+      (section) => section.code !== "reassuring" && section.code !== "missing_information",
+    )
     .map((section) => ({
       ...section,
       findings: section.findings.filter(
-        (finding) => finding.expectation_level === null,
+        (finding) => finding.status !== "missing_information",
       ),
     }));
   const populatedSections = visibleSections.filter((section) => section.findings.length > 0);
   const riskFindings = report.sections
     .filter((section) => section.code !== "reassuring")
     .flatMap((section) => section.findings)
-    .filter((finding) => finding.expectation_level === null)
+    .filter((finding) => finding.status !== "missing_information")
     .toSorted((left, right) => severityRank[right.severity] - severityRank[left.severity]);
   const priorityFindings = riskFindings.slice(0, 4);
 
@@ -414,13 +490,14 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
             <section className="dossier-card">
               <div className="dossier-card-heading">
-                <div><p className="section-kicker">Synthèse</p><strong>{report.summary.finding_count}</strong><span>points analysés</span></div>
+                <div><p className="section-kicker">Synthèse</p><strong>{report.summary.analyzed_count}</strong><span>points analysés</span></div>
                 <Icon name="document" />
               </div>
+              <SummaryDistribution summary={report.summary} />
               <div className="dossier-metrics">
-                <Metric value={report.summary.high_or_critical_count} label="alertes fortes" />
-                <Metric value={report.summary.missing_information_count} label="infos à compléter" />
-                <Metric value={report.summary.reassuring_count} label="points rassurants" />
+                <Metric value={report.summary.risk_count} label="alertes" />
+                <Metric value={report.summary.missing_information_count} label="à compléter" />
+                <Metric value={report.summary.reassuring_count} label="rassurants" />
               </div>
               <Link className="dossier-card-link" href="/upload">Voir les documents <Icon name="arrow" /></Link>
             </section>

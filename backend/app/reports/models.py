@@ -55,9 +55,12 @@ class ReportSection(BaseModel):
 
 class ReportSummary(BaseModel):
     finding_count: int = Field(ge=0)
+    analyzed_count: int = Field(ge=0)
+    risk_count: int = Field(ge=0)
     high_or_critical_count: int = Field(ge=0)
     missing_information_count: int = Field(ge=0)
     reassuring_count: int = Field(ge=0)
+    risk_severity_counts: dict[RiskSeverity, int]
 
 
 class BuyerReport(BaseModel):
