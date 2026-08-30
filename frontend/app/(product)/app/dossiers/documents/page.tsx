@@ -1,6 +1,6 @@
-import { DocumentUpload } from "../../features/documents/document-upload";
+import { DocumentUpload } from "@/features/documents/document-upload";
 
-export default function UploadPage() {
+export default function DocumentsPage() {
   return (
     <section className="upload-page">
       <div className="upload-heading">

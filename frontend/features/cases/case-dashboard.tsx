@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
 import { CaseCreation } from "@/features/cases/case-creation";
 import { propertyTypeLabels } from "@/features/documents/document-catalog";
+import { productRoutes } from "@/lib/routes";
 import {
   type AnalysisCase,
   CASE_CREATION_REQUEST_EVENT,
@@ -84,7 +85,7 @@ export function CaseDashboard() {
   function selectCase(analysisCase: AnalysisCase) {
     saveWorkspace(analysisCase.id);
     setActiveCaseId(analysisCase.id);
-    router.push("/overview");
+    router.push(productRoutes.caseOverview);
   }
 
   function beginCreation() {

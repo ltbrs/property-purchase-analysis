@@ -8,6 +8,7 @@ import {
   PdfViewer,
   type PdfDocumentSelection,
 } from "@/features/documents/pdf-viewer";
+import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
   getWorkspace,
@@ -414,7 +415,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         <span className="state-icon"><Icon name="folder" /></span>
         <strong>Créez d’abord votre dossier</strong>
         <span>Renseignez le bien avant d’ajouter des documents ou de lancer l’analyse.</span>
-        <Link href="/">Créer mon dossier</Link>
+        <Link href={productRoutes.cases}>Créer mon dossier</Link>
       </div>
     );
   }
@@ -475,7 +476,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
             <section className="panel priority-panel">
               <div className="panel-heading">
                 <div><p className="section-kicker">À traiter en premier</p><h2>Alertes prioritaires</h2></div>
-                <Link className="text-link" href="/analysis">Tout voir <Icon name="arrow" /></Link>
+                <Link className="text-link" href={productRoutes.analysis}>Tout voir <Icon name="arrow" /></Link>
               </div>
               {priorityFindings.length > 0 ? (
                 <div className="finding-rows">
@@ -499,7 +500,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
                 <Metric value={report.summary.missing_information_count} label="à compléter" />
                 <Metric value={report.summary.reassuring_count} label="rassurants" />
               </div>
-              <Link className="dossier-card-link" href="/upload">Voir les documents <Icon name="arrow" /></Link>
+              <Link className="dossier-card-link" href={productRoutes.documents}>Voir les documents <Icon name="arrow" /></Link>
             </section>
           </div>
         </>
@@ -527,7 +528,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <span className="state-icon"><Icon name="document" /></span>
           <strong>Aucune alerte détectée</strong>
           <span>Consultez la page Documents pour vérifier les pièces encore attendues.</span>
-          <Link href="/upload">Voir les documents</Link>
+          <Link href={productRoutes.documents}>Voir les documents</Link>
         </div>
       )}
 

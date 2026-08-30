@@ -1,0 +1,49 @@
+:root {
+  --canvas: #f4f6f2;
+  --ink: #14251f;
+  --muted: #66776f;
+  --surface: #ffffff;
+  --line: #dfe5df;
+  --line-strong: #cfd8d1;
+  --green-950: #102a25;
+  --green-800: #173f35;
+  --green-700: #315e52;
+  --lime: #d8ff72;
+  --red: #bd4b3b;
+  --red-soft: #fff0ed;
+  --amber: #9b690f;
+  --amber-soft: #fff7df;
+  --success: #28713d;
+  --success-soft: #e9f7e9;
+  --shadow: 0 1rem 3rem rgba(24, 43, 35, 0.06);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --content-width: 86rem;
+}
+
+.ds-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.68rem 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.ds-button:hover {
+  transform: translateY(-1px);
+}
+
+.ds-button--primary {
+  color: #ffffff;
+  background: var(--green-800);
+}
+
+.ds-button--primary:hover {
+  background: var(--green-950);
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { BrandLink } from "@/components/design-system/brand-link";
 import { Icon, type IconName } from "@/components/icons";
+import { marketingRoutes, productRoutes } from "@/lib/routes";
 import {
   type AnalysisCase,
   CASE_CREATION_REQUEST_EVENT,
@@ -27,12 +28,12 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
 
   const caseNavItems: { href: string; label: string; icon: IconName }[] = [
-    { href: "/overview", label: "Vue d’ensemble", icon: "gauge" },
-    { href: "/upload", label: "Documents", icon: "folder" },
-    { href: "/analysis", label: "Alertes", icon: "shield" },
+    { href: productRoutes.caseOverview, label: "Vue d’ensemble", icon: "gauge" },
+    { href: productRoutes.documents, label: "Documents", icon: "folder" },
+    { href: productRoutes.analysis, label: "Alertes", icon: "shield" },
   ];
   const activeCase = analysisCases.find(({ id }) => id === activeCaseId) ?? null;
-  const isGlobalView = pathname === "/";
+  const isGlobalView = pathname === productRoutes.home || pathname === productRoutes.cases;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +64,7 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
     saveWorkspace(analysisCase.id);
     setActiveCaseId(analysisCase.id);
     setIsMenuOpen(false);
-    router.push("/overview");
+    router.push(productRoutes.caseOverview);
   }
 
   function requestCaseCreation() {
@@ -73,24 +74,17 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
   return (
     <div className="app-frame">
       <aside className={`sidebar${isMenuOpen ? " is-open" : ""}`}>
-        <Link
+        <BrandLink
           className="brand"
-          href="/"
-          aria-label="Acquora — accueil"
+          href={productRoutes.home}
+          appearance="on-dark"
+          priority
           onClick={() => setIsMenuOpen(false)}
-        >
-          <Image
-            src="/brand/acquora-wordmark-dark.svg"
-            alt="Acquora"
-            width={520}
-            height={150}
-            priority
-          />
-        </Link>
+        />
 
         <nav className="sidebar-nav sidebar-global-nav" aria-label="Navigation globale">
           <Link
-            href="/"
+            href={productRoutes.cases}
             className={isGlobalView ? "is-active" : undefined}
             aria-current={isGlobalView ? "page" : undefined}
             onClick={() => setIsMenuOpen(false)}
@@ -98,12 +92,21 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
             <Icon name="folder" />
             <span>Tous les dossiers</span>
           </Link>
+          <Link
+            href={productRoutes.account}
+            className={pathname === productRoutes.account ? "is-active" : undefined}
+            aria-current={pathname === productRoutes.account ? "page" : undefined}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <Icon name="home" />
+            <span>Mon compte</span>
+          </Link>
         </nav>
 
         <section className="sidebar-cases" aria-labelledby="sidebar-cases-title">
           <div className="sidebar-section-heading">
             <span id="sidebar-cases-title">Dossiers</span>
-            <Link href="/#nouveau-dossier" aria-label="Créer un nouveau dossier" onClick={() => setIsMenuOpen(false)}>+</Link>
+            <Link href={`${productRoutes.cases}#nouveau-dossier`} aria-label="Créer un nouveau dossier" onClick={() => setIsMenuOpen(false)}>+</Link>
           </div>
           {analysisCases.length > 0 ? (
             <div className="sidebar-case-list">
@@ -151,6 +154,14 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
           <Icon name="info" />
           <p>Chaque constat reste relié à sa page source.</p>
         </div>
+        <Link
+          className="sidebar-exit"
+          href={marketingRoutes.home}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          <Icon name="arrow" />
+          <span>Retour sur Acquora.fr</span>
+        </Link>
       </aside>
 
       {isMenuOpen ? (
@@ -183,12 +194,12 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
               <span>Créer</span>
             </button>
           ) : activeCase ? (
-            <Link className="primary-action" href="/upload">
+            <Link className="primary-action" href={productRoutes.documents}>
               <Icon name="upload" />
               <span>Ajouter</span>
             </Link>
           ) : (
-            <Link className="primary-action" href="/">
+            <Link className="primary-action" href={productRoutes.cases}>
               <Icon name="folder" />
               <span>Dossiers</span>
             </Link>

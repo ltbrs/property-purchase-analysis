@@ -24,6 +24,7 @@ import {
   RawExtractionViewer,
   type RawExtractionSelection,
 } from "@/features/documents/raw-extraction-viewer";
+import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
   getWorkspace,
@@ -371,7 +372,7 @@ export function DocumentUpload() {
         <span className="state-icon"><Icon name="folder" /></span>
         <strong>Créez d’abord votre dossier</strong>
         <span>Le type du bien permettra d’adapter la liste des pièces attendues.</span>
-        <Link href="/">Créer mon dossier</Link>
+        <Link href={productRoutes.cases}>Créer mon dossier</Link>
       </div>
     );
   }

@@ -1,22 +1,4 @@
-:root {
-  --canvas: #f4f6f2;
-  --ink: #14251f;
-  --muted: #66776f;
-  --surface: #ffffff;
-  --line: #dfe5df;
-  --line-strong: #cfd8d1;
-  --green-950: #102a25;
-  --green-800: #173f35;
-  --green-700: #315e52;
-  --lime: #d8ff72;
-  --red: #bd4b3b;
-  --red-soft: #fff0ed;
-  --amber: #9b690f;
-  --amber-soft: #fff7df;
-  --success: #28713d;
-  --success-soft: #e9f7e9;
-  --shadow: 0 1rem 3rem rgba(24, 43, 35, 0.06);
-}
+@import "../styles/design-system.css";
 
 * {
   box-sizing: border-box;
@@ -31,7 +13,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--canvas);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -490,6 +472,30 @@ svg {
   margin: 0;
   font-size: 0.75rem;
   line-height: 1.5;
+}
+
+.sidebar-exit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.75rem;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sidebar-exit:hover {
+  color: var(--green-950);
+  background: var(--lime);
+}
+
+.sidebar-exit svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  transform: rotate(180deg);
 }
 
 .workspace-shell {

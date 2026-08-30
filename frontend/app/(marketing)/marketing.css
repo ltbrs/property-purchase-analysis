@@ -1,0 +1,123 @@
+.marketing-shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+.marketing-header,
+.marketing-footer {
+  width: min(100% - 3rem, var(--content-width));
+  margin: 0 auto;
+}
+
+.marketing-header {
+  display: flex;
+  min-height: 5.5rem;
+  align-items: center;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.marketing-brand {
+  display: flex;
+  width: 8.5rem;
+  flex: 0 0 auto;
+}
+
+.marketing-brand img {
+  width: 100%;
+  height: auto;
+}
+
+.marketing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  margin-left: auto;
+}
+
+.marketing-nav a,
+.marketing-footer a {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.marketing-nav a:hover,
+.marketing-footer a:hover {
+  color: var(--ink);
+}
+
+.marketing-main {
+  display: grid;
+  width: min(100% - 3rem, var(--content-width));
+  min-height: 28rem;
+  flex: 1;
+  margin: 0 auto;
+  place-items: center;
+  padding: 4rem 0;
+}
+
+.marketing-placeholder {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.4rem, 4vw, 2.5rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  text-align: center;
+}
+
+.marketing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.marketing-footer nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+@media (max-width: 68rem) {
+  .marketing-header {
+    flex-wrap: wrap;
+    padding: 1rem 0;
+  }
+
+  .marketing-nav {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 0.25rem 0;
+  }
+
+  .marketing-header > .ds-button {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 38rem) {
+  .marketing-header,
+  .marketing-footer,
+  .marketing-main {
+    width: min(100% - 2rem, var(--content-width));
+  }
+
+  .marketing-header > .ds-button {
+    padding-inline: 0.75rem;
+  }
+
+  .marketing-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

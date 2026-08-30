@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/icons";
 import type { PropertyType } from "@/features/documents/document-catalog";
+import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
   type AnalysisCase,
@@ -76,7 +77,7 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
       const analysisCase = (await response.json()) as AnalysisCase;
       saveWorkspace(analysisCase.id);
       onCreated?.(analysisCase);
-      router.push("/overview");
+      router.push(productRoutes.caseOverview);
     } catch (creationError) {
       setError(
         creationError instanceof Error

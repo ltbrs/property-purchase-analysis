@@ -220,24 +220,6 @@ Before adding a dependency, ask:
 
 Prefer explicit application code over generic abstractions that may be useful later.
 
-## Recommended agent skills
-
-Useful project-level skills:
-
-```bash
-npx skills add vercel-labs/agent-skills --skill react-best-practices
-npx skills add vercel-labs/agent-skills --skill composition-patterns
-npx skills add vercel-labs/agent-skills --skill web-design-guidelines
-```
-
-For current Next.js-specific skills:
-
-```bash
-npx skills add vercel/next.js
-```
-
-Do not install every available skill by default.
-
 ## Scope
 
 The MVP should answer one question very well:
