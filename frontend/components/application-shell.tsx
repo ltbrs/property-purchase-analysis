@@ -30,7 +30,7 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
   const caseNavItems: { href: string; label: string; icon: IconName }[] = [
     { href: productRoutes.caseOverview, label: "Vue d’ensemble", icon: "gauge" },
     { href: productRoutes.documents, label: "Documents", icon: "folder" },
-    { href: productRoutes.analysis, label: "Alertes", icon: "shield" },
+    { href: productRoutes.analysis, label: "Analyse", icon: "shield" },
   ];
   const activeCase = analysisCases.find(({ id }) => id === activeCaseId) ?? null;
   const isGlobalView = pathname === productRoutes.home || pathname === productRoutes.cases;

@@ -55,7 +55,7 @@ from app.property.normalization.structured_service import (
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
 from app.risks.engine import evaluate_case_risks
-from app.risks.models import RiskFindingRead
+from app.risks.models import FindingReviewStatus, FindingStatus, RiskFindingRead
 from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
@@ -65,6 +65,10 @@ router = APIRouter(prefix="/analysis-cases", tags=["documents"])
 class CaseFindingsRefreshRead(BaseModel):
     findings: list[RiskFindingRead]
     timeline: list[TimelineEvent]
+
+
+class FindingReviewUpdate(BaseModel):
+    review_status: FindingReviewStatus
 
 
 def _load_normalized_case_data(
@@ -678,6 +682,42 @@ def list_case_findings(
         RiskFindingRead.model_validate(record)
         for record in repository.list_case_findings(analysis_case_id, current_user_id)
     ]
+
+
+@router.patch(
+    "/{analysis_case_id}/findings/{finding_key}/review",
+    response_model=RiskFindingRead,
+)
+def update_finding_review_status(
+    analysis_case_id: UUID,
+    finding_key: str,
+    payload: FindingReviewUpdate,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> RiskFindingRead:
+    repository = DocumentRepository(session)
+    finding = repository.get_case_finding(
+        analysis_case_id, current_user_id, finding_key
+    )
+    if finding is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Finding not found")
+    if (
+        finding.status == FindingStatus.MISSING_INFORMATION.value
+        and payload.review_status == FindingReviewStatus.NOT_PROBLEMATIC
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une information manquante ne peut pas être classée comme non problématique.",
+        )
+    updated = repository.update_finding_review_status(
+        analysis_case_id=analysis_case_id,
+        user_id=current_user_id,
+        finding_key=finding_key,
+        review_status=payload.review_status,
+    )
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Finding not found")
+    return RiskFindingRead.model_validate(updated)
 
 
 @router.post("/{analysis_case_id}/report/refresh", response_model=BuyerReport)

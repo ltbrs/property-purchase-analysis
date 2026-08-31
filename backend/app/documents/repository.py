@@ -29,7 +29,7 @@ from app.property.normalization.structured import (
     StructuredExtractionType,
 )
 from app.reports.models import BuyerReport, ReportRecord
-from app.risks.models.findings import RiskFinding, RiskFindingRecord
+from app.risks.models.findings import FindingReviewStatus, RiskFinding, RiskFindingRecord
 
 
 class DocumentRepository:
@@ -415,12 +415,19 @@ class DocumentRepository:
                 )
             )
         )
+        review_statuses = {
+            record.finding_key: FindingReviewStatus(record.review_status) for record in existing
+        }
         for record in existing:
             self.session.delete(record)
         # Flush removals before inserting identical deterministic keys on refresh.
         self.session.flush()
         records = [
-            RiskFindingRecord.from_finding(analysis_case_id=analysis_case_id, finding=finding)
+            RiskFindingRecord.from_finding(
+                analysis_case_id=analysis_case_id,
+                finding=finding,
+                review_status=review_statuses.get(finding.finding_key),
+            )
             for finding in findings
         ]
         self.session.add_all(records)
@@ -454,6 +461,41 @@ class DocumentRepository:
                 )
             )
         )
+
+    def get_case_finding(
+        self, analysis_case_id: UUID, user_id: UUID, finding_key: str
+    ) -> RiskFindingRecord | None:
+        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+            return None
+        return self.session.scalar(
+            select(RiskFindingRecord).where(
+                RiskFindingRecord.analysis_case_id == analysis_case_id,
+                RiskFindingRecord.finding_key == finding_key,
+            )
+        )
+
+    def update_finding_review_status(
+        self,
+        *,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        finding_key: str,
+        review_status: FindingReviewStatus,
+    ) -> RiskFindingRecord | None:
+        if self._lock_owned_analysis_case(analysis_case_id, user_id) is None:
+            return None
+        record = self.session.scalar(
+            select(RiskFindingRecord).where(
+                RiskFindingRecord.analysis_case_id == analysis_case_id,
+                RiskFindingRecord.finding_key == finding_key,
+            )
+        )
+        if record is None:
+            return None
+        record.review_status = review_status.value
+        self.session.commit()
+        self.session.refresh(record)
+        return record
 
     def save_case_report(
         self, *, analysis_case_id: UUID, user_id: UUID, report: BuyerReport

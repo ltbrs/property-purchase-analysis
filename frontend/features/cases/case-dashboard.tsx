@@ -101,7 +101,7 @@ export function CaseDashboard() {
         <div>
           <p className="eyebrow">Vue globale</p>
           <h1>Vos dossiers immobiliers</h1>
-          <p>Sélectionnez un bien pour retrouver sa synthèse, ses documents et ses alertes.</p>
+          <p>Sélectionnez un bien pour retrouver sa synthèse, ses documents et son analyse.</p>
         </div>
         <button type="button" onClick={beginCreation}>
           <Icon name="folder" /> Nouveau dossier

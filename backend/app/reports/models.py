@@ -10,10 +10,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.risks.models import (
     DocumentExpectation,
+    FindingReviewStatus,
     FindingStatus,
     MissingDocumentReason,
     RiskSeverity,
 )
+
+
+class AnalysisFindingType(StrEnum):
+    RISK = "risk"
+    VERIFICATION = "verification"
+    REASSURING = "reassuring"
+    MISSING_INFORMATION = "missing_information"
 
 
 class ReportSectionCode(StrEnum):
@@ -40,6 +48,8 @@ class ReportFinding(BaseModel):
     title: str
     explanation: str
     status: FindingStatus
+    analysis_type: AnalysisFindingType = AnalysisFindingType.RISK
+    review_status: FindingReviewStatus = FindingReviewStatus.OPEN
     confidence: float | None = None
     amount_eur: Decimal | None = None
     expectation_level: DocumentExpectation | None = None
@@ -57,6 +67,7 @@ class ReportSummary(BaseModel):
     finding_count: int = Field(ge=0)
     analyzed_count: int = Field(ge=0)
     risk_count: int = Field(ge=0)
+    verification_count: int = Field(default=0, ge=0)
     high_or_critical_count: int = Field(ge=0)
     missing_information_count: int = Field(ge=0)
     reassuring_count: int = Field(ge=0)

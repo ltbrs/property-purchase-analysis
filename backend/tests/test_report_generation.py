@@ -10,6 +10,7 @@ from app.property.normalization.dpe import (
 from app.reports import build_buyer_report
 from app.risks.models import (
     DocumentExpectation,
+    FindingReviewStatus,
     FindingStatus,
     MissingDocumentReason,
     RiskCategory,
@@ -142,6 +143,62 @@ def test_missing_information_is_not_counted_as_analyzed_or_as_a_strong_alert() -
     assert report.summary.high_or_critical_count == 0
     assert report.summary.missing_information_count == 3
     assert all(count == 0 for count in report.summary.risk_severity_counts.values())
+
+
+def test_user_can_reclassify_a_risk_as_a_reassuring_finding() -> None:
+    reviewed_finding = RiskFinding(
+        code="REVIEWED_TEST",
+        finding_key="REVIEWED_TEST",
+        category=RiskCategory.COPROPERTY,
+        title="Travaux déjà budgétés",
+        severity=RiskSeverity.HIGH,
+        description="Le financement a été confirmé par l’utilisateur.",
+        status=FindingStatus.CONFIRMED,
+        review_status=FindingReviewStatus.NOT_PROBLEMATIC,
+    )
+
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=[reviewed_finding],
+        document_names={},
+        dpe_documents=[],
+        diagnostics=[],
+    )
+
+    reassuring = report.sections[-1].findings
+    assert reassuring[0].finding_key == "REVIEWED_TEST"
+    assert reassuring[0].analysis_type.value == "reassuring"
+    assert reassuring[0].review_status == FindingReviewStatus.NOT_PROBLEMATIC
+    assert report.summary.risk_count == 0
+    assert report.summary.high_or_critical_count == 0
+    assert report.summary.reassuring_count == 1
+
+
+def test_uncertain_or_medium_findings_are_points_to_verify() -> None:
+    finding = RiskFinding(
+        code="VERIFY_TEST",
+        finding_key="VERIFY_TEST",
+        category=RiskCategory.DIAGNOSTICS,
+        title="Information à confirmer",
+        severity=RiskSeverity.MEDIUM,
+        description="Le document ne permet pas de conclure définitivement.",
+        status=FindingStatus.POSSIBLE,
+    )
+
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=[finding],
+        document_names={},
+        dpe_documents=[],
+        diagnostics=[],
+    )
+
+    report_finding = report.sections[3].findings[0]
+    assert report_finding.analysis_type.value == "verification"
+    assert report.summary.verification_count == 1
+    assert report.summary.risk_count == 0
 
 
 def test_report_exposes_verified_ademe_registration() -> None:

@@ -19,6 +19,8 @@ import {
 
 type Severity = "info" | "low" | "medium" | "high" | "critical";
 type FindingStatus = "confirmed" | "likely" | "possible" | "missing_information";
+type AnalysisType = "risk" | "verification" | "reassuring" | "missing_information";
+type ReviewStatus = "open" | "not_problematic";
 type Expectation = "definitely_expected" | "usually_useful" | "context_dependent";
 
 type ReportSource = {
@@ -35,6 +37,8 @@ type ReportFinding = {
   title: string;
   explanation: string;
   status: FindingStatus;
+  analysis_type: AnalysisType;
+  review_status: ReviewStatus;
   confidence: number | null;
   amount_eur: number | string | null;
   expectation_level: Expectation | null;
@@ -56,6 +60,7 @@ type BuyerReportData = {
     finding_count: number;
     analyzed_count: number;
     risk_count: number;
+    verification_count: number;
     high_or_critical_count: number;
     missing_information_count: number;
     reassuring_count: number;
@@ -84,20 +89,17 @@ const statusLabels: Record<FindingStatus, string> = {
   missing_information: "Information manquante",
 };
 
+const analysisTypeLabels: Record<AnalysisType, string> = {
+  risk: "Risque",
+  verification: "Point à vérifier",
+  reassuring: "Point rassurant",
+  missing_information: "Élément manquant",
+};
+
 const expectationLabels: Record<Expectation, string> = {
   definitely_expected: "Attendu dans le dossier",
   usually_useful: "Habituellement utile",
   context_dependent: "Selon le contexte",
-};
-
-const sectionIcons: Record<string, IconName> = {
-  financial: "wallet",
-  building_coproperty: "building",
-  energy: "leaf",
-  diagnostics_safety: "shield",
-  inconsistencies: "alert",
-  missing_information: "document",
-  reassuring: "check",
 };
 
 const severityRank: Record<Severity, number> = {
@@ -138,6 +140,25 @@ async function fetchReport(workspace: Workspace): Promise<BuyerReportData | null
   return (await response.json()) as BuyerReportData;
 }
 
+async function updateFindingReview(
+  workspace: Workspace,
+  findingKey: string,
+  reviewStatus: ReviewStatus,
+) {
+  const response = await fetch(
+    `${API_URL}/analysis-cases/${workspace.caseId}/findings/${encodeURIComponent(findingKey)}/review`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": workspace.userId,
+      },
+      body: JSON.stringify({ review_status: reviewStatus }),
+    },
+  );
+  if (!response.ok) throw new Error(await readApiError(response));
+}
+
 const pendingReportLoads = new Map<string, Promise<BuyerReportData | null>>();
 
 function loadReport(): Promise<BuyerReportData | null> {
@@ -160,33 +181,63 @@ function loadReport(): Promise<BuyerReportData | null> {
 function FindingRow({
   finding,
   onSelect,
+  onReview,
+  isUpdating,
 }: {
   finding: ReportFinding;
   onSelect: (finding: ReportFinding) => void;
+  onReview: (finding: ReportFinding, checked: boolean) => void;
+  isUpdating: boolean;
 }) {
+  const isUserReviewed = finding.review_status === "not_problematic";
+  const isReviewable = finding.analysis_type !== "missing_information"
+    && (finding.analysis_type !== "reassuring" || isUserReviewed);
+  const icon = finding.analysis_type === "reassuring"
+    ? "check"
+    : finding.analysis_type === "missing_information"
+      ? "document"
+      : finding.analysis_type === "verification"
+        ? "info"
+        : "alert";
+
   return (
-    <button type="button" className="finding-row" onClick={() => onSelect(finding)}>
-      <span className={`finding-icon severity-${finding.severity}`}>
-        <Icon name={finding.status === "missing_information" ? "document" : "alert"} />
-      </span>
-      <span className="finding-row-copy">
-        <strong>{finding.title}</strong>
-        <small>
-          {finding.sources[0]
-            ? `${finding.sources[0].document_name} · p. ${finding.sources[0].page_number}`
-            : statusLabels[finding.status]}
-        </small>
-      </span>
-      {finding.amount_eur !== null ? (
-        <span className="finding-row-amount">
-          {currencyFormatter.format(Number(finding.amount_eur))}
+    <div className={`finding-row analysis-${finding.analysis_type}`}>
+      <button type="button" className="finding-row-main" onClick={() => onSelect(finding)}>
+        <span className={`finding-icon severity-${finding.severity}`}>
+          <Icon name={icon} />
         </span>
+        <span className="finding-row-copy">
+          <strong>{finding.title}</strong>
+          <small>
+            {finding.sources[0]
+              ? `${finding.sources[0].document_name} · p. ${finding.sources[0].page_number}`
+              : statusLabels[finding.status]}
+          </small>
+        </span>
+        {finding.amount_eur !== null ? (
+          <span className="finding-row-amount">
+            {currencyFormatter.format(Number(finding.amount_eur))}
+          </span>
+        ) : null}
+        <span className={`severity-pill severity-${finding.severity}`}>
+          {finding.analysis_type === "reassuring"
+            ? "Rassurant"
+            : severityLabels[finding.severity]}
+        </span>
+        <Icon className="row-chevron" name="chevron" />
+      </button>
+      {isReviewable ? (
+        <label className="finding-review-control">
+          <input
+            type="checkbox"
+            checked={isUserReviewed}
+            disabled={isUpdating}
+            onChange={(event) => onReview(finding, event.target.checked)}
+          />
+          <span>Non problématique</span>
+        </label>
       ) : null}
-      <span className={`severity-pill severity-${finding.severity}`}>
-        {severityLabels[finding.severity]}
-      </span>
-      <Icon className="row-chevron" name="chevron" />
-    </button>
+    </div>
   );
 }
 
@@ -224,6 +275,12 @@ function SummaryDistribution({ summary }: { summary: BuyerReportData["summary"] 
       }),
     ),
     {
+      key: "verification",
+      count: summary.verification_count,
+      label: "Points à vérifier",
+      className: "is-verification",
+    },
+    {
       key: "missing",
       count: summary.missing_information_count,
       label: "Informations à compléter",
@@ -242,8 +299,9 @@ function SummaryDistribution({ summary }: { summary: BuyerReportData["summary"] 
         className="dossier-distribution-bar"
         role="img"
         aria-label={
-          `Répartition de ${total} points : ${summary.risk_count} alertes, `
-          + `${summary.missing_information_count} informations à compléter et `
+          `Répartition de ${total} points : ${summary.risk_count} risques, `
+          + `${summary.verification_count} points à vérifier, `
+          + `${summary.missing_information_count} éléments manquants et `
           + `${summary.reassuring_count} points rassurants.`
         }
       >
@@ -274,11 +332,19 @@ function DetailDrawer({
   finding,
   onClose,
   onViewSource,
+  onReview,
+  isUpdating,
 }: {
   finding: ReportFinding;
   onClose: () => void;
   onViewSource: (source: ReportSource) => void;
+  onReview: (finding: ReportFinding, checked: boolean) => void;
+  isUpdating: boolean;
 }) {
+  const isUserReviewed = finding.review_status === "not_problematic";
+  const isReviewable = finding.analysis_type !== "missing_information"
+    && (finding.analysis_type !== "reassuring" || isUserReviewed);
+
   return (
     <div className="detail-layer">
       <button type="button" className="detail-backdrop" aria-label="Fermer le détail" onClick={onClose} />
@@ -289,6 +355,7 @@ function DetailDrawer({
               {severityLabels[finding.severity]}
             </span>
             <span>{statusLabels[finding.status]}</span>
+            <span>{analysisTypeLabels[finding.analysis_type]}</span>
           </div>
           <button type="button" className="icon-button" aria-label="Fermer" onClick={onClose}>
             <Icon name="x" />
@@ -300,6 +367,20 @@ function DetailDrawer({
         </div>
 
         <div className="detail-content">
+          {isReviewable ? (
+            <label className="detail-review-control">
+              <input
+                type="checkbox"
+                checked={isUserReviewed}
+                disabled={isUpdating}
+                onChange={(event) => onReview(finding, event.target.checked)}
+              />
+              <span>
+                <strong>Cette alerte n’est pas problématique</strong>
+                <small>Elle sera reclassée comme point rassurant dans la synthèse.</small>
+              </span>
+            </label>
+          ) : null}
           <section className="explanation-block">
             <div><Icon name="info" /><strong>Pourquoi c’est important</strong></div>
             <p>{finding.explanation}</p>
@@ -353,6 +434,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updatingFindingKey, setUpdatingFindingKey] = useState<string | null>(null);
 
   async function refresh() {
     setIsLoading(true);
@@ -399,6 +481,38 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedFinding, viewingSource]);
 
+  async function reviewFinding(finding: ReportFinding, checked: boolean) {
+    const workspace = getWorkspace();
+    if (!workspace) {
+      setNeedsWorkspace(true);
+      return;
+    }
+    setUpdatingFindingKey(finding.finding_key);
+    setError(null);
+    try {
+      await updateFindingReview(
+        workspace,
+        finding.finding_key,
+        checked ? "not_problematic" : "open",
+      );
+      const updatedReport = await fetchReport(workspace);
+      setReport(updatedReport);
+      setSelectedFinding(
+        updatedReport?.sections
+          .flatMap((section) => section.findings)
+          .find((item) => item.finding_key === finding.finding_key) ?? null,
+      );
+    } catch (reviewError) {
+      setError(
+        reviewError instanceof Error
+          ? reviewError.message
+          : "Le reclassement n’a pas pu être enregistré.",
+      );
+    } finally {
+      setUpdatingFindingKey(null);
+    }
+  }
+
   if (isLoading && report === null) {
     return (
       <div className="report-state">
@@ -433,30 +547,50 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
   if (report === null) return null;
 
-  const visibleSections = report.sections
-    .filter(
-      (section) => section.code !== "reassuring" && section.code !== "missing_information",
-    )
-    .map((section) => ({
-      ...section,
-      findings: section.findings.filter(
-        (finding) => finding.status !== "missing_information",
-      ),
-    }));
-  const populatedSections = visibleSections.filter((section) => section.findings.length > 0);
-  const riskFindings = report.sections
-    .filter((section) => section.code !== "reassuring")
-    .flatMap((section) => section.findings)
-    .filter((finding) => finding.status !== "missing_information")
+  const allFindings = report.sections.flatMap((section) => section.findings);
+  const analysisSections = [
+    {
+      code: "risk" as const,
+      title: "Risques",
+      kicker: "À prendre en compte",
+      icon: "alert" as IconName,
+    },
+    {
+      code: "verification" as const,
+      title: "Points à vérifier",
+      kicker: "À confirmer",
+      icon: "info" as IconName,
+    },
+    {
+      code: "reassuring" as const,
+      title: "Points rassurants",
+      kicker: "Vérifiés ou reclassés",
+      icon: "check" as IconName,
+    },
+    {
+      code: "missing_information" as const,
+      title: "Éléments manquants",
+      kicker: "À compléter",
+      icon: "document" as IconName,
+    },
+  ].map((section) => ({
+    ...section,
+    findings: allFindings
+      .filter((finding) => finding.analysis_type === section.code)
+      .toSorted((left, right) => severityRank[right.severity] - severityRank[left.severity]),
+  }));
+  const populatedSections = analysisSections.filter((section) => section.findings.length > 0);
+  const priorityFindings = allFindings
+    .filter((finding) => finding.analysis_type === "risk" || finding.analysis_type === "verification")
     .toSorted((left, right) => severityRank[right.severity] - severityRank[left.severity]);
-  const priorityFindings = riskFindings.slice(0, 4);
+  const firstPriorityFindings = priorityFindings.slice(0, 4);
 
   return (
     <div className={`buyer-report report-${variant}`}>
       <header className="report-page-heading">
         <div>
           <p className="report-updated">Analyse mise à jour le {dateFormatter.format(new Date(report.generated_at))}</p>
-          <h1>{variant === "overview" ? "Votre dossier, en clair" : "Alertes du dossier"}</h1>
+          <h1>{variant === "overview" ? "Votre dossier, en clair" : "Analyse du dossier"}</h1>
         </div>
         <div className="report-heading-actions">
           <span className="attention-count">
@@ -475,17 +609,23 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <div className="overview-grid">
             <section className="panel priority-panel">
               <div className="panel-heading">
-                <div><p className="section-kicker">À traiter en premier</p><h2>Alertes prioritaires</h2></div>
+                <div><p className="section-kicker">À traiter en premier</p><h2>Points prioritaires</h2></div>
                 <Link className="text-link" href={productRoutes.analysis}>Tout voir <Icon name="arrow" /></Link>
               </div>
-              {priorityFindings.length > 0 ? (
+              {firstPriorityFindings.length > 0 ? (
                 <div className="finding-rows">
-                  {priorityFindings.map((finding) => (
-                    <FindingRow key={finding.finding_key} finding={finding} onSelect={setSelectedFinding} />
+                  {firstPriorityFindings.map((finding) => (
+                    <FindingRow
+                      key={finding.finding_key}
+                      finding={finding}
+                      onSelect={setSelectedFinding}
+                      onReview={(item, checked) => void reviewFinding(item, checked)}
+                      isUpdating={updatingFindingKey === finding.finding_key}
+                    />
                   ))}
                 </div>
               ) : (
-                <p className="panel-empty">Aucune alerte détectée dans les pièces analysées.</p>
+                <p className="panel-empty">Aucun risque ni point à vérifier dans les pièces analysées.</p>
               )}
             </section>
 
@@ -496,9 +636,10 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
               </div>
               <SummaryDistribution summary={report.summary} />
               <div className="dossier-metrics">
-                <Metric value={report.summary.risk_count} label="alertes" />
-                <Metric value={report.summary.missing_information_count} label="à compléter" />
+                <Metric value={report.summary.risk_count} label="risques" />
+                <Metric value={report.summary.verification_count} label="à vérifier" />
                 <Metric value={report.summary.reassuring_count} label="rassurants" />
+                <Metric value={report.summary.missing_information_count} label="manquants" />
               </div>
               <Link className="dossier-card-link" href={productRoutes.documents}>Voir les documents <Icon name="arrow" /></Link>
             </section>
@@ -510,14 +651,20 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
             <section key={section.code} id={section.code} className="report-section panel">
               <div className="panel-heading">
                 <div className="section-title-with-icon">
-                  <span><Icon name={sectionIcons[section.code] ?? "document"} /></span>
-                  <div><p className="section-kicker">{section.code === "reassuring" ? "Vérifié" : "Catégorie"}</p><h2>{section.title}</h2></div>
+                  <span><Icon name={section.icon} /></span>
+                  <div><p className="section-kicker">{section.kicker}</p><h2>{section.title}</h2></div>
                 </div>
                 <span className="count-badge">{section.findings.length}</span>
               </div>
               <div className="finding-rows">
                 {section.findings.map((finding) => (
-                  <FindingRow key={finding.finding_key} finding={finding} onSelect={setSelectedFinding} />
+                  <FindingRow
+                    key={finding.finding_key}
+                    finding={finding}
+                    onSelect={setSelectedFinding}
+                    onReview={(item, checked) => void reviewFinding(item, checked)}
+                    isUpdating={updatingFindingKey === finding.finding_key}
+                  />
                 ))}
               </div>
             </section>
@@ -526,7 +673,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       ) : (
         <div className="report-state">
           <span className="state-icon"><Icon name="document" /></span>
-          <strong>Aucune alerte détectée</strong>
+          <strong>Aucun point d’analyse disponible</strong>
           <span>Consultez la page Documents pour vérifier les pièces encore attendues.</span>
           <Link href={productRoutes.documents}>Voir les documents</Link>
         </div>
@@ -542,6 +689,8 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
             filename: source.document_name,
             pageNumber: source.page_number,
           })}
+          onReview={(finding, checked) => void reviewFinding(finding, checked)}
+          isUpdating={updatingFindingKey === selectedFinding.finding_key}
         />
       ) : null}
       {viewingSource ? (

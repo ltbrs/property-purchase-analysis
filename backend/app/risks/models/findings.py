@@ -47,6 +47,11 @@ class FindingStatus(StrEnum):
     MISSING_INFORMATION = "missing_information"
 
 
+class FindingReviewStatus(StrEnum):
+    OPEN = "open"
+    NOT_PROBLEMATIC = "not_problematic"
+
+
 class DocumentExpectation(StrEnum):
     DEFINITELY_EXPECTED = "definitely_expected"
     USUALLY_USEFUL = "usually_useful"
@@ -71,6 +76,7 @@ class RiskFinding(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     expectation_level: DocumentExpectation | None = None
     missing_reason: MissingDocumentReason | None = None
+    review_status: FindingReviewStatus = FindingReviewStatus.OPEN
 
 
 class RiskFindingRecord(Base):
@@ -104,6 +110,10 @@ class RiskFindingRecord(Base):
             "missing_reason IS NULL OR missing_reason IN ('absent', 'insufficient')",
             name="ck_risk_findings_missing_reason",
         ),
+        CheckConstraint(
+            "review_status IN ('open', 'not_problematic')",
+            name="ck_risk_findings_review_status",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -125,12 +135,21 @@ class RiskFindingRecord(Base):
     sources: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
     expectation_level: Mapped[str | None] = mapped_column(String(30))
     missing_reason: Mapped[str | None] = mapped_column(String(20))
+    review_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=FindingReviewStatus.OPEN.value
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     @classmethod
-    def from_finding(cls, *, analysis_case_id: UUID, finding: RiskFinding) -> "RiskFindingRecord":
+    def from_finding(
+        cls,
+        *,
+        analysis_case_id: UUID,
+        finding: RiskFinding,
+        review_status: FindingReviewStatus | None = None,
+    ) -> "RiskFindingRecord":
         return cls(
             analysis_case_id=analysis_case_id,
             code=finding.code,
@@ -149,6 +168,7 @@ class RiskFindingRecord(Base):
             missing_reason=(
                 finding.missing_reason.value if finding.missing_reason is not None else None
             ),
+            review_status=(review_status or finding.review_status).value,
         )
 
     def to_finding(self) -> RiskFinding:
@@ -166,6 +186,7 @@ class RiskFindingRecord(Base):
                 "sources": self.sources,
                 "expectation_level": self.expectation_level,
                 "missing_reason": self.missing_reason,
+                "review_status": self.review_status,
             }
         )
 
@@ -187,4 +208,5 @@ class RiskFindingRead(BaseModel):
     sources: list[SourceReference]
     expectation_level: DocumentExpectation | None
     missing_reason: MissingDocumentReason | None
+    review_status: FindingReviewStatus
     created_at: datetime

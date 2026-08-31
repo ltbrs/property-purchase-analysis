@@ -13,6 +13,7 @@ from app.property.normalization.dpe import (
     SourceReference,
 )
 from app.reports.models import (
+    AnalysisFindingType,
     BuyerReport,
     ReportFinding,
     ReportSection,
@@ -21,7 +22,13 @@ from app.reports.models import (
     ReportSummary,
     report_generated_at,
 )
-from app.risks.models import FindingStatus, RiskCategory, RiskFinding, RiskSeverity
+from app.risks.models import (
+    FindingReviewStatus,
+    FindingStatus,
+    RiskCategory,
+    RiskFinding,
+    RiskSeverity,
+)
 
 SECTION_TITLES = {
     ReportSectionCode.FINANCIAL: "Risques financiers majeurs",
@@ -71,6 +78,22 @@ def _section_for_finding(finding: RiskFinding) -> ReportSectionCode:
     }[finding.category]
 
 
+def _analysis_type_for_finding(finding: RiskFinding) -> AnalysisFindingType:
+    if finding.review_status == FindingReviewStatus.NOT_PROBLEMATIC:
+        return AnalysisFindingType.REASSURING
+    if (
+        finding.category == RiskCategory.MISSING_INFORMATION
+        or finding.status == FindingStatus.MISSING_INFORMATION
+    ):
+        return AnalysisFindingType.MISSING_INFORMATION
+    if finding.status in {FindingStatus.LIKELY, FindingStatus.POSSIBLE} or finding.severity in {
+        RiskSeverity.INFO,
+        RiskSeverity.MEDIUM,
+    }:
+        return AnalysisFindingType.VERIFICATION
+    return AnalysisFindingType.RISK
+
+
 def _reassuring_findings(
     *,
     dpe_documents: list[NormalizedDpeFacts],
@@ -98,6 +121,7 @@ def _reassuring_findings(
                         "public de l’ADEME et les données comparables sont cohérentes."
                     ),
                     status=FindingStatus.CONFIRMED,
+                    analysis_type=AnalysisFindingType.REASSURING,
                     sources=_report_sources([facts.dpe_number.source], document_names),
                 )
             )
@@ -123,6 +147,7 @@ def _reassuring_findings(
                     title=f"Classe énergétique {rating}",
                     explanation=explanation,
                     status=FindingStatus.CONFIRMED,
+                    analysis_type=AnalysisFindingType.REASSURING,
                     sources=_report_sources([source], document_names),
                 )
             )
@@ -150,6 +175,7 @@ def _reassuring_findings(
                 title=f"Constat favorable — {label}",
                 explanation=item.description,
                 status=FindingStatus.CONFIRMED,
+                analysis_type=AnalysisFindingType.REASSURING,
                 sources=_report_sources([item.source], document_names),
             )
         )
@@ -170,7 +196,13 @@ def build_buyer_report(
         section: [] for section in SECTION_ORDER
     }
     for finding in findings:
-        grouped[_section_for_finding(finding)].append(
+        analysis_type = _analysis_type_for_finding(finding)
+        section = (
+            ReportSectionCode.REASSURING
+            if analysis_type == AnalysisFindingType.REASSURING
+            else _section_for_finding(finding)
+        )
+        grouped[section].append(
             ReportFinding(
                 code=finding.code,
                 finding_key=finding.finding_key,
@@ -178,6 +210,8 @@ def build_buyer_report(
                 title=finding.title,
                 explanation=finding.description,
                 status=finding.status,
+                analysis_type=analysis_type,
+                review_status=finding.review_status,
                 confidence=finding.confidence,
                 amount_eur=finding.amount_eur,
                 expectation_level=finding.expectation_level,
@@ -190,14 +224,21 @@ def build_buyer_report(
         diagnostics=diagnostics,
         document_names=document_names,
     )
-    grouped[ReportSectionCode.REASSURING] = reassuring
-    risk_findings = [
-        finding
-        for finding in findings
-        if finding.category != RiskCategory.MISSING_INFORMATION
-        and finding.status != FindingStatus.MISSING_INFORMATION
-    ]
-    missing_information_count = len(findings) - len(risk_findings)
+    grouped[ReportSectionCode.REASSURING].extend(reassuring)
+    findings_by_type = {
+        analysis_type: [
+            finding
+            for finding in findings
+            if _analysis_type_for_finding(finding) == analysis_type
+        ]
+        for analysis_type in AnalysisFindingType
+    }
+    risk_findings = findings_by_type[AnalysisFindingType.RISK]
+    verification_findings = findings_by_type[AnalysisFindingType.VERIFICATION]
+    reviewed_reassuring = findings_by_type[AnalysisFindingType.REASSURING]
+    missing_information_count = len(
+        findings_by_type[AnalysisFindingType.MISSING_INFORMATION]
+    )
     high_severities = {RiskSeverity.HIGH, RiskSeverity.CRITICAL}
     return BuyerReport(
         analysis_case_id=analysis_case_id,
@@ -205,13 +246,19 @@ def build_buyer_report(
         generated_at=generated_at or report_generated_at(),
         summary=ReportSummary(
             finding_count=len(findings),
-            analyzed_count=len(risk_findings) + len(reassuring),
+            analyzed_count=(
+                len(risk_findings)
+                + len(verification_findings)
+                + len(reviewed_reassuring)
+                + len(reassuring)
+            ),
             risk_count=len(risk_findings),
+            verification_count=len(verification_findings),
             high_or_critical_count=sum(
                 finding.severity in high_severities for finding in risk_findings
             ),
             missing_information_count=missing_information_count,
-            reassuring_count=len(reassuring),
+            reassuring_count=len(reviewed_reassuring) + len(reassuring),
             risk_severity_counts={
                 severity: sum(finding.severity == severity for finding in risk_findings)
                 for severity in RiskSeverity

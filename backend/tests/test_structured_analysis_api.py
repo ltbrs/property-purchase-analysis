@@ -165,6 +165,20 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
         second = client.post(extraction_url, headers=headers)
         refresh = client.post(f"/api/v1/analysis-cases/{case_id}/findings/refresh", headers=headers)
         listed = client.get(f"/api/v1/analysis-cases/{case_id}/findings", headers=headers)
+        reviewed_finding = next(
+            finding
+            for finding in listed.json()
+            if finding["code"] == "COPRO_MAJOR_WORKS_VOTED"
+        )
+        reviewed = client.patch(
+            f"/api/v1/analysis-cases/{case_id}/findings/"
+            f"{reviewed_finding['finding_key']}/review",
+            headers=headers,
+            json={"review_status": "not_problematic"},
+        )
+        refreshed_after_review = client.post(
+            f"/api/v1/analysis-cases/{case_id}/findings/refresh", headers=headers
+        )
         report_refresh = client.post(
             f"/api/v1/analysis-cases/{case_id}/report/refresh", headers=headers
         )
@@ -188,6 +202,13 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
     assert {finding["finding_key"] for finding in listed.json()} == {
         finding["finding_key"] for finding in refresh.json()["findings"]
     }
+    assert reviewed.status_code == 200
+    assert reviewed.json()["review_status"] == "not_problematic"
+    assert next(
+        finding
+        for finding in refreshed_after_review.json()["findings"]
+        if finding["finding_key"] == reviewed_finding["finding_key"]
+    )["review_status"] == "not_problematic"
     assert session.scalar(select(StructuredExtractionRecord)) is not None
     assert len(list(session.scalars(select(RiskFindingRecord)))) == len(listed.json())
     assert {finding["code"] for finding in listed.json()} >= {
@@ -208,9 +229,16 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
         "missing_information",
         "reassuring",
     ]
-    copro_finding = report_refresh.json()["sections"][1]["findings"][0]
+    copro_finding = next(
+        finding
+        for section in report_refresh.json()["sections"]
+        for finding in section["findings"]
+        if finding["finding_key"] == reviewed_finding["finding_key"]
+    )
     assert copro_finding["sources"][0]["document_name"] == "ag.pdf"
     assert copro_finding["sources"][0]["page_number"] == 1
+    assert copro_finding["analysis_type"] == "reassuring"
+    assert report_refresh.json()["summary"]["reassuring_count"] >= 1
     assert session.scalar(select(ReportRecord)) is not None
 
 
