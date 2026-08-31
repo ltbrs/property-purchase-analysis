@@ -267,6 +267,40 @@ def test_analysis_endpoints_are_idempotent(
     assert "api_call=false" in caplog.text
 
 
+def test_list_documents_exposes_verified_ademe_status(session: Session) -> None:
+    user_id = uuid4()
+    case_id, document_id = seed_extracted_dpe(session, user_id)
+    llm_client = FakeStructuredOutputClient([classification_candidate(), dpe_candidate()])
+
+    with make_client(session, llm_client) as client:
+        client.post(
+            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/classify",
+            headers=auth(user_id),
+        )
+        client.post(
+            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/extract-dpe",
+            headers=auth(user_id),
+        )
+
+        record = session.scalar(select(DpeExtractionRecord))
+        assert record is not None
+        normalized_facts = dict(record.normalized_facts)
+        normalized_facts["ademe_verification"] = {
+            **dict(normalized_facts["ademe_verification"]),
+            "status": "verified",
+        }
+        record.normalized_facts = normalized_facts
+        session.commit()
+
+        response = client.get(
+            f"/api/v1/analysis-cases/{case_id}/documents",
+            headers=auth(user_id),
+        )
+
+    assert response.status_code == 200
+    assert response.json()[0]["ademe_verification_status"] == "verified"
+
+
 def test_dpe_extraction_rejects_non_dpe_classification(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)

@@ -149,6 +149,7 @@ class DocumentRead(BaseModel):
     status: DocumentStatus
     failure_reason: str | None
     document_type: str | None = None
+    ademe_verification_status: str | None = None
     created_at: datetime
     updated_at: datetime
 

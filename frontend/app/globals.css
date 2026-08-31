@@ -2359,9 +2359,9 @@ svg {
 .document-file {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem;
 }
 
 .document-file + .document-file {
@@ -2376,6 +2376,108 @@ svg {
 .document-file .document-details strong {
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.document-file-content {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.55rem;
+}
+
+.document-file-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.document-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.document-status-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.23rem 0.45rem;
+  border-radius: 100vmax;
+  color: var(--muted);
+  background: #edf0ed;
+  font-size: 0.61rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.document-status-step svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+
+.document-status-step.is-complete,
+.document-status-step.status-completed {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.document-status-step.status-failed {
+  color: #8d332d;
+  background: var(--red-soft);
+}
+
+.ademe-verification {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.48rem 0.18rem 0.32rem;
+  border-radius: 0.55rem;
+  color: var(--success);
+  background: #f0f3f6;
+  font-size: 0.63rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ademe-verification > img {
+  width: 1.36rem;
+  height: 1.62rem;
+  object-fit: contain;
+}
+
+.ademe-verification > span {
+  display: grid;
+  width: 1rem;
+  height: 1rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--success);
+}
+
+.ademe-verification > span svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+
+.ademe-verification.has-inconsistencies {
+  color: #7f5912;
+  background: var(--amber-soft);
+}
+
+.ademe-verification.has-inconsistencies > span {
+  background: var(--amber);
+}
+
+.document-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .other-document-list {
@@ -2421,8 +2523,9 @@ svg {
   font-size: 0.68rem;
 }
 
-.document-details .document-failure {
+.document-failure {
   color: var(--red);
+  font-size: 0.68rem;
 }
 
 .status-badge {
@@ -2446,7 +2549,13 @@ svg {
 }
 
 .delete-document-button {
+  display: inline-flex;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
   padding: 0.42rem 0.55rem;
   border: 0;
   border-radius: 0.55rem;
@@ -2460,7 +2569,10 @@ svg {
 .view-document-button,
 .dpe-data-button,
 .raw-extraction-button {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.32rem;
   padding: 0.42rem 0.55rem;
   border: 0;
   border-radius: 0.55rem;
@@ -2469,6 +2581,11 @@ svg {
   font-size: 0.68rem;
   font-weight: 750;
   cursor: pointer;
+}
+
+.document-actions button svg {
+  width: 0.82rem;
+  height: 0.82rem;
 }
 
 .view-document-button:hover,
@@ -3131,23 +3248,24 @@ svg {
     display: none;
   }
 
-  .document-item,
-  .document-file {
-    align-items: flex-start;
+  .document-file-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .document-status {
     flex-wrap: wrap;
   }
 
-  .document-item .status-badge,
-  .document-file .status-badge {
-    margin-left: 3.3rem;
+  .document-actions {
+    align-items: stretch;
   }
 
-  .delete-document-button {
-    margin-left: auto;
-  }
-
-  .raw-extraction-button {
-    margin-left: 3.3rem;
+  .document-actions .view-document-button,
+  .document-actions .dpe-data-button,
+  .document-actions .raw-extraction-button {
+    justify-content: center;
   }
 
   .dpe-rating-grid,

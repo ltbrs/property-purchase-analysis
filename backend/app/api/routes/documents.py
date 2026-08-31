@@ -225,9 +225,20 @@ def list_documents(
             analysis_case_id, current_user_id
         )
     }
+    ademe_verification_statuses = {
+        extraction.document_id: NormalizedDpeFacts.model_validate(
+            extraction.normalized_facts
+        ).ademe_verification.status.value
+        for extraction in repository.list_case_dpe_extractions(
+            analysis_case_id, current_user_id
+        )
+    }
     return [
         DocumentRead.model_validate(document).model_copy(
-            update={"document_type": classifications.get(document.id)}
+            update={
+                "document_type": classifications.get(document.id),
+                "ademe_verification_status": ademe_verification_statuses.get(document.id),
+            }
         )
         for document in repository.list_documents(analysis_case_id, current_user_id)
     ]
@@ -438,8 +449,19 @@ async def process_document(
         ) from error
 
     session.refresh(document)
+    dpe_extraction = repository.get_dpe_extraction(document.id)
+    ademe_verification_status = (
+        NormalizedDpeFacts.model_validate(
+            dpe_extraction.normalized_facts
+        ).ademe_verification.status.value
+        if dpe_extraction is not None
+        else None
+    )
     return DocumentRead.model_validate(document).model_copy(
-        update={"document_type": classification.document_type}
+        update={
+            "document_type": classification.document_type,
+            "ademe_verification_status": ademe_verification_status,
+        }
     )
 
 

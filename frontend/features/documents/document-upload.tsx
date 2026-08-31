@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { AdemeMark } from "@/components/ademe-mark";
 import { Icon } from "@/components/icons";
 import {
   documentTypeLabels,
@@ -43,6 +44,13 @@ type DocumentStatus =
   | "completed"
   | "failed";
 
+type AdemeVerificationStatus =
+  | "not_attempted"
+  | "verified"
+  | "verified_with_inconsistencies"
+  | "not_found"
+  | "unavailable";
+
 type UploadedDocument = {
   id: string;
   analysis_case_id: string;
@@ -52,6 +60,7 @@ type UploadedDocument = {
   status: DocumentStatus;
   failure_reason: string | null;
   document_type: DocumentType | null;
+  ademe_verification_status: AdemeVerificationStatus | null;
   created_at: string;
   updated_at: string;
 };
@@ -172,62 +181,113 @@ function DocumentFile({
   const canViewExtraction = ["extracted", "analyzing", "completed"].includes(
     document.status,
   );
+  const isAdemeVerified = document.ademe_verification_status === "verified";
+  const hasAdemeInconsistencies =
+    document.ademe_verification_status === "verified_with_inconsistencies";
+  const analysisStatusIcon = document.status === "failed"
+    ? "alert"
+    : ["extracted", "completed"].includes(document.status)
+      ? "check"
+      : "refresh";
+  const documentStatusLabel = [
+    "reçu",
+    ...(document.status === "uploaded"
+      ? []
+      : [statusLabels[document.status].toLocaleLowerCase("fr-FR")]),
+    ...(isAdemeVerified
+      ? ["vérifié auprès de l’ADEME"]
+      : hasAdemeInconsistencies
+        ? ["écarts détectés avec l’ADEME"]
+        : []),
+  ].join(", ");
 
   return (
     <div className="document-file">
       <span className="document-type" aria-hidden="true"><Icon name="document" /></span>
-      <div className="document-details">
-        <strong>{document.original_filename}</strong>
-        <span>
-          {showType
-            ? `${documentTypeLabels[document.document_type ?? "unknown"]} · `
-            : ""}
-          {formatFileSize(document.size_bytes)} · {dateFormatter.format(new Date(document.created_at))}
-        </span>
+      <div className="document-file-content">
+        <div className="document-file-heading">
+          <div className="document-details">
+            <strong>{document.original_filename}</strong>
+            <span>
+              {showType
+                ? `${documentTypeLabels[document.document_type ?? "unknown"]} · `
+                : ""}
+              {formatFileSize(document.size_bytes)} · {dateFormatter.format(new Date(document.created_at))}
+            </span>
+          </div>
+          <div
+            className="document-status"
+            aria-label={`Statut : ${documentStatusLabel}`}
+          >
+            <span className="document-status-step is-complete">
+              <Icon name="check" /> Reçu
+            </span>
+            {document.status !== "uploaded" ? (
+              <span className={`document-status-step status-${document.status}`}>
+                <Icon name={analysisStatusIcon} />
+                {statusLabels[document.status]}
+              </span>
+            ) : null}
+            {isAdemeVerified || hasAdemeInconsistencies ? (
+              <span
+                className={`ademe-verification${hasAdemeInconsistencies ? " has-inconsistencies" : ""}`}
+                title={
+                  isAdemeVerified
+                    ? "Le numéro DPE a été retrouvé dans le registre public de l’ADEME et les données comparables sont cohérentes."
+                    : "Le numéro DPE a été retrouvé dans le registre public de l’ADEME, avec des écarts sur certaines données."
+                }
+              >
+                <AdemeMark />
+                <span aria-hidden="true"><Icon name={isAdemeVerified ? "check" : "info"} /></span>
+                {isAdemeVerified ? "Vérifié" : "Écarts détectés"}
+              </span>
+            ) : null}
+          </div>
+        </div>
         {document.failure_reason ? (
           <span className="document-failure">{document.failure_reason}</span>
         ) : null}
+        <div className="document-actions">
+          <button
+            className="view-document-button"
+            type="button"
+            aria-label={`Visualiser ${document.original_filename}`}
+            onClick={() => onView(document)}
+          >
+            <Icon name="eye" /> Visualiser
+          </button>
+          {document.document_type === "dpe" && document.status === "completed" ? (
+            <button
+              className="dpe-data-button"
+              type="button"
+              aria-label={`Voir les données DPE de ${document.original_filename}`}
+              onClick={() => onViewDpe(document)}
+            >
+              <Icon name="gauge" /> Données DPE
+            </button>
+          ) : null}
+          {canViewExtraction ? (
+            <button
+              className="raw-extraction-button"
+              type="button"
+              aria-label={`Voir l’extraction brute de ${document.original_filename}`}
+              onClick={() => onViewExtraction(document)}
+            >
+              <Icon name="table" /> Extraction
+            </button>
+          ) : null}
+          <button
+            className="delete-document-button"
+            type="button"
+            disabled={deletingDocumentId !== null}
+            aria-label={`Supprimer ${document.original_filename}`}
+            title={`Supprimer ${document.original_filename}`}
+            onClick={() => onDelete(document)}
+          >
+            {deletingDocumentId === document.id ? "Suppression…" : <Icon name="trash" />}
+          </button>
+        </div>
       </div>
-      <span className={`status-badge status-${document.status}`}>
-        {statusLabels[document.status]}
-      </span>
-      <button
-        className="view-document-button"
-        type="button"
-        aria-label={`Visualiser ${document.original_filename}`}
-        onClick={() => onView(document)}
-      >
-        Visualiser
-      </button>
-      {document.document_type === "dpe" && document.status === "completed" ? (
-        <button
-          className="dpe-data-button"
-          type="button"
-          aria-label={`Voir les données DPE de ${document.original_filename}`}
-          onClick={() => onViewDpe(document)}
-        >
-          Données DPE
-        </button>
-      ) : null}
-      {canViewExtraction ? (
-        <button
-          className="raw-extraction-button"
-          type="button"
-          aria-label={`Voir l’extraction brute de ${document.original_filename}`}
-          onClick={() => onViewExtraction(document)}
-        >
-          Extraction
-        </button>
-      ) : null}
-      <button
-        className="delete-document-button"
-        type="button"
-        disabled={deletingDocumentId !== null}
-        aria-label={`Supprimer ${document.original_filename}`}
-        onClick={() => onDelete(document)}
-      >
-        {deletingDocumentId === document.id ? "Suppression…" : "Supprimer"}
-      </button>
     </div>
   );
 }
@@ -264,10 +324,14 @@ function ExpectedDocumentRow({
         <div className="coverage-copy">
           <div>
             <strong>{expectation.label}</strong>
-            <span className={`coverage-badge is-${state}`}>{stateLabel}</span>
+            {!isPresent ? (
+              <span className={`coverage-badge is-${state}`}>{stateLabel}</span>
+            ) : null}
           </div>
-          <p>{expectation.description}</p>
-          <small>{expectation.priority === "essential" ? "Prioritaire pour l’analyse" : "Utile avant l’achat"}</small>
+          {!isPresent ? <p>{expectation.description}</p> : null}
+          {!isPresent && expectation.priority === "essential" ? (
+            <small>Prioritaire pour l’analyse</small>
+          ) : null}
         </div>
       </div>
       {documents.length > 0 ? (
