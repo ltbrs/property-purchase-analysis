@@ -57,7 +57,6 @@ export function PdfViewer({
           `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/view-url`,
           {
             cache: "no-store",
-            headers: { "X-User-Id": workspace.userId },
             signal: controller.signal,
           },
         );

@@ -82,20 +82,12 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
 }
 
-function workspaceHeaders(workspace: Workspace) {
-  return { "X-User-Id": workspace.userId };
-}
-
 async function fetchDocuments(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents`, {
-    headers: workspaceHeaders(workspace),
-  });
+  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents`);
 }
 
 async function fetchAnalysisCase(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}`, {
-    headers: workspaceHeaders(workspace),
-  });
+  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}`);
 }
 
 function PropertyTypeSelector({
@@ -406,7 +398,6 @@ export function DocumentUpload() {
       const response = await fetch(`${API_URL}/analysis-cases/${workspace.caseId}`, {
         method: "PATCH",
         headers: {
-          ...workspaceHeaders(workspace),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ property_type: nextPropertyType }),
@@ -450,7 +441,6 @@ export function DocumentUpload() {
           `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
           {
             method: "POST",
-            headers: workspaceHeaders(workspace),
             body: formData,
           },
         );
@@ -494,7 +484,7 @@ export function DocumentUpload() {
       successfulDocuments.map(async (document) => {
         const response = await fetch(
           `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}/process`,
-          { method: "POST", headers: workspaceHeaders(workspace) },
+          { method: "POST" },
         );
         if (!response.ok) {
           throw new Error(
@@ -552,7 +542,7 @@ export function DocumentUpload() {
     try {
       const response = await fetch(
         `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}`,
-        { method: "DELETE", headers: workspaceHeaders(workspace) },
+        { method: "DELETE" },
       );
       if (!response.ok) throw new Error(await readApiError(response));
       setDocuments((currentDocuments) =>

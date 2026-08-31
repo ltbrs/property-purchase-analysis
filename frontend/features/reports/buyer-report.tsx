@@ -126,7 +126,6 @@ const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
 async function requestReport(workspace: Workspace) {
   return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/report/refresh`, {
     method: "POST",
-    headers: { "X-User-Id": workspace.userId },
   });
 }
 
@@ -151,7 +150,6 @@ async function updateFindingReview(
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": workspace.userId,
       },
       body: JSON.stringify({ review_status: reviewStatus }),
     },
@@ -165,7 +163,7 @@ function loadReport(): Promise<BuyerReportData | null> {
   const workspace = getWorkspace();
   if (!workspace) return Promise.resolve(null);
 
-  const requestKey = `${workspace.userId}:${workspace.caseId}`;
+  const requestKey = workspace.caseId;
   const pendingLoad = pendingReportLoads.get(requestKey);
   if (pendingLoad) return pendingLoad;
 

@@ -63,7 +63,6 @@ export function RawExtractionViewer({
           `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/extraction`,
           {
             cache: "no-store",
-            headers: { "X-User-Id": workspace.userId },
             signal: controller.signal,
           },
         );

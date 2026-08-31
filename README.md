@@ -43,6 +43,7 @@ Copy the example configuration before local development:
 
 ```bash
 cp .env.example .env
+cp frontend/.env.example frontend/.env.local
 ```
 
 The initial scaffold recognizes these variables:
@@ -51,7 +52,6 @@ The initial scaffold recognizes these variables:
 | --- | --- |
 | `APP_ENV` | Backend runtime environment (`development` by default) |
 | `FRONTEND_ORIGIN` | Allowed browser origin for the API |
-| `NEXT_PUBLIC_API_URL` | API base URL exposed to the frontend |
 | `DATABASE_URL` | PostgreSQL connection URL |
 | `POSTGRES_DB` | Local Compose database name |
 | `POSTGRES_USER` | Local Compose database user |
@@ -64,6 +64,24 @@ The initial scaffold recognizes these variables:
 | `DOCUMENT_VIEW_URL_TTL_SECONDS` | Lifetime of private PDF viewing links (5 minutes by default) |
 | `MAX_UPLOAD_SIZE_BYTES` | Maximum PDF size (25 MiB by default) |
 | `OPENAI_API_KEY` | Server-side OpenAI API key used for structured extraction |
+
+The frontend-specific file recognizes:
+
+| Variable | Purpose |
+| --- | --- |
+| `AUTH_SECRET` | Random secret used to encrypt Auth.js sessions |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `BACKEND_API_URL` | Private API base URL used by the authenticated Next.js boundary |
+
+Create a Google OAuth web client with these authorized redirect URIs:
+
+```text
+http://localhost:3000/api/auth/callback/google
+https://your-domain.example/api/auth/callback/google
+```
+
+Generate `AUTH_SECRET` with `npx auth secret` from the `frontend` directory.
 
 The model is deliberately fixed to `gpt-5.6-luna` in the server-side adapter; it
 cannot be selected by a request or changed through environment configuration.
@@ -212,10 +230,11 @@ a chatbot. The document list exposes a dedicated DPE detail view containing norm
 facts, provenance pages, the ADEME verification result, and the origin of the rating.
 Secure source-document links and in-document page inspection remain step 14.
 
-Ownership is checked in every case-scoped database query. For this pre-login MVP,
-`X-User-Id` represents an identity asserted by the authentication boundary; the
-frontend creates a local development identity. A production edge must authenticate
-the user, replace this header, and prevent clients from overriding it.
+Ownership is checked in every case-scoped database query. Google OAuth sessions are
+handled by Auth.js in Next.js. Browser API calls pass through an authenticated Next.js
+route, which derives a stable UUID from the Google account and injects `X-User-Id`
+server-side. The FastAPI service must remain private behind that boundary in production
+so clients cannot assert this header directly.
 
 ## Architecture direction
 
@@ -234,9 +253,9 @@ PDF upload
 -> source-backed report
 ```
 
-Background processing and production authentication remain deferred. The frontend calls
-the synchronous, idempotent `/process` workflow after upload; the individual stage
-endpoints remain available for retries and diagnostics.
+Background processing remains deferred. The frontend calls the synchronous,
+idempotent `/process` workflow after upload; the individual stage endpoints remain
+available for retries and diagnostics.
 
 ## Evaluation fixtures
 

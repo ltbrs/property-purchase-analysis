@@ -9,7 +9,6 @@ import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
   type AnalysisCase,
-  getOrCreateUserId,
   readApiError,
   saveWorkspace,
 } from "@/lib/workspace";
@@ -62,7 +61,6 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-User-Id": getOrCreateUserId(),
         },
         body: JSON.stringify({
           title: String(formData.get("title") ?? "").trim(),
