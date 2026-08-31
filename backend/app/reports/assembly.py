@@ -182,6 +182,19 @@ def _reassuring_findings(
     return findings
 
 
+def _deduplicate_report_findings(findings: list[ReportFinding]) -> list[ReportFinding]:
+    """Keep one report row for each persistent/display finding identity."""
+
+    unique: list[ReportFinding] = []
+    seen: set[str] = set()
+    for finding in findings:
+        if finding.finding_key in seen:
+            continue
+        seen.add(finding.finding_key)
+        unique.append(finding)
+    return unique
+
+
 def build_buyer_report(
     *,
     analysis_case_id: UUID,
@@ -219,12 +232,16 @@ def build_buyer_report(
                 sources=_report_sources(finding.sources, document_names),
             )
         )
-    reassuring = _reassuring_findings(
-        dpe_documents=dpe_documents,
-        diagnostics=diagnostics,
-        document_names=document_names,
+    grouped[ReportSectionCode.REASSURING].extend(
+        _reassuring_findings(
+            dpe_documents=dpe_documents,
+            diagnostics=diagnostics,
+            document_names=document_names,
+        )
     )
-    grouped[ReportSectionCode.REASSURING].extend(reassuring)
+    grouped[ReportSectionCode.REASSURING] = _deduplicate_report_findings(
+        grouped[ReportSectionCode.REASSURING]
+    )
     findings_by_type = {
         analysis_type: [
             finding
@@ -235,7 +252,7 @@ def build_buyer_report(
     }
     risk_findings = findings_by_type[AnalysisFindingType.RISK]
     verification_findings = findings_by_type[AnalysisFindingType.VERIFICATION]
-    reviewed_reassuring = findings_by_type[AnalysisFindingType.REASSURING]
+    reassuring_count = len(grouped[ReportSectionCode.REASSURING])
     missing_information_count = len(
         findings_by_type[AnalysisFindingType.MISSING_INFORMATION]
     )
@@ -249,8 +266,7 @@ def build_buyer_report(
             analyzed_count=(
                 len(risk_findings)
                 + len(verification_findings)
-                + len(reviewed_reassuring)
-                + len(reassuring)
+                + reassuring_count
             ),
             risk_count=len(risk_findings),
             verification_count=len(verification_findings),
@@ -258,7 +274,7 @@ def build_buyer_report(
                 finding.severity in high_severities for finding in risk_findings
             ),
             missing_information_count=missing_information_count,
-            reassuring_count=len(reviewed_reassuring) + len(reassuring),
+            reassuring_count=reassuring_count,
             risk_severity_counts={
                 severity: sum(finding.severity == severity for finding in risk_findings)
                 for severity in RiskSeverity

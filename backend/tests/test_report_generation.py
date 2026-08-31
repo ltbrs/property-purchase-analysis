@@ -2,10 +2,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+from app.property.normalization.diagnostics import (
+    DiagnosticKind,
+    DiagnosticResult,
+    NormalizedDiagnosticFinding,
+    NormalizedDiagnostics,
+)
 from app.property.normalization.dpe import (
     AdemeVerificationStatus,
     DpeAdemeVerification,
     DpeTextFact,
+    SourceReference,
 )
 from app.reports import build_buyer_report
 from app.risks.models import (
@@ -233,3 +240,32 @@ def test_report_exposes_verified_ademe_registration() -> None:
     assert reassuring[0].title == "Enregistrement ADEME vérifié"
     assert reassuring[0].sources[0].page_number == number_source.page_number
     assert report.summary.reassuring_count == 2
+
+
+def test_report_deduplicates_reassuring_diagnostic_findings_with_the_same_key() -> None:
+    document_id = uuid4()
+    source = SourceReference(document_id=document_id, page_number=35, quote="Zone sans risque")
+    environmental_risk = NormalizedDiagnosticFinding(
+        kind=DiagnosticKind.ENVIRONMENTAL_RISK,
+        result=DiagnosticResult.CLEAR,
+        description="Le diagnostic ne relève aucun risque environnemental.",
+        diagnostic_date=None,
+        valid_until=None,
+        measured_surface_m2=None,
+        source=source,
+    )
+
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=[],
+        document_names={document_id: "ERP.pdf"},
+        dpe_documents=[],
+        diagnostics=[NormalizedDiagnostics(findings=[environmental_risk, environmental_risk])],
+    )
+
+    reassuring = report.sections[-1].findings
+    assert [finding.finding_key for finding in reassuring] == [
+        f"REASSURING_ENVIRONMENTAL_RISK:{document_id}:35"
+    ]
+    assert report.summary.reassuring_count == 1
