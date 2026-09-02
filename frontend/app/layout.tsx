@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://acquora.fr"),
   applicationName: "Acquora",
   title: "Acquora — Achetez en sachant",
   description: "Analyse documentée des risques d’un achat immobilier en France.",

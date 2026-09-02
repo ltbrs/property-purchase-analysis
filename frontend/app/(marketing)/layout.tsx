@@ -52,7 +52,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
         <nav aria-label="Rubriques du blog">
           <Link href={marketingRoutes.blogDpe}>DPE</Link>
           <Link href={marketingRoutes.blogCoproperty}>Copropriété</Link>
-          <Link href={`${marketingRoutes.blog}/exemple-article`}>Article exemple</Link>
+          <Link href={`${marketingRoutes.blog}/documents-achat-appartement`}>Documents à vérifier</Link>
         </nav>
       </footer>
     </div>

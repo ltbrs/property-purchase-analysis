@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title description">
+  <title id="title">Documents à vérifier avant l’achat d’un appartement</title>
+  <desc id="description">Une chemise contenant plusieurs documents, placée devant un immeuble stylisé.</desc>
+  <rect width="1200" height="675" rx="32" fill="#eaf1ed"/>
+  <circle cx="1048" cy="116" r="170" fill="#d8ff72" opacity=".78"/>
+  <circle cx="101" cy="608" r="230" fill="#d7e5df"/>
+  <path d="M706 146h318v392H706z" fill="#315e52"/>
+  <path d="M746 196h62v76h-62zm88 0h62v76h-62zm88 0h62v76h-62zm-176 105h62v76h-62zm88 0h62v76h-62zm88 0h62v76h-62zm-176 105h62v76h-62zm176 0h62v76h-62z" fill="#f7faf8" opacity=".94"/>
+  <path d="M823 392h84v146h-84z" fill="#102a25"/>
+  <path d="M218 244h252l42 47h232v281H218z" fill="#d8ff72"/>
+  <path d="M263 194h336l69 300H332z" fill="#fff" transform="rotate(-4 465 344)"/>
+  <path d="M320 264h212M326 306h268M332 348h233M338 390h250" stroke="#aabbb4" stroke-width="15" stroke-linecap="round"/>
+  <circle cx="593" cy="431" r="58" fill="#315e52"/>
+  <path d="m568 431 18 18 34-39" fill="none" stroke="#d8ff72" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M184 572h832" stroke="#102a25" stroke-width="12" stroke-linecap="round" opacity=".15"/>
+</svg>
