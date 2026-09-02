@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_db_session
 from app.documents.models import DocumentRecord
 from app.main import create_app
-from app.property.models import AnalysisCaseRecord
+from app.property.models import AnalysisCaseRecord, AuthAccountRecord, UserRecord
 from app.storage.object_storage import ObjectStorageError, get_object_storage
 
 PDF_CONTENT = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
@@ -516,3 +516,57 @@ def test_storage_delete_failure_keeps_document_metadata(
 
     assert response.status_code == 502
     assert session.scalar(select(DocumentRecord)) is not None
+
+
+def test_authenticated_identity_is_persisted(
+    client: TestClient, session: Session
+) -> None:
+    user_id = uuid4()
+
+    response = client.get(
+        "/api/v1/analysis-cases",
+        headers={
+            "X-User-Id": str(user_id),
+            "X-User-Name": "L%C3%A9a%20Martin",
+            "X-User-Email": "Lea.Martin@Example.com",
+            "X-User-Email-Verified": "true",
+            "X-Auth-Provider": "google",
+            "X-Auth-Provider-Account-Id": "google-account-123",
+        },
+    )
+
+    assert response.status_code == 200
+    user = session.get(UserRecord, user_id)
+    assert user is not None
+    assert user.name == "Léa Martin"
+    assert user.email == "lea.martin@example.com"
+    assert user.email_verified is True
+
+    account = session.get(AuthAccountRecord, ("google", "google-account-123"))
+    assert account is not None
+    assert account.user_id == user_id
+
+
+def test_identity_profile_is_refreshed_from_authentication(
+    client: TestClient, session: Session
+) -> None:
+    user_id = uuid4()
+    initial_headers = {
+        "X-User-Id": str(user_id),
+        "X-User-Email": "before@example.com",
+    }
+    assert client.get("/api/v1/analysis-cases", headers=initial_headers).status_code == 200
+
+    updated_headers = {
+        "X-User-Id": str(user_id),
+        "X-User-Name": "Nouveau%20nom",
+        "X-User-Email": "after@example.com",
+        "X-User-Email-Verified": "true",
+    }
+    assert client.get("/api/v1/analysis-cases", headers=updated_headers).status_code == 200
+
+    user = session.get(UserRecord, user_id)
+    assert user is not None
+    assert user.name == "Nouveau nom"
+    assert user.email == "after@example.com"
+    assert user.email_verified is True

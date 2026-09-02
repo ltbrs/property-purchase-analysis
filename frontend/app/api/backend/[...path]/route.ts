@@ -38,6 +38,22 @@ async function proxyToBackend(
   if (accept) headers.set("Accept", accept);
   if (contentType) headers.set("Content-Type", contentType);
   headers.set("X-User-Id", userId);
+  if (session.user.name) {
+    headers.set("X-User-Name", encodeURIComponent(session.user.name));
+  }
+  if (session.user.email) {
+    headers.set("X-User-Email", session.user.email);
+  }
+  headers.set("X-User-Email-Verified", String(session.user.isEmailVerified));
+  if (session.user.authProvider) {
+    headers.set("X-Auth-Provider", session.user.authProvider);
+  }
+  if (session.user.authProviderAccountId) {
+    headers.set(
+      "X-Auth-Provider-Account-Id",
+      encodeURIComponent(session.user.authProviderAccountId),
+    );
+  }
 
   const options: RequestInit & { duplex?: "half" } = {
     method: request.method,

@@ -28,10 +28,11 @@ class Settings(BaseSettings):
     document_view_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
     max_upload_size_bytes: int = 25 * 1024 * 1024
     openai_api_key: SecretStr | None = None
-    ademe_dpe_api_url: str = (
-        "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
-    )
+    ademe_dpe_api_url: str = "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
     ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    contact_proxy_secret: SecretStr | None = None
+    contact_short_rate_limit: int = Field(default=5, ge=1, le=100)
+    contact_daily_rate_limit: int = Field(default=20, ge=1, le=1000)
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -43,6 +44,13 @@ class Settings(BaseSettings):
     @field_validator("openai_api_key", mode="before")
     @classmethod
     def empty_openai_api_key_is_unconfigured(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("contact_proxy_secret", mode="before")
+    @classmethod
+    def empty_contact_proxy_secret_is_unconfigured(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value

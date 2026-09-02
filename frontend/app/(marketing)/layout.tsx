@@ -21,7 +21,7 @@ const navigation = [
   { href: marketingRoutes.pricing, label: "Tarifs" },
   { href: marketingRoutes.exampleAnalysis, label: "Exemple d’analyse" },
   { href: marketingRoutes.blog, label: "Blog" },
-  { href: marketingRoutes.faq, label: "FAQ" },
+  { href: marketingRoutes.contact, label: "Nous contacter" },
 ] as const;
 
 type MarketingLayoutProps = Readonly<{
@@ -48,12 +48,51 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
       <main className="marketing-main">{children}</main>
 
       <footer className="marketing-footer">
-        <span>Acquora.fr</span>
-        <nav aria-label="Rubriques du blog">
-          <Link href={marketingRoutes.blogDpe}>DPE</Link>
-          <Link href={marketingRoutes.blogCoproperty}>Copropriété</Link>
-          <Link href={`${marketingRoutes.blog}/documents-achat-appartement`}>Documents à vérifier</Link>
-        </nav>
+        <div className="marketing-footer-inner">
+          <div className="marketing-footer-intro">
+            <BrandLink
+              appearance="on-dark"
+              className="marketing-footer-brand"
+              href={marketingRoutes.home}
+            />
+            <p>
+              Les documents de votre achat immobilier, transformés en points de
+              vigilance clairs et sourcés.
+            </p>
+          </div>
+
+          <nav className="marketing-footer-links" aria-label="Pied de page">
+            <div>
+              <strong>Découvrir</strong>
+              <Link href={marketingRoutes.features}>Fonctionnalités</Link>
+              <Link href={marketingRoutes.howItWorks}>Comment ça marche</Link>
+              <Link href={marketingRoutes.pricing}>Tarifs</Link>
+              <Link href={marketingRoutes.exampleAnalysis}>Exemple d’analyse</Link>
+            </div>
+            <div>
+              <strong>Ressources</strong>
+              <Link href={marketingRoutes.blog}>Tous les guides</Link>
+              <Link href={marketingRoutes.blogDpe}>DPE</Link>
+              <Link href={marketingRoutes.blogCoproperty}>Copropriété</Link>
+              <Link href={`${marketingRoutes.blog}/documents-achat-appartement`}>
+                Documents à vérifier
+              </Link>
+            </div>
+            <div>
+              <strong>Acquora</strong>
+              <Link href={marketingRoutes.contact}>Nous contacter</Link>
+              <Link href={productRoutes.home}>Mon espace personnel</Link>
+            </div>
+          </nav>
+
+          <div className="marketing-footer-bottom">
+            <span>© {new Date().getFullYear()} Acquora</span>
+            <p>
+              Outil d’aide à la décision. Ne remplace pas les conseils d’un
+              notaire, d’un diagnostiqueur ou d’un professionnel du bâtiment.
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   );

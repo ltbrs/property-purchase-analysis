@@ -7,7 +7,7 @@ export const marketingRoutes = {
   blog: "/blog",
   blogDpe: "/blog/dpe",
   blogCoproperty: "/blog/copropriete",
-  faq: "/faq",
+  contact: "/nous-contacter",
 } as const;
 
 export const productRoutes = {

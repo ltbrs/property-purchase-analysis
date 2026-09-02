@@ -19,6 +19,7 @@ It is not legal, notarial, engineering, energy-audit, or financial advice. Do no
 
 - Frontend: Next.js and TypeScript.
 - Backend: FastAPI, Python, Pydantic, `uv`, and `pytest`.
+- Use the `slowapi` package for HTTP rate limiting.
 - Data: PostgreSQL, preferably Supabase for the MVP.
 - Files: private S3-compatible object storage.
 - Documents: Xberg by default, with vision only for poorly extracted or scanned pages.
@@ -66,9 +67,13 @@ Track extraction, monetary, date, and citation accuracy, plus risk recall and fa
 ## Frontend
 
 The main UX is a trustworthy inspection report, not a chatbot or AI demo. Prioritize financial, building, copropriété, energy, diagnostic, and safety risks, followed by inconsistencies, missing information, and reassuring findings. Show a source for each finding.
-
 Never set an accent border in the UI.
+Consider the user can have screen as low as 1080p.
 
 ## Style
 
 Do not use an em dash, an en dash as an aside, or a double hyphen as punctuation. Rewrite with a comma, parentheses, a colon, or two sentences. List bullets and dashes between a bold label and its gloss are allowed.
+
+# Proactivity
+
+The project is largely coded via AI, meaning that short prompt doesn't mean you have to do the only specified tasks but you need to ensure global coherency in the product.

@@ -36,15 +36,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/connexion",
   },
   callbacks: {
-    jwt({ token, account }) {
+    jwt({ token, account, profile }) {
       if (account?.provider === "google") {
         token.userId = googleAccountIdToUserId(account.providerAccountId);
+      }
+      if (account) {
+        token.authProvider = account.provider;
+        token.authProviderAccountId = account.providerAccountId;
+        token.isEmailVerified = profile?.email_verified === true;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user && typeof token.userId === "string") {
         session.user.id = token.userId;
+        session.user.authProvider = token.authProvider;
+        session.user.authProviderAccountId = token.authProviderAccountId;
+        session.user.isEmailVerified = token.isEmailVerified === true;
       }
       return session;
     },

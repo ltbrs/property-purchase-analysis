@@ -24,7 +24,7 @@ export const blogArticles = [
       "Copropriété, charges, travaux et diagnostics : les pièces à demander, ce qu’elles révèlent et les incohérences à repérer avant de signer.",
     category: "Copropriété",
     categoryHref: "/blog/copropriete",
-    publishedAt: "2026-09-02",
+    publishedAt: "2026-02-02",
     modifiedAt: "2026-09-02",
     readingTime: "10 min",
     cover: "/images/blog/documents-achat-appartement.svg",

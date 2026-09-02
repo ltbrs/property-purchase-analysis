@@ -1,3 +1,7 @@
+import { permanentRedirect } from "next/navigation";
+
+import { marketingRoutes } from "@/lib/routes";
+
 export default function FaqPage() {
-  return <p className="marketing-placeholder">Questions fréquentes sur Acquora.</p>;
+  permanentRedirect(marketingRoutes.contact);
 }

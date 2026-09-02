@@ -1,5 +1,10 @@
 """Validated normalized property models."""
 
-from app.property.models.analysis_case import AnalysisCaseRecord, PropertyType, UserRecord
+from app.property.models.analysis_case import (
+    AnalysisCaseRecord,
+    AuthAccountRecord,
+    PropertyType,
+    UserRecord,
+)
 
-__all__ = ["AnalysisCaseRecord", "PropertyType", "UserRecord"]
+__all__ = ["AnalysisCaseRecord", "AuthAccountRecord", "PropertyType", "UserRecord"]
