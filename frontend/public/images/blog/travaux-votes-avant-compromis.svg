@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title description">
+  <title id="title">Travaux votés avant le compromis</title>
+  <desc id="description">Un calendrier d’appels de fonds, une clé et un immeuble de copropriété stylisé.</desc>
+  <rect width="1200" height="675" rx="32" fill="#eaf1ed"/>
+  <circle cx="1090" cy="92" r="190" fill="#d8ff72" opacity=".78"/>
+  <circle cx="106" cy="618" r="230" fill="#d7e5df"/>
+  <path d="M778 134h274v430H778z" fill="#315e52"/>
+  <path d="M816 187h54v67h-54zm75 0h54v67h-54zm75 0h54v67h-54zm-150 92h54v67h-54zm75 0h54v67h-54zm75 0h54v67h-54zm-150 92h54v67h-54zm150 0h54v67h-54z" fill="#f7faf8" opacity=".94"/>
+  <path d="M886 424h58v140h-58z" fill="#102a25"/>
+  <rect x="201" y="137" width="555" height="401" rx="28" fill="#fff" transform="rotate(-3 478 338)"/>
+  <path d="M205 214h554v-49a28 28 0 0 0-29-26l-500 26a28 28 0 0 0-25 29z" fill="#d8ff72" transform="rotate(-3 478 177)"/>
+  <path d="M321 129v78m318-95v78" stroke="#315e52" stroke-width="20" stroke-linecap="round"/>
+  <path d="M275 279h91v76h-91zm120 0h91v76h-91zm120 0h91v76h-91zm120 0h62v76h-62zM275 382h91v76h-91zm120 0h91v76h-91zm120 0h91v76h-91z" fill="#e5eee9" transform="rotate(-3 486 368)"/>
+  <path d="M522 413a52 52 0 1 1 104 0 52 52 0 0 1-104 0z" fill="#315e52"/>
+  <path d="m554 413 15 15 29-34" fill="none" stroke="#d8ff72" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="721" cy="466" r="48" fill="#f7faf8" stroke="#102a25" stroke-width="16"/>
+  <path d="m688 501-83 83m22-22 28 28m-2-54 27 27" fill="none" stroke="#102a25" stroke-width="17" stroke-linecap="round"/>
+  <path d="M163 574h880" stroke="#102a25" stroke-width="12" stroke-linecap="round" opacity=".15"/>
+</svg>

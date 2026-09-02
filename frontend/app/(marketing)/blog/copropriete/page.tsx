@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
-import { blogArticles, SITE_URL } from "@/lib/blog";
+import { blogArticles, formatBlogDate, SITE_URL } from "@/lib/blog";
 
 export const metadata: Metadata = {
   title: "Guides sur la copropriété",
@@ -40,6 +40,7 @@ export default function CopropertyBlogPage() {
             <div className="blog-card-copy">
               <div className="blog-card-meta">
                 <span>{article.category}</span>
+                <time dateTime={article.publishedAt}>{formatBlogDate(article.publishedAt)}</time>
                 <span>{article.readingTime} de lecture</span>
               </div>
               <h2><Link href={`/blog/${article.slug}`}>{article.title}</Link></h2>

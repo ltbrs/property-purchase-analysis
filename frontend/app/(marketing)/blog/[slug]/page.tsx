@@ -5,17 +5,16 @@ import { notFound } from "next/navigation";
 
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon } from "@/components/icons";
-import { blogArticles, getBlogArticle, SITE_URL, type BlogArticle } from "@/lib/blog";
+import {
+  blogArticles,
+  formatBlogDate,
+  getBlogArticle,
+  SITE_URL,
+  type BlogArticle,
+} from "@/lib/blog";
 import { marketingRoutes, productRoutes } from "@/lib/routes";
 
 type BlogArticlePageProps = Readonly<{ params: Promise<{ slug: string }> }>;
-
-const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/Paris",
-});
 
 export function generateStaticParams() {
   return blogArticles.map(({ slug }) => ({ slug }));
@@ -114,7 +113,7 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
           </p>
           <div className="article-byline">
             <time dateTime={article.publishedAt}>
-              Publié le {dateFormatter.format(new Date(`${article.publishedAt}T12:00:00+02:00`))}
+              Publié le {formatBlogDate(article.publishedAt)}
             </time>
             <span>{article.readingTime} de lecture</span>
           </div>
@@ -254,7 +253,10 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
                 <li>ce qui est inclus dans les charges, notamment chauffage, eau, ascenseur et gardiennage ;</li>
                 <li>l’écart entre le budget voté et les dépenses réelles ;</li>
                 <li>la progression des impayés et des dettes fournisseurs ;</li>
-                <li>les appels de fonds déjà votés, leur calendrier et la répartition prévue dans l’acte.</li>
+                <li>
+                  les <Link href="/blog/travaux-votes-avant-compromis">appels de fonds pour les travaux votés</Link>,
+                  leur calendrier et la répartition prévue dans l’acte.
+                </li>
               </ul>
             </div>
 
@@ -431,9 +433,303 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
   );
 }
 
+function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
+  return (
+    <>
+      <JsonLd article={article} />
+      <article className="blog-article">
+        <nav className="blog-breadcrumb" aria-label="Fil d’Ariane">
+          <Link href={marketingRoutes.home}>Accueil</Link>
+          <span aria-hidden="true">/</span>
+          <Link href={marketingRoutes.blog}>Blog</Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Travaux votés</span>
+        </nav>
+
+        <header className="article-header">
+          <Link className="article-category" href={article.categoryHref}>{article.category}</Link>
+          <h1>{article.title}</h1>
+          <p className="article-standfirst">
+            La date du vote ne suffit pas à répondre. Voici comment relier le
+            calendrier des appels de fonds, la date de vente et la clause du
+            compromis pour savoir qui règle le syndic et qui supporte le coût final.
+          </p>
+          <div className="article-byline">
+            <time dateTime={article.publishedAt}>
+              Publié le {formatBlogDate(article.publishedAt)}
+            </time>
+            <span>{article.readingTime} de lecture</span>
+          </div>
+        </header>
+
+        <figure className="article-cover">
+          <Image
+            src={article.cover}
+            alt={article.coverAlt}
+            fill
+            priority
+            sizes="(max-width: 64rem) 100vw, 1024px"
+          />
+        </figure>
+
+        <div className="article-layout">
+          <aside className="article-toc" aria-label="Sommaire">
+            <strong>Dans ce guide</strong>
+            <ol>
+              <li><a href="#reponse">La réponse courte</a></li>
+              <li><a href="#regle">La règle des appels</a></li>
+              <li><a href="#compromis">Le rôle du compromis</a></li>
+              <li><a href="#exemple">Un exemple chiffré</a></li>
+              <li><a href="#documents">Les documents à vérifier</a></li>
+              <li><a href="#checklist">La checklist avant signature</a></li>
+            </ol>
+          </aside>
+
+          <div className="article-body">
+            <div className="article-callout article-callout--key" id="reponse">
+              <strong>La réponse courte</strong>
+              <p>
+                Pour des travaux votés avant le compromis et financés hors
+                budget prévisionnel, le syndic réclame chaque appel de fonds à
+                la personne qui est copropriétaire lorsqu’il devient exigible.
+                Le vendeur paie donc les appels exigibles avant la vente, puis
+                l’acquéreur ceux exigibles après la vente. Le compromis ou l’acte
+                peut prévoir une autre répartition entre eux, mais cet accord ne
+                s’impose pas au syndic.
+              </p>
+            </div>
+
+            <p>
+              Trois dates doivent être séparées : le vote des travaux en
+              assemblée générale, la signature du compromis et la date
+              d’exigibilité de chaque appel de fonds. La signature de l’acte
+              authentique, qui marque habituellement la vente et le changement de
+              propriétaire, complète cette chronologie. Confondre ces dates peut
+              conduire un acquéreur à sous-estimer plusieurs milliers d’euros.
+            </p>
+
+            <h2 id="regle">La date d’exigibilité compte plus que la date du vote</h2>
+            <p>
+              L’<a href="https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006488321">article 6-2 du décret du 17 mars 1967</a>{" "}
+              distingue les provisions du budget prévisionnel des dépenses qui
+              n’y sont pas comprises. Pour ces dépenses hors budget, dont relèvent
+              notamment certains travaux d’amélioration ou travaux autres que de
+              maintenance, le paiement incombe à celui qui est copropriétaire au
+              moment où la provision est exigible.
+            </p>
+            <p>
+              En pratique, l’assemblée générale vote le montant et peut fixer un
+              calendrier d’appels. Le travail peut ne pas avoir commencé lorsque
+              le paiement devient exigible. Inversement, un chantier visible ne
+              permet pas de savoir si tous les appels ont déjà été réglés. La
+              fiche de <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F32920">Service Public sur les charges l’année de la vente</a>{" "}
+              confirme cette lecture appel par appel.
+            </p>
+
+            <div className="article-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Situation</th><th>Interlocuteur du syndic</th><th>Point à contrôler</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Appel exigible avant la vente</td>
+                    <td>Le vendeur, encore copropriétaire</td>
+                    <td>Date d’exigibilité indiquée dans la décision ou l’appel</td>
+                  </tr>
+                  <tr>
+                    <td>Appel exigible après la vente</td>
+                    <td>L’acquéreur, devenu copropriétaire</td>
+                    <td>Clause de répartition entre vendeur et acquéreur</td>
+                  </tr>
+                  <tr>
+                    <td>Travaux seulement évoqués ou chiffrés</td>
+                    <td>Pas encore d’appel certain au titre de ces travaux</td>
+                    <td>Devis, ordre du jour, projet de plan et prochain vote</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h2 id="compromis">Le compromis peut changer la charge finale, pas la demande du syndic</h2>
+            <p>
+              Le vendeur et l’acquéreur peuvent convenir que le vendeur supportera
+              tous les travaux votés avant le compromis, y compris les appels
+              exigibles après la vente. Ils peuvent aussi retenir une autre date
+              de partage. Cette répartition doit être lue dans votre propre avant-contrat
+              et reprise de manière cohérente dans l’acte authentique.
+            </p>
+            <p>
+              L’<a href="https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006488324">article 6-3 du même décret</a>{" "}
+              précise qu’une convention contraire à la règle légale ne produit
+              d’effet qu’entre les parties. Autrement dit, si un appel devient
+              exigible après la vente, le syndic peut le demander à l’acquéreur,
+              même si le compromis met finalement cette somme à la charge du
+              vendeur. La clause doit donc aussi prévoir clairement comment le
+              montant sera réglé entre eux.
+            </p>
+
+            <div className="article-callout article-callout--warning">
+              <strong>Deux questions, deux réponses possibles</strong>
+              <ul>
+                <li><strong>Qui le syndic peut-il appeler ?</strong> Le copropriétaire à la date d’exigibilité.</li>
+                <li><strong>Qui garde le coût à sa charge ?</strong> La personne désignée par la clause du compromis ou de l’acte, si cette clause déroge à la règle.</li>
+              </ul>
+            </div>
+
+            <h2 id="exemple">Exemple : trois appels autour de la vente</h2>
+            <p>
+              L’assemblée générale vote avant le compromis un ravalement. La
+              quote-part du lot est de 9 000 €, appelée en trois fois. Le
+              compromis est signé le 5 juin et l’acte authentique le 2 septembre.
+            </p>
+            <div className="article-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Date d’exigibilité</th><th>Montant</th><th>Qui paie le syndic ?</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>15 mai</td><td>3 000 €</td><td>Le vendeur</td></tr>
+                  <tr><td>15 août</td><td>3 000 €</td><td>Le vendeur</td></tr>
+                  <tr><td>15 novembre</td><td>3 000 €</td><td>L’acquéreur</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Ce tableau applique la règle vis-à-vis du syndic. Si le compromis
+              stipule que les travaux votés avant sa signature restent entièrement
+              à la charge du vendeur, les parties doivent aussi organiser le sort
+              des 3 000 € de novembre. Faites confirmer le calcul et son mode
+              de règlement par le notaire avant la signature.
+            </p>
+
+            <h2 id="documents">Les documents qui permettent de calculer votre exposition</h2>
+            <p>
+              Une mention telle que « ravalement voté » ne suffit pas. Pour
+              reconstituer le coût restant, il faut rapprocher plusieurs pièces.
+              Notre guide sur les <Link href="/blog/documents-achat-appartement">documents à vérifier avant l’achat d’un appartement</Link>{" "}
+              explique comment les lire ensemble.
+            </p>
+            <ul className="article-check-list">
+              <li><strong>Le procès-verbal d’assemblée générale :</strong> résolution adoptée, montant voté, clé de répartition et calendrier prévu.</li>
+              <li><strong>Les appels de fonds :</strong> montant attribué au lot, date d’exigibilité et sommes déjà réglées.</li>
+              <li><strong>Le compromis :</strong> date charnière choisie par les parties, périmètre des travaux et traitement des appels postérieurs à la vente.</li>
+              <li><strong>L’état daté :</strong> provisions déjà exigibles et provisions hors budget qui ne le sont pas encore.</li>
+              <li><strong>Les derniers procès-verbaux et le plan pluriannuel :</strong> autres travaux à l’étude, reportés ou susceptibles d’être votés.</li>
+            </ul>
+            <p>
+              L’état daté est établi par le syndic et transmis au notaire avant
+              la vente. Il distingue notamment les provisions exigibles du vendeur
+              et les provisions non encore exigibles qui seront à la charge de
+              l’acquéreur, comme l’explique la{" "}
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37294">fiche officielle sur l’état daté</a>.
+              Il reste indicatif jusqu’à l’arrêté des comptes. Il doit donc être
+              rapproché du procès-verbal et de la clause contractuelle.
+            </p>
+
+            <h3>Et le fonds travaux déjà constitué ?</h3>
+            <p>
+              Les <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F32920">cotisations versées au fonds travaux ne sont pas remboursées au vendeur</a>{" "}
+              par le syndicat lors de la vente. Ce point est distinct des appels
+              propres au chantier voté. Il faut vérifier si l’assemblée a décidé
+              d’affecter une partie du fonds au financement des travaux et quel
+              solde reste à appeler.
+            </p>
+
+            <h3>Et si une assemblée se tient entre le compromis et la vente ?</h3>
+            <p>
+              Ne transposez pas automatiquement la réponse donnée pour des travaux
+              votés avant le compromis. Lisez la clause consacrée aux assemblées
+              organisées pendant cette période : transmission de la convocation,
+              pouvoir de vote, décisions concernées et répartition de leur coût.
+              Demandez au notaire de clarifier toute formulation qui ne permet pas
+              de relier une résolution à un payeur.
+            </p>
+
+            <h2 id="checklist">La checklist avant de signer le compromis</h2>
+            <ol>
+              <li>Identifiez chaque résolution de travaux adoptée et le lot concerné.</li>
+              <li>Relevez votre quote-part, le montant total et les éventuels honoraires associés.</li>
+              <li>Listez les dates d’exigibilité passées et futures, pas seulement les dates d’envoi.</li>
+              <li>Demandez la preuve des appels déjà réglés par le vendeur.</li>
+              <li>Comparez le calendrier avec la date prévue de l’acte authentique.</li>
+              <li>Faites désigner sans ambiguïté la partie qui supporte chaque somme.</li>
+              <li>Vérifiez le mécanisme prévu si le syndic appelle l’autre partie.</li>
+              <li>Actualisez le calcul avant l’acte à partir de l’état daté.</li>
+            </ol>
+
+            <div className="article-callout">
+              <strong>La question à poser au notaire</strong>
+              <p>
+                « Pour chaque appel de fonds restant, qui paiera le syndic à la
+                date d’exigibilité, qui en conservera la charge finale selon l’acte,
+                et comment l’écart sera-t-il réglé entre le vendeur et moi ? »
+              </p>
+            </div>
+
+            <h2>Questions fréquentes</h2>
+            <h3>Le vendeur doit-il payer tous les travaux votés avant le compromis ?</h3>
+            <p>
+              Pas automatiquement vis-à-vis du syndic. Il paie les appels exigibles
+              tant qu’il est copropriétaire. Une clause peut toutefois mettre à sa
+              charge finale tous les travaux votés avant le compromis. Il faut lire
+              l’avant-contrat, puis vérifier sa reprise dans l’acte.
+            </p>
+            <h3>L’acquéreur peut-il recevoir un appel pour des travaux votés avant son achat ?</h3>
+            <p>
+              Oui. Si l’appel devient exigible après la vente, le syndic peut le
+              réclamer au nouveau copropriétaire. La répartition contractuelle avec
+              le vendeur se traite séparément.
+            </p>
+            <h3>Des travaux refusés ou reportés doivent-ils entrer dans le calcul ?</h3>
+            <p>
+              Ils ne constituent pas encore un appel de fonds certain. Ils restent
+              toutefois un coût futur possible. Conservez-les dans une estimation
+              séparée, avec leur devis, leur niveau de maturité et la date du prochain vote.
+            </p>
+
+            <section className="article-sources" aria-labelledby="sources-title">
+              <h2 id="sources-title">Sources officielles</h2>
+              <ul>
+                <li><a href="https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006488321">Décret du 17 mars 1967, article 6-2 sur la répartition des provisions</a></li>
+                <li><a href="https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006488324">Décret du 17 mars 1967, article 6-3 sur les conventions entre les parties</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F32920">Service Public, paiement des charges de copropriété l’année de la vente</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37294">Service Public, contenu et rôle de l’état daté</a></li>
+              </ul>
+              <p>Sources consultées le 2 septembre 2026.</p>
+            </section>
+
+            <p className="article-disclaimer">
+              Ce guide présente les règles générales applicables à une vente en
+              copropriété. Il ne remplace pas l’analyse de votre compromis, de vos
+              appels de fonds et de votre situation par un notaire.
+            </p>
+
+            <section className="article-cta" aria-labelledby="article-cta-title">
+              <div>
+                <p className="blog-kicker">Des dates aux montants</p>
+                <h2 id="article-cta-title">Reliez les décisions aux appels de fonds.</h2>
+                <p>
+                  Acquora analyse les documents de la copropriété, rapproche les
+                  travaux et leurs sources, puis présente les points à clarifier.
+                </p>
+              </div>
+              <div>
+                <ButtonLink href={productRoutes.home}>Analyser mon bien <Icon name="arrow" /></ButtonLink>
+                <Link href={marketingRoutes.exampleAnalysis}>Voir un exemple d’analyse</Link>
+              </div>
+            </section>
+          </div>
+        </div>
+      </article>
+    </>
+  );
+}
+
 export default async function BlogArticlePage({ params }: BlogArticlePageProps) {
   const article = getBlogArticle((await params).slug);
   if (!article) notFound();
   if (article.slug === "documents-achat-appartement") return <DocumentsArticle article={article} />;
+  if (article.slug === "travaux-votes-avant-compromis") return <VotedWorksArticle article={article} />;
   notFound();
 }

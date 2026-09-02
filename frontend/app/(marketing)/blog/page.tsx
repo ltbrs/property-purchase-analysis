@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
-import { blogArticles, SITE_URL } from "@/lib/blog";
+import { blogArticles, formatBlogDate, SITE_URL } from "@/lib/blog";
 
 export const metadata: Metadata = {
   title: "Blog immobilier",
@@ -37,6 +37,7 @@ export default function BlogPage() {
             <div className="blog-card-copy">
               <div className="blog-card-meta">
                 <Link href={article.categoryHref}>{article.category}</Link>
+                <time dateTime={article.publishedAt}>{formatBlogDate(article.publishedAt)}</time>
                 <span>{article.readingTime} de lecture</span>
               </div>
               <h2>

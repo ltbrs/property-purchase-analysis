@@ -27,10 +27,6 @@ export default function ContactPage() {
             <p>Chaque demande est lue par l’équipe Acquora.</p>
           </article>
           <article>
-            <strong>Vos données restent sobres</strong>
-            <p>Nous conservons uniquement les informations utiles à votre demande.</p>
-          </article>
-          <article>
             <strong>Aucun document sensible</strong>
             <p>
               N’ajoutez pas de document immobilier dans ce formulaire. Utilisez
