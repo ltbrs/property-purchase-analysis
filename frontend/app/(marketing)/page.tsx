@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon, type IconName } from "@/components/icons";
 import { ProductWorkflowPlayer } from "@/components/marketing/product-workflow-player";
-import { marketingRoutes, productRoutes } from "@/lib/routes";
+import { productRoutes } from "@/lib/routes";
 
 export const metadata: Metadata = {
   description:
@@ -79,9 +78,6 @@ export default function MarketingHomePage() {
             <ButtonLink href={productRoutes.home} className="home-primary-cta">
               Analyser mon bien <Icon name="arrow" />
             </ButtonLink>
-            <Link className="home-secondary-cta" href={marketingRoutes.exampleAnalysis}>
-              Voir un exemple d’analyse <Icon name="chevron" />
-            </Link>
           </div>
           <div className="home-trust-list" aria-label="Engagements Acquora">
             {trustPoints.map((point) => (
@@ -174,9 +170,6 @@ export default function MarketingHomePage() {
             <li><Icon name="check" /> Niveau d’importance explicite</li>
             <li><Icon name="check" /> Incertitudes signalées, jamais masquées</li>
           </ul>
-          <Link href={marketingRoutes.features} className="home-inline-link">
-            Découvrir les fonctionnalités <Icon name="arrow" />
-          </Link>
         </div>
         <div className="home-report-preview" aria-label="Exemple de constats dans un rapport">
           <div className="home-report-preview-header">

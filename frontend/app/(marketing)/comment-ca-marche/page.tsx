@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon, type IconName } from "@/components/icons";
-import { marketingRoutes, productRoutes } from "@/lib/routes";
+import { productRoutes } from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: "Comment ça marche",
@@ -93,9 +92,6 @@ export default function HowItWorksPage() {
             <ButtonLink href={productRoutes.home} className="how-primary-cta">
               Analyser mon bien <Icon name="arrow" />
             </ButtonLink>
-            <Link className="how-text-link" href={marketingRoutes.exampleAnalysis}>
-              Voir un rapport exemple <Icon name="chevron" />
-            </Link>
           </div>
           <div className="how-hero-reassurance" aria-label="Engagements Acquora">
             <span><Icon name="shield" /> Documents privés</span>
@@ -298,9 +294,6 @@ export default function HowItWorksPage() {
               <li key={benefit}><Icon name="check" /> {benefit}</li>
             ))}
           </ul>
-          <Link className="how-inline-link" href={marketingRoutes.exampleAnalysis}>
-            Explorer un exemple d’analyse <Icon name="arrow" />
-          </Link>
         </div>
       </section>
 

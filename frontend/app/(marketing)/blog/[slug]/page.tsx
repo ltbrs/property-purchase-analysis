@@ -423,7 +423,6 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               </div>
               <div>
                 <ButtonLink href={productRoutes.home}>Analyser mon bien <Icon name="arrow" /></ButtonLink>
-                <Link href={marketingRoutes.exampleAnalysis}>Voir un exemple d’analyse</Link>
               </div>
             </section>
           </div>
@@ -716,7 +715,6 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
               </div>
               <div>
                 <ButtonLink href={productRoutes.home}>Analyser mon bien <Icon name="arrow" /></ButtonLink>
-                <Link href={marketingRoutes.exampleAnalysis}>Voir un exemple d’analyse</Link>
               </div>
             </section>
           </div>

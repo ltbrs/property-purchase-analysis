@@ -16,10 +16,8 @@ export const metadata: Metadata = {
 };
 
 const navigation = [
-  { href: marketingRoutes.features, label: "Fonctionnalités" },
   { href: marketingRoutes.howItWorks, label: "Comment ça marche" },
   { href: marketingRoutes.pricing, label: "Tarifs" },
-  { href: marketingRoutes.exampleAnalysis, label: "Exemple d’analyse" },
   { href: marketingRoutes.blog, label: "Blog" },
   { href: marketingRoutes.contact, label: "Nous contacter" },
 ] as const;
@@ -64,10 +62,8 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
           <nav className="marketing-footer-links" aria-label="Pied de page">
             <div>
               <strong>Découvrir</strong>
-              <Link href={marketingRoutes.features}>Fonctionnalités</Link>
               <Link href={marketingRoutes.howItWorks}>Comment ça marche</Link>
               <Link href={marketingRoutes.pricing}>Tarifs</Link>
-              <Link href={marketingRoutes.exampleAnalysis}>Exemple d’analyse</Link>
             </div>
             <div>
               <strong>Ressources</strong>

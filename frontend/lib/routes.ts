@@ -1,9 +1,7 @@
 export const marketingRoutes = {
   home: "/",
-  features: "/fonctionnalites",
   howItWorks: "/comment-ca-marche",
   pricing: "/tarifs",
-  exampleAnalysis: "/exemple-analyse",
   blog: "/blog",
   blogDpe: "/blog/dpe",
   blogCoproperty: "/blog/copropriete",
