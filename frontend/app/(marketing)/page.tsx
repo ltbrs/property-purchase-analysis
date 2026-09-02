@@ -117,7 +117,6 @@ export default function MarketingHomePage() {
               <span><strong>Travaux à chiffrer</strong><small>Source : PV d’AG · page 11</small></span>
             </div>
           </div>
-          <span className="home-photo-caption">Un achat serein commence par les bons faits.</span>
         </div>
       </section>
 

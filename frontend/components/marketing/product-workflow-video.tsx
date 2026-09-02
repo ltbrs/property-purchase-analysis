@@ -229,7 +229,7 @@ function AnalysisScene({ frame }: { frame: number }) {
           <span style={{ color: colors.green, fontSize: 30, fontWeight: 850 }}>{Math.round(progress)}%</span>
         </div>
         <div style={{ background: colors.canvas, borderRadius: 999, height: 12, overflow: "hidden" }}>
-          <div style={{ background: colors.lime, borderRadius: 999, height: "100%", width: `${progress}%` }} />
+          <div style={{ background: colors.green, borderRadius: 999, height: "100%", width: `${progress}%` }} />
         </div>
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(3, 1fr)", marginTop: 26 }}>
           {facts.map((fact, index) => {

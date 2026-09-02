@@ -3,14 +3,16 @@
   "tasks": [
     {
       "label": "Check Docker",
-      "type": "shell",
-      "command": "docker info",
+      "type": "process",
+      "command": "docker",
+      "args": ["info"],
       "problemMatcher": []
     },
     {
       "label": "Start Services",
-      "type": "shell",
-      "command": "docker compose up -d",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "up", "-d"],
       "dependsOn": "Check Docker",
       "options": {
         "cwd": "${workspaceFolder}"
@@ -19,13 +21,11 @@
     },
     {
       "label": "Start Backend",
-      "type": "shell",
-      "command": "uv run uvicorn app.main:app --reload --port 8000",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "uvicorn", "app.main:app", "--reload", "--port", "8000"],
       "options": {
-        "cwd": "${workspaceFolder}/backend",
-        "env": {
-          "PATH": "${env:HOME}/.local/node-current/bin:${env:HOME}/.local/bin:${env:PATH}"
-        }
+        "cwd": "${workspaceFolder}/backend"
       },
       "isBackground": true,
       "problemMatcher": {
@@ -46,13 +46,11 @@
     },
     {
       "label": "Start Frontend",
-      "type": "shell",
-      "command": "npm run dev",
+      "type": "process",
+      "command": "npm",
+      "args": ["run", "dev"],
       "options": {
-        "cwd": "${workspaceFolder}/frontend",
-        "env": {
-          "PATH": "${env:HOME}/.local/node-current/bin:${env:HOME}/.local/bin:${env:PATH}"
-        }
+        "cwd": "${workspaceFolder}/frontend"
       },
       "isBackground": true,
       "problemMatcher": {

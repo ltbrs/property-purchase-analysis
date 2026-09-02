@@ -1,0 +1,1 @@
+The goal of the marketing website is to maximize SEO and being a shiny showcase of the feature.
