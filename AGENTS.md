@@ -1,229 +1,74 @@
 # AGENTS.md
 
-## Product
+## Product and scope
 
-This repository contains a SaaS for home buyers in France.
+Build decision-support software for French home buyers. It extracts facts from property documents and produces a source-backed report of important risks, future costs, inconsistencies, and missing information.
 
-Users upload property documents such as DPEs, diagnostics, copropriété AG minutes, charges, works, and financial statements. The application extracts factual information, applies deterministic real-estate risk rules, and produces a source-backed report highlighting risks, future costs, inconsistencies, and missing information.
+It is not legal, notarial, engineering, energy-audit, or financial advice. Do not expand the MVP beyond this purpose without evidence from real usage.
 
-The product is decision support, not legal, notarial, engineering, energy-audit, or financial advice.
+## Non-negotiable principles
 
-## Core engineering principles
+- Prioritize correctness, traceability, explicit uncertainty, and simple architecture.
+- Never invent facts absent from uploaded documents.
+- Cite the source document and page for important facts and findings whenever possible.
+- Prefer deterministic rules to LLM judgment when rules can be encoded.
+- Validate structured LLM output before persistence. Permit `null`, `unknown`, `not_found`, and `ambiguous`.
+- Keep confirmed facts, inferred risks, missing information, and inconsistencies distinct.
 
-Optimize for:
+## Architecture
 
-1. correctness over cleverness
-2. traceability over fluent answers
-3. deterministic rules over LLM judgment when rules can be encoded
-4. simple architecture over premature infrastructure
-5. explicit uncertainty over invented conclusions
-6. fast iteration over hypothetical scalability
+- Frontend: Next.js and TypeScript.
+- Backend: FastAPI, Python, Pydantic, `uv`, and `pytest`.
+- Data: PostgreSQL, preferably Supabase for the MVP.
+- Files: private S3-compatible object storage.
+- Documents: Xberg by default, with vision only for poorly extracted or scanned pages.
+- AI: one hosted LLM with structured outputs.
 
-Every important user-facing finding should be traceable to its source document and page whenever technically possible.
-
-Never fabricate facts that are absent from the uploaded documents.
-
-## MVP architecture
-
-Use:
-
-- Next.js + TypeScript for the frontend
-- FastAPI + Python + Pydantic for the backend + uv
-- PostgreSQL, preferably Supabase for the MVP
-- S3-compatible object storage for PDFs
-- Xberg as the default PDF parser
-- one hosted LLM with structured outputs
-- vision only as a fallback for poorly extracted or scanned pages
-
-Do not add by default:
-
-- LangChain
-- LlamaIndex
-- vector databases
-- Elasticsearch
-- Kafka
-- Kubernetes
-- Celery
-- Temporal
-- microservices
-- multi-agent orchestration
-
-Introduce infrastructure only when real production needs justify it.
-
-## Processing architecture
-
-Keep the workflow explicit:
+Keep processing explicit:
 
 ```text
-PDF upload
-→ file validation
-→ PDF extraction
-→ document classification
-→ structured extraction
-→ normalized property model
-→ deterministic risk rules
-→ cross-document checks
-→ LLM explanation
-→ source-backed report
+upload → validation → extraction → classification → structured extraction
+→ normalized property model → deterministic risks → cross-document checks
+→ LLM explanation → source-backed report
 ```
 
-Avoid hiding the full workflow behind one autonomous agent.
+Use LLMs for language understanding, classification, structured extraction, normalization, cross-document interpretation, and concise explanations. Use deterministic code for arithmetic, dates, thresholds, totals, permissions, billing, risk severity, and encoded legal or regulatory conditions.
 
-## LLM policy
+Prefer a stable normalized model based on real documents. Do not pass raw LLM output through the application or design an exhaustive schema prematurely.
 
-Use LLMs for:
+Do not add LangChain, LlamaIndex, vector databases, Elasticsearch, Kafka, Kubernetes, Celery, Temporal, microservices, or multi-agent orchestration without a demonstrated production need. Prefer standard-library or framework features and explicit application code before new dependencies.
 
-- understanding document wording
-- structured fact extraction
-- classification
-- normalization
-- cross-document interpretation
-- concise explanations
+## Findings and risk rules
 
-Use deterministic code for:
+Every important extracted fact or risk should retain its source document ID, page when available, and a short quote only when useful. Clearly label findings without documentary evidence as inferred, not confirmed.
 
-- arithmetic
-- dates
-- thresholds
-- financial totals
-- permissions
-- billing
-- risk severity when rules exist
-- legal or regulatory conditions once encoded
+For each risk rule:
 
-Persist structured outputs only after validation.
+- define a stable code, required facts, and explicit severity;
+- use deterministic detection when possible;
+- preserve sources and handle missing or conflicting information;
+- add tests.
 
-Allow `null`, `unknown`, `not_found`, and `ambiguous` when appropriate.
+## Testing
 
-Never force certainty.
+Test normalization, risk rules, parser adapters, cross-document reconciliation, and API behavior. Test LLM behavior with evaluation fixtures and maintain a small golden set of representative French property documents.
 
-## Provenance
-
-Important extracted facts and risks should retain:
-
-- source document ID
-- page number when available
-- short quote only when useful
-
-A risk without document-backed evidence should be clearly distinguished from a confirmed risk.
-
-## Domain model
-
-Prefer a stable normalized internal model over passing raw LLM outputs around.
-
-Likely domains:
-
-```text
-property
-sale
-energy
-coproperty
-financials
-works
-building
-diagnostics
-legal
-environmental_risks
-documents
-```
-
-Evolve the schema from real documents rather than designing an exhaustive model upfront.
-
-## Risk engine
-
-The core product value is the risk model.
-
-When adding a risk:
-
-- define a stable risk code
-- define required facts
-- implement deterministic detection when possible
-- define severity explicitly
-- preserve source references
-- handle missing and conflicting information
-- add tests
-
-The product must distinguish:
-
-- confirmed facts
-- inferred risks
-- missing information
-- inconsistencies
-
-## Testing and evaluation
-
-Use `pytest` for backend tests.
-
-Test:
-
-- normalization
-- risk rules
-- parsers/adapters
-- cross-document reconciliation
-- API behavior
-
-LLM behavior should use dedicated evaluation fixtures, not only unit tests.
-
-Maintain a small golden dataset with representative French property documents.
-
-Measure at least:
-
-- extraction correctness
-- monetary amount accuracy
-- date accuracy
-- citation accuracy
-- risk recall
-- false-positive rate
+Track extraction, monetary, date, and citation accuracy, plus risk recall and false-positive rate.
 
 ## Security and privacy
 
-Property documents may contain personal data.
+- Enforce server-side authorization and private object storage.
+- Use signed URLs where appropriate and never use public buckets.
+- Do not log full documents or full extracted text in ordinary logs.
+- Support document deletion.
+- Make clear which third-party providers receive document content.
 
-Requirements:
+## Frontend
 
-- private object storage
-- server-side authorization
-- signed URLs where appropriate
-- no public buckets
-- no full documents in logs
-- no full extracted text in ordinary logs
-- document deletion support
-- clear control over which third-party providers receive document content
+The main UX is a trustworthy inspection report, not a chatbot or AI demo. Prioritize financial, building, copropriété, energy, diagnostic, and safety risks, followed by inconsistencies, missing information, and reassuring findings. Show a source for each finding.
 
-## Frontend principles
+Never set an accent border in the UI.
 
-The core UX is a structured report, not a chatbot.
+## Style
 
-Prioritize:
-
-1. major financial risks
-2. building and copropriété risks
-3. energy risks
-4. diagnostics and safety
-5. inconsistencies
-6. missing documents or questions to ask
-7. reassuring findings
-
-Each finding should show its source.
-
-The product should feel like a trustworthy inspection report, not an AI demo.
-In the UI, never set accent border.
-
-## Dependency policy
-
-Before adding a dependency, ask:
-
-1. does the framework or standard library already solve this?
-2. is the dependency actively maintained?
-3. does it materially reduce complexity?
-4. can this be implemented simply without it?
-
-Prefer explicit application code over generic abstractions that may be useful later.
-
-## Scope
-
-The MVP should answer one question very well:
-
-> Based on the documents provided for this property, what important risks, future costs, inconsistencies, and missing information should the buyer know before purchasing?
-
-Protect that scope until real usage demonstrates a better adjacent opportunity.
+Do not use an em dash, an en dash as an aside, or a double hyphen as punctuation. Rewrite with a comma, parentheses, a colon, or two sentences. List bullets and dashes between a bold label and its gloss are allowed.
