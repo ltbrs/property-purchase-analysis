@@ -156,6 +156,7 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/*
       <section className="pricing-reassurance" aria-labelledby="reassurance-title">
         <div>
           <p className="pricing-section-label">Ce que vous payez</p>
@@ -188,6 +189,7 @@ export default function PricingPage() {
           ))}
         </div>
       </section>
+      */}
     </div>
   );
 }

@@ -68,7 +68,6 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             <div>
               <strong>Ressources</strong>
               <Link href={marketingRoutes.blog}>Tous les guides</Link>
-              <Link href={marketingRoutes.blogDpe}>DPE</Link>
               <Link href={marketingRoutes.blogCoproperty}>Copropriété</Link>
               <Link href={`${marketingRoutes.blog}/documents-achat-appartement`}>
                 Documents à vérifier

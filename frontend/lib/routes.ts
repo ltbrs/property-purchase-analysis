@@ -3,7 +3,6 @@ export const marketingRoutes = {
   howItWorks: "/comment-ca-marche",
   pricing: "/tarifs",
   blog: "/blog",
-  blogDpe: "/blog/dpe",
   blogCoproperty: "/blog/copropriete",
   contact: "/nous-contacter",
 } as const;

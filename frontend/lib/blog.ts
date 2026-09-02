@@ -12,8 +12,8 @@ export type BlogArticle = Readonly<{
   title: string;
   description: string;
   excerpt: string;
-  category: "Copropriété" | "DPE";
-  categoryHref: "/blog/copropriete" | "/blog/dpe";
+  category: "Copropriété";
+  categoryHref: "/blog/copropriete";
   publishedAt: string;
   modifiedAt: string;
   readingTime: string;
