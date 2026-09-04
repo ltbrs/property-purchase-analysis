@@ -77,3 +77,7 @@ Do not use an em dash, an en dash as an aside, or a double hyphen as punctuation
 # Proactivity
 
 The project is largely coded via AI, meaning that short prompt doesn't mean you have to do the only specified tasks but you need to ensure global coherency in the product.
+
+## Setup
+
+Github CLI is installed. Accessible via 'gh' in terminal. Already authentificated.
