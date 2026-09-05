@@ -25,7 +25,19 @@ async function proxyToBackend(
     return Response.json({ detail: "Authentication required" }, { status: 401 });
   }
 
-  const backendApiUrl = process.env.BACKEND_API_URL ?? "http://localhost:8000/api/v1";
+  const configuredBackendApiUrl = process.env.BACKEND_API_URL?.trim();
+  const backendProxySecret = process.env.BACKEND_PROXY_SECRET?.trim();
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!configuredBackendApiUrl || !backendProxySecret)
+  ) {
+    return Response.json(
+      { detail: "Le service d’analyse n’est pas configuré." },
+      { status: 503 },
+    );
+  }
+  const backendApiUrl =
+    configuredBackendApiUrl ?? "http://localhost:8000/api/v1";
   const { path } = await context.params;
   const target = new URL(
     `${backendApiUrl.replace(/\/$/, "")}/${path.map(encodeURIComponent).join("/")}`,
@@ -37,6 +49,9 @@ async function proxyToBackend(
   const contentType = request.headers.get("content-type");
   if (accept) headers.set("Accept", accept);
   if (contentType) headers.set("Content-Type", contentType);
+  if (backendProxySecret) {
+    headers.set("X-Backend-Proxy-Secret", backendProxySecret);
+  }
   headers.set("X-User-Id", userId);
   if (session.user.name) {
     headers.set("X-User-Name", encodeURIComponent(session.user.name));

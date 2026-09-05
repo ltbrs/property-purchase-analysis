@@ -66,7 +66,15 @@ export async function POST(request: NextRequest) {
     return Response.json({ detail: "Invalid request" }, { status });
   }
 
-  const backendApiUrl = process.env.BACKEND_API_URL ?? "http://localhost:8000/api/v1";
+  const configuredBackendApiUrl = process.env.BACKEND_API_URL?.trim();
+  if (!configuredBackendApiUrl && process.env.NODE_ENV === "production") {
+    return Response.json(
+      { detail: "Le service de contact n’est pas configuré." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  const backendApiUrl =
+    configuredBackendApiUrl ?? "http://localhost:8000/api/v1";
   const headers = new Headers({
     "Content-Type": "application/json",
     "X-Contact-Client-IP": getClientIp(request),

@@ -9,6 +9,7 @@ frontend/.next/
 frontend/out/
 frontend/coverage/
 frontend/*.tsbuildinfo
+frontend/.vercel/
 
 # Backend
 backend/.venv/
