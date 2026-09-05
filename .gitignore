@@ -9,7 +9,7 @@ frontend/.next/
 frontend/out/
 frontend/coverage/
 frontend/*.tsbuildinfo
-frontend/.vercel/
+.vercel/
 
 # Backend
 backend/.venv/
@@ -30,3 +30,5 @@ data*
 !.vscode/tasks.json
 .DS_Store
 Thumbs.db
+.vercel
+.env*
