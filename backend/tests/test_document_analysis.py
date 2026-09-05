@@ -285,8 +285,10 @@ def test_list_documents_exposes_verified_ademe_status(session: Session) -> None:
         record = session.scalar(select(DpeExtractionRecord))
         assert record is not None
         normalized_facts = dict(record.normalized_facts)
+        ademe_verification = normalized_facts["ademe_verification"]
+        assert isinstance(ademe_verification, dict)
         normalized_facts["ademe_verification"] = {
-            **dict(normalized_facts["ademe_verification"]),
+            **ademe_verification,
             "status": "verified",
         }
         record.normalized_facts = normalized_facts
