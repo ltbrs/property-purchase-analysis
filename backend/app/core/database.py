@@ -21,13 +21,16 @@ def get_engine() -> Engine:
         raise RuntimeError("DATABASE_URL is not configured")
 
     url = make_url(database_url)
+    # The Vercel Supabase integration appends routing metadata that is not a
+    # libpq connection parameter and must not be passed to psycopg.
+    url = url.difference_update_query(["supa"])
     connect_args: dict[str, object] = {}
     if url.get_backend_name() == "postgresql" and url.port == 6543:
         # Supabase transaction pooling does not support named prepared statements.
         connect_args["prepare_threshold"] = None
 
     return create_engine(
-        database_url,
+        url,
         pool_pre_ping=True,
         pool_recycle=300,
         connect_args=connect_args,

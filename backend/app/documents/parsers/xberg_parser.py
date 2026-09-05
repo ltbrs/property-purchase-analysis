@@ -1,7 +1,9 @@
+import ctypes
+import os
 from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
+from pathlib import Path
 from typing import Any
-
-from xberg import ExtractInput, ExtractionConfig, PageConfig, PdfConfig, extract
 
 from app.documents.parsers.base import (
     ParsedBoundingBox,
@@ -10,6 +12,30 @@ from app.documents.parsers.base import (
     ParsedTable,
     PdfParserError,
 )
+
+
+def _preload_vercel_onnxruntime() -> None:
+    """Load Xberg's packaged ONNX runtime when Vercel omits its sibling libs."""
+    if os.getenv("VERCEL") != "1":
+        return
+
+    bundled_library = Path(__file__).resolve().parents[2] / "_native/libonnxruntime.bin"
+    if bundled_library.is_file():
+        ctypes.CDLL(str(bundled_library), mode=ctypes.RTLD_GLOBAL)
+        return
+
+    package_spec = find_spec("xberg")
+    if package_spec is None or package_spec.origin is None:
+        return
+
+    candidates = sorted(Path(package_spec.origin).parent.glob("libonnxruntime*.so*"))
+    if candidates:
+        ctypes.CDLL(str(candidates[0]), mode=ctypes.RTLD_GLOBAL)
+
+
+_preload_vercel_onnxruntime()
+
+from xberg import ExtractInput, ExtractionConfig, PageConfig, PdfConfig, extract  # noqa: E402
 
 
 class XbergPdfParser:
