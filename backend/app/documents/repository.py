@@ -76,9 +76,7 @@ class DocumentRepository:
     ) -> AnalysisCaseRecord:
         analysis_case.property_type = property_type.value
         self.session.execute(
-            delete(RiskFindingRecord).where(
-                RiskFindingRecord.analysis_case_id == analysis_case.id
-            )
+            delete(RiskFindingRecord).where(RiskFindingRecord.analysis_case_id == analysis_case.id)
         )
         self.session.execute(
             delete(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case.id)

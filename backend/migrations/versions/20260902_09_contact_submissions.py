@@ -47,6 +47,7 @@ def upgrade() -> None:
         ["status", "created_at"],
     )
 
+
 def downgrade() -> None:
     op.drop_index("ix_contact_submissions_status_created_at", table_name="contact_submissions")
     op.drop_table("contact_submissions")

@@ -204,9 +204,7 @@ def update_analysis_case(
     analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
     if analysis_case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
-    updated = repository.update_analysis_case_property_type(
-        analysis_case, payload.property_type
-    )
+    updated = repository.update_analysis_case_property_type(analysis_case, payload.property_type)
     return AnalysisCaseRead.model_validate(updated)
 
 
@@ -229,9 +227,7 @@ def list_documents(
         extraction.document_id: NormalizedDpeFacts.model_validate(
             extraction.normalized_facts
         ).ademe_verification.status.value
-        for extraction in repository.list_case_dpe_extractions(
-            analysis_case_id, current_user_id
-        )
+        for extraction in repository.list_case_dpe_extractions(analysis_case_id, current_user_id)
     }
     return [
         DocumentRead.model_validate(document).model_copy(
@@ -256,13 +252,9 @@ async def create_document_view_url(
     storage: ObjectStorage,
 ) -> DocumentViewUrlRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(
-        analysis_case_id, document_id, current_user_id
-    )
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     ttl_seconds = get_settings().document_view_url_ttl_seconds
     try:
@@ -295,13 +287,9 @@ def get_document_extraction(
     session: DatabaseSession,
 ) -> DocumentExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(
-        analysis_case_id, document_id, current_user_id
-    )
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     extraction = repository.get_extraction(document.id)
     if extraction is None:
         raise HTTPException(
@@ -322,13 +310,9 @@ def get_dpe_extraction(
     session: DatabaseSession,
 ) -> DpeExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(
-        analysis_case_id, document_id, current_user_id
-    )
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     extraction = repository.get_dpe_extraction(document.id)
     if extraction is None:
         raise HTTPException(
@@ -405,13 +389,9 @@ async def process_document(
     llm_client: StructuredOutputClientDependency,
 ) -> DocumentRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(
-        analysis_case_id, document_id, current_user_id
-    )
+    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     if document.status in {
         DocumentStatus.EXTRACTING.value,
         DocumentStatus.ANALYZING.value,
@@ -482,9 +462,7 @@ async def delete_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     try:
-        await run_in_threadpool(
-            storage.delete_pdf, document.storage_bucket, document.storage_key
-        )
+        await run_in_threadpool(storage.delete_pdf, document.storage_bucket, document.storage_key)
     except ObjectStorageError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -718,9 +696,7 @@ def update_finding_review_status(
     session: DatabaseSession,
 ) -> RiskFindingRead:
     repository = DocumentRepository(session)
-    finding = repository.get_case_finding(
-        analysis_case_id, current_user_id, finding_key
-    )
+    finding = repository.get_case_finding(analysis_case_id, current_user_id, finding_key)
     if finding is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Finding not found")
     if (

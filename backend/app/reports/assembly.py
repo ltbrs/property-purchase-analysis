@@ -111,8 +111,7 @@ def _reassuring_findings(
                 ReportFinding(
                     code="REASSURING_DPE_ADEME_VERIFIED",
                     finding_key=(
-                        "REASSURING_DPE_ADEME_VERIFIED:"
-                        f"{facts.dpe_number.source.document_id}"
+                        f"REASSURING_DPE_ADEME_VERIFIED:{facts.dpe_number.source.document_id}"
                     ),
                     severity=RiskSeverity.INFO,
                     title="Enregistrement ADEME vérifié",
@@ -244,18 +243,14 @@ def build_buyer_report(
     )
     findings_by_type = {
         analysis_type: [
-            finding
-            for finding in findings
-            if _analysis_type_for_finding(finding) == analysis_type
+            finding for finding in findings if _analysis_type_for_finding(finding) == analysis_type
         ]
         for analysis_type in AnalysisFindingType
     }
     risk_findings = findings_by_type[AnalysisFindingType.RISK]
     verification_findings = findings_by_type[AnalysisFindingType.VERIFICATION]
     reassuring_count = len(grouped[ReportSectionCode.REASSURING])
-    missing_information_count = len(
-        findings_by_type[AnalysisFindingType.MISSING_INFORMATION]
-    )
+    missing_information_count = len(findings_by_type[AnalysisFindingType.MISSING_INFORMATION])
     high_severities = {RiskSeverity.HIGH, RiskSeverity.CRITICAL}
     return BuyerReport(
         analysis_case_id=analysis_case_id,
@@ -263,11 +258,7 @@ def build_buyer_report(
         generated_at=generated_at or report_generated_at(),
         summary=ReportSummary(
             finding_count=len(findings),
-            analyzed_count=(
-                len(risk_findings)
-                + len(verification_findings)
-                + reassuring_count
-            ),
+            analyzed_count=(len(risk_findings) + len(verification_findings) + reassuring_count),
             risk_count=len(risk_findings),
             verification_count=len(verification_findings),
             high_or_critical_count=sum(

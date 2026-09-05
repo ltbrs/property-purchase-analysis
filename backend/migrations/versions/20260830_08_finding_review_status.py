@@ -35,7 +35,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "ck_risk_findings_review_status", "risk_findings", type_="check"
-    )
+    op.drop_constraint("ck_risk_findings_review_status", "risk_findings", type_="check")
     op.drop_column("risk_findings", "review_status")

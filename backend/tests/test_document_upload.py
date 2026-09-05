@@ -31,9 +31,7 @@ class MemoryObjectStorage:
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
         self.objects[key] = file.read()
 
-    def create_pdf_view_url(
-        self, bucket: str, key: str, expires_in_seconds: int
-    ) -> str:
+    def create_pdf_view_url(self, bucket: str, key: str, expires_in_seconds: int) -> str:
         self.view_url_requests.append((bucket, key, expires_in_seconds))
         return f"https://storage.test/{bucket}/{key}?signed=true"
 
@@ -132,9 +130,7 @@ def test_property_type_updates_the_expected_coproperty_documents(client: TestCli
     }
 
 
-def test_create_case_persists_the_property_details(
-    client: TestClient, session: Session
-) -> None:
+def test_create_case_persists_the_property_details(client: TestClient, session: Session) -> None:
     user_id = uuid4()
 
     response = client.post(
@@ -380,24 +376,18 @@ def test_document_view_url_is_short_lived_and_requires_ownership(
     assert response.json()["expires_at"]
     persisted = session.get(DocumentRecord, UUID(document_id))
     assert persisted is not None
-    assert storage.view_url_requests == [
-        (persisted.storage_bucket, persisted.storage_key, 300)
-    ]
+    assert storage.view_url_requests == [(persisted.storage_bucket, persisted.storage_key, 300)]
 
 
 def test_document_view_url_reports_storage_failure(
     client: TestClient,
 ) -> None:
     class FailingViewUrlStorage(MemoryObjectStorage):
-        def create_pdf_view_url(
-            self, bucket: str, key: str, expires_in_seconds: int
-        ) -> str:
+        def create_pdf_view_url(self, bucket: str, key: str, expires_in_seconds: int) -> str:
             raise ObjectStorageError("storage unavailable")
 
     failing_storage = FailingViewUrlStorage()
-    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = (
-        lambda: failing_storage
-    )
+    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
     uploaded = client.post(
@@ -412,9 +402,7 @@ def test_document_view_url_reports_storage_failure(
     )
 
     assert response.status_code == 502
-    assert response.json()["detail"] == (
-        "Le document ne peut pas être affiché pour le moment."
-    )
+    assert response.json()["detail"] == ("Le document ne peut pas être affiché pour le moment.")
 
 
 def test_storage_failure_does_not_persist_metadata(
@@ -520,9 +508,7 @@ def test_storage_delete_failure_keeps_document_metadata(
     assert session.scalar(select(DocumentRecord)) is not None
 
 
-def test_authenticated_identity_is_persisted(
-    client: TestClient, session: Session
-) -> None:
+def test_authenticated_identity_is_persisted(client: TestClient, session: Session) -> None:
     user_id = uuid4()
 
     response = client.get(
