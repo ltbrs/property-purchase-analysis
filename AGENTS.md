@@ -4,7 +4,7 @@
 
 Build decision-support software for French home buyers. It extracts facts from property documents and produces a source-backed report of important risks, future costs, inconsistencies, and missing information.
 
-It is not legal, notarial, engineering, energy-audit, or financial advice. Do not expand the MVP beyond this purpose without evidence from real usage.
+It is not legal, notarial, engineering, energy-audit, or financial advice. Do not expand the app beyond this purpose without evidence from real usage.
 
 ## Non-negotiable principles
 
@@ -81,4 +81,4 @@ The project is largely coded via AI, meaning that short prompt doesn't mean you 
 ## Setup
 
 Github CLI is installed. Accessible via 'gh' in terminal. Already authentificated.
-The app is deployed on OVH, on the domain "acquora.fr".
+The app is deployed on OVH, on the domain "acquora.fr", vercel and supabase (data and file store).

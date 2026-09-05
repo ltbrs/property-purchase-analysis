@@ -70,9 +70,12 @@ The frontend-specific file recognizes:
 | Variable | Purpose |
 | --- | --- |
 | `AUTH_SECRET` | Random secret used to encrypt Auth.js sessions |
+| `AUTH_URL` | Canonical Auth.js URL (`https://acquora.fr` in production) |
 | `AUTH_GOOGLE_ID` | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
 | `BACKEND_API_URL` | Private API base URL used by the authenticated Next.js boundary |
+| `BACKEND_PROXY_SECRET` | Shared secret that protects authenticated identity headers |
+| `CONTACT_PROXY_SECRET` | Shared secret for the public contact proxy and rate limiting |
 
 Create a Google OAuth web client with these authorized redirect URIs:
 
@@ -88,6 +91,9 @@ cannot be selected by a request or changed through environment configuration.
 
 Never commit a populated `.env` file. Replace the example object-storage secret
 outside local development.
+
+See [docs/deployment.md](docs/deployment.md) for the Vercel, Supabase, OVH DNS,
+and FastAPI production setup.
 
 ## Start local services
 
