@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
@@ -8,6 +9,7 @@ import {
   PdfViewer,
   type PdfDocumentSelection,
 } from "@/features/documents/pdf-viewer";
+import { isPostHogConfigured } from "@/instrumentation-client";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
@@ -441,6 +443,9 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       const loadedReport = await loadReport();
       setNeedsWorkspace(loadedReport === null);
       setReport(loadedReport);
+      if (loadedReport !== null && isPostHogConfigured) {
+        posthog.capture("analysis_report_refreshed", { report_variant: variant });
+      }
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Le rapport n’a pas pu être généré.");
     } finally {
@@ -495,6 +500,13 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       );
       const updatedReport = await fetchReport(workspace);
       setReport(updatedReport);
+      if (isPostHogConfigured) {
+        posthog.capture("report_finding_review_updated", {
+          analysis_type: finding.analysis_type,
+          review_status: checked ? "not_problematic" : "open",
+          severity: finding.severity,
+        });
+      }
       setSelectedFinding(
         updatedReport?.sections
           .flatMap((section) => section.findings)

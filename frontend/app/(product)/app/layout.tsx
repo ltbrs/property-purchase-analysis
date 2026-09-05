@@ -15,5 +15,15 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     redirect(`${productRoutes.signIn}?callbackUrl=${encodeURIComponent(productRoutes.home)}`);
   }
 
-  return <ApplicationShell>{children}</ApplicationShell>;
+  return (
+    <ApplicationShell
+      user={{
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+      }}
+    >
+      {children}
+    </ApplicationShell>
+  );
 }
