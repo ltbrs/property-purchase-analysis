@@ -216,9 +216,7 @@ def test_report_exposes_verified_ademe_registration() -> None:
     number_source = number_source.model_copy(update={"document_id": document_id})
     dpe = dpe.model_copy(
         update={
-            "dpe_number": DpeTextFact(
-                value="2475E4333306Q", source=number_source
-            ),
+            "dpe_number": DpeTextFact(value="2475E4333306Q", source=number_source),
             "ademe_verification": DpeAdemeVerification(
                 status=AdemeVerificationStatus.VERIFIED,
                 dpe_number="2475E4333306Q",

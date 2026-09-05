@@ -191,12 +191,8 @@ class DocumentExtractionRead(BaseModel):
 class AnalysisCaseCreate(BaseModel):
     title: str = Field(default="Mon achat immobilier", min_length=1, max_length=200)
     property_type: PropertyType = PropertyType.UNKNOWN
-    price_eur: Decimal | None = Field(
-        default=None, gt=0, max_digits=14, decimal_places=2
-    )
-    surface_m2: Decimal | None = Field(
-        default=None, gt=0, max_digits=10, decimal_places=2
-    )
+    price_eur: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+    surface_m2: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
     lot_count: int | None = Field(default=None, gt=0)
 
     @field_validator("title")

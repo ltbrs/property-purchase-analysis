@@ -32,16 +32,10 @@ def facts(*, rating: str | None = None) -> NormalizedDpeFacts:
     energy_source = source()
     return NormalizedDpeFacts(
         dpe_rating=DpeTextFact(value=rating, source=source() if rating else None),
-        dpe_rating_method=(
-            DpeRatingMethod.DOCUMENT if rating else DpeRatingMethod.MISSING
-        ),
+        dpe_rating_method=(DpeRatingMethod.DOCUMENT if rating else DpeRatingMethod.MISSING),
         ges_rating=DpeTextFact(value=None, source=None),
-        energy_consumption_kwh_m2_year=DpeNumberFact(
-            value=170, source=energy_source
-        ),
-        greenhouse_gas_emissions_kg_co2_m2_year=DpeNumberFact(
-            value=34, source=source()
-        ),
+        energy_consumption_kwh_m2_year=DpeNumberFact(value=170, source=energy_source),
+        greenhouse_gas_emissions_kg_co2_m2_year=DpeNumberFact(value=34, source=source()),
         estimated_annual_energy_cost_min=DpeNumberFact(value=None, source=None),
         estimated_annual_energy_cost_max=DpeNumberFact(value=None, source=None),
         surface=DpeNumberFact(value=62.71, source=source()),
@@ -70,10 +64,7 @@ def ademe_record(**changes: object) -> AdemeDpeRecord:
 
 def test_extract_dpe_number_tolerates_layout_whitespace() -> None:
     assert extract_dpe_number("n° : 2475 E433 3306 Q") == "2475E4333306Q"
-    assert (
-        extract_dpe_number("n° : 2475E4333306Q  établi le : 06/12/2024")
-        == "2475E4333306Q"
-    )
+    assert extract_dpe_number("n° : 2475E4333306Q  établi le : 06/12/2024") == "2475E4333306Q"
     assert extract_dpe_number("aucune référence") is None
 
 
@@ -93,9 +84,7 @@ def test_find_dpe_number_keeps_the_pdf_page_as_provenance() -> None:
 def test_ademe_match_supplies_missing_rating_and_verification_details() -> None:
     dpe_number = DpeTextFact(value="2475E4333306Q", source=source())
 
-    resolved = resolve_dpe_facts(
-        facts(), dpe_number=dpe_number, ademe_record=ademe_record()
-    )
+    resolved = resolve_dpe_facts(facts(), dpe_number=dpe_number, ademe_record=ademe_record())
 
     assert resolved.dpe_rating.value == "D"
     assert resolved.dpe_rating.source == dpe_number.source
@@ -122,8 +111,7 @@ def test_ademe_mismatch_is_exposed_and_does_not_overwrite_document_rating() -> N
     assert resolved.dpe_rating.value == "E"
     assert resolved.dpe_rating_method == DpeRatingMethod.DOCUMENT
     assert (
-        resolved.ademe_verification.status
-        == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES
+        resolved.ademe_verification.status == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES
     )
     assert resolved.ademe_verification.inconsistent_fields == ["dpe_rating"]
     risks = evaluate_dpe_risks(resolved, as_of=date(2026, 8, 28))
@@ -168,11 +156,7 @@ def test_rating_fallback_refuses_small_surfaces_with_variable_thresholds() -> No
 
 def test_verified_ademe_consumption_is_usable_by_the_risk_engine() -> None:
     document_facts = facts().model_copy(
-        update={
-            "energy_consumption_kwh_m2_year": DpeNumberFact(
-                value=None, source=None
-            )
-        }
+        update={"energy_consumption_kwh_m2_year": DpeNumberFact(value=None, source=None)}
     )
     resolved = resolve_dpe_facts(
         document_facts,

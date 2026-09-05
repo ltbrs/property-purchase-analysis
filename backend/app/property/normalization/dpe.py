@@ -139,9 +139,7 @@ class DpeAdemeVerification(BaseModel):
 
 
 class NormalizedDpeFacts(BaseModel):
-    dpe_number: DpeTextFact = Field(
-        default_factory=lambda: DpeTextFact(value=None, source=None)
-    )
+    dpe_number: DpeTextFact = Field(default_factory=lambda: DpeTextFact(value=None, source=None))
     dpe_rating: DpeTextFact
     dpe_rating_method: DpeRatingMethod = DpeRatingMethod.MISSING
     ges_rating: DpeTextFact
@@ -387,9 +385,7 @@ def normalize_dpe_candidate(
     return NormalizedDpeFacts(
         dpe_rating=dpe_rating,
         dpe_rating_method=(
-            DpeRatingMethod.DOCUMENT
-            if dpe_rating.value is not None
-            else DpeRatingMethod.MISSING
+            DpeRatingMethod.DOCUMENT if dpe_rating.value is not None else DpeRatingMethod.MISSING
         ),
         ges_rating=_text_fact(
             candidate.ges_rating,

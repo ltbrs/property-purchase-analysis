@@ -123,12 +123,8 @@ def dpe_outputs() -> list[BaseModel]:
             extraction_strategy=ExtractionStrategy.TEXT,
         ),
         DpeExtractionCandidate(
-            dpe_rating=DpeTextFactCandidate(
-                value="D", page_number=1, quote="Classe énergie D"
-            ),
-            ges_rating=DpeTextFactCandidate(
-                value="B", page_number=1, quote="Classe climat B"
-            ),
+            dpe_rating=DpeTextFactCandidate(value="D", page_number=1, quote="Classe énergie D"),
+            ges_rating=DpeTextFactCandidate(value="B", page_number=1, quote="Classe climat B"),
             energy_consumption_kwh_m2_year=DpeNumberFactCandidate(
                 value=182,
                 page_number=1,
@@ -193,9 +189,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
             files={"file": ("dpe.pdf", DPE_PDF, "application/pdf")},
         )
         document_id = uploaded.json()["id"]
-        process_url = (
-            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/process"
-        )
+        process_url = f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/process"
 
         first = client.post(process_url, headers=auth(user_id))
         second = client.post(process_url, headers=auth(user_id))
@@ -216,9 +210,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
     document = session.get(DocumentRecord, UUID(document_id))
     assert document is not None and document.status == DocumentStatus.COMPLETED.value
     report_codes = {
-        finding["code"]
-        for section in report.json()["sections"]
-        for finding in section["findings"]
+        finding["code"] for section in report.json()["sections"] for finding in section["findings"]
     }
     assert "MISSING_DPE_DOCUMENT" not in report_codes
     assert session.scalar(select(RiskFindingRecord)) is not None
@@ -248,8 +240,7 @@ def test_process_enforces_document_ownership(session: Session) -> None:
             files={"file": ("dpe.pdf", DPE_PDF, "application/pdf")},
         )
         response = client.post(
-            f"/api/v1/analysis-cases/{case_id}/documents/"
-            f"{uploaded.json()['id']}/process",
+            f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
             headers=auth(uuid4()),
         )
 

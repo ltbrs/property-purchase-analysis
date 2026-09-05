@@ -51,7 +51,7 @@ class OpenAIStructuredOutputClient:
                 {"role": "user", "content": user_content},
             ],
             text_format=response_model,
-            store=True
+            store=True,
         )
         if response.output_parsed is None:
             raise RuntimeError("OpenAI returned no structured output")

@@ -39,9 +39,7 @@ class DocumentProcessingService:
         self.parser = parser
         self.llm_client = llm_client
 
-    async def process(
-        self, document: DocumentRecord
-    ) -> DocumentClassificationRecord:
+    async def process(self, document: DocumentRecord) -> DocumentClassificationRecord:
         extraction = self.repository.get_extraction(document.id)
         if extraction is None:
             pdf_bytes = await run_in_threadpool(
@@ -49,9 +47,9 @@ class DocumentProcessingService:
                 document.storage_bucket,
                 document.storage_key,
             )
-            extraction = await DocumentExtractionService(
-                self.repository, self.parser
-            ).extract(document, pdf_bytes)
+            extraction = await DocumentExtractionService(self.repository, self.parser).extract(
+                document, pdf_bytes
+            )
 
         classification = await DocumentClassificationService(
             self.repository, self.llm_client

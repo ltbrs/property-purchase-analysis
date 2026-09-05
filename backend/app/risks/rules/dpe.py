@@ -35,17 +35,12 @@ def _finding_key(
 
 def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFinding]:
     risks: list[RiskFinding] = []
-    if (
-        facts.ademe_verification.status
-        == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES
-    ):
+    if facts.ademe_verification.status == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES:
         fields = ", ".join(facts.ademe_verification.inconsistent_fields)
         risks.append(
             RiskFinding(
                 code="DPE_ADEME_INCONSISTENCY",
-                finding_key=_finding_key(
-                    "DPE_ADEME_INCONSISTENCY", facts, facts.dpe_number.source
-                ),
+                finding_key=_finding_key("DPE_ADEME_INCONSISTENCY", facts, facts.dpe_number.source),
                 category=RiskCategory.CONSISTENCY,
                 title="Écart avec le registre ADEME",
                 severity=(

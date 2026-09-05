@@ -43,9 +43,7 @@ class AdemeDpeRecord(BaseModel):
             dpe_rating=_rating(self.etiquette_dpe),
             ges_rating=_rating(self.etiquette_ges),
             energy_consumption_kwh_m2_year=self.conso_5_usages_par_m2_ep,
-            greenhouse_gas_emissions_kg_co2_m2_year=(
-                self.emission_ges_5_usages_par_m2
-            ),
+            greenhouse_gas_emissions_kg_co2_m2_year=(self.emission_ges_5_usages_par_m2),
             surface=self.surface_habitable_logement,
             dpe_date=self.date_etablissement_dpe,
             dpe_valid_until=self.date_fin_validite_dpe,
@@ -113,9 +111,7 @@ class PublicAdemeDpeClient:
             raise AdemeApiUnavailable("ADEME DPE API returned invalid DPE data") from error
 
 
-def find_dpe_number(
-    pages: dict[int, str], *, document_id: UUID
-) -> DpeTextFact:
+def find_dpe_number(pages: dict[int, str], *, document_id: UUID) -> DpeTextFact:
     for page_number in sorted(pages):
         page = pages[page_number]
         dpe_number = extract_dpe_number(page)
@@ -162,9 +158,7 @@ def calculate_dpe_rating(
         or dpe_date < date(2021, 7, 1)
     ):
         return None
-    energy_rating = _class_for_value(
-        energy_consumption_kwh_m2_year, (70, 110, 180, 250, 330, 420)
-    )
+    energy_rating = _class_for_value(energy_consumption_kwh_m2_year, (70, 110, 180, 250, 330, 420))
     climate_rating = _rating(ges_rating)
     if greenhouse_gas_emissions_kg_co2_m2_year is not None:
         climate_rating = _class_for_value(
@@ -266,9 +260,7 @@ def resolve_dpe_facts(
         return resolved
 
     calculated_rating = calculate_dpe_rating(
-        energy_consumption_kwh_m2_year=(
-            resolved.energy_consumption_kwh_m2_year.value
-        ),
+        energy_consumption_kwh_m2_year=(resolved.energy_consumption_kwh_m2_year.value),
         greenhouse_gas_emissions_kg_co2_m2_year=(
             resolved.greenhouse_gas_emissions_kg_co2_m2_year.value
         ),
