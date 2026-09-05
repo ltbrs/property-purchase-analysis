@@ -46,8 +46,10 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def use_psycopg_three_driver(cls, value: object) -> object:
-        if isinstance(value, str) and value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        if isinstance(value, str):
+            for scheme in ("postgresql://", "postgres://"):
+                if value.startswith(scheme):
+                    return value.replace(scheme, "postgresql+psycopg://", 1)
         return value
 
     @field_validator(

@@ -1,13 +1,13 @@
 from unittest.mock import patch
 
+from sqlalchemy.engine import make_url
+
 from app.core.config import Settings
 from app.core.database import get_engine
 
 
 def test_transaction_pooler_disables_prepared_statements() -> None:
-    settings = Settings(
-        database_url="postgresql://user:password@pooler.supabase.com:6543/postgres"
-    )
+    settings = Settings(database_url="postgresql://user:password@pooler.supabase.com:6543/postgres")
 
     get_engine.cache_clear()
     with (
@@ -17,7 +17,7 @@ def test_transaction_pooler_disables_prepared_statements() -> None:
         get_engine()
 
     create_engine.assert_called_once_with(
-        "postgresql+psycopg://user:password@pooler.supabase.com:6543/postgres",
+        make_url("postgresql+psycopg://user:password@pooler.supabase.com:6543/postgres"),
         pool_pre_ping=True,
         pool_recycle=300,
         connect_args={"prepare_threshold": None},
@@ -26,9 +26,7 @@ def test_transaction_pooler_disables_prepared_statements() -> None:
 
 
 def test_session_pooler_keeps_prepared_statements_enabled() -> None:
-    settings = Settings(
-        database_url="postgresql://user:password@pooler.supabase.com:5432/postgres"
-    )
+    settings = Settings(database_url="postgresql://user:password@pooler.supabase.com:5432/postgres")
 
     get_engine.cache_clear()
     with (
@@ -38,9 +36,29 @@ def test_session_pooler_keeps_prepared_statements_enabled() -> None:
         get_engine()
 
     create_engine.assert_called_once_with(
-        "postgresql+psycopg://user:password@pooler.supabase.com:5432/postgres",
+        make_url("postgresql+psycopg://user:password@pooler.supabase.com:5432/postgres"),
         pool_pre_ping=True,
         pool_recycle=300,
         connect_args={},
     )
+    get_engine.cache_clear()
+
+
+def test_vercel_supabase_metadata_is_not_passed_to_psycopg() -> None:
+    settings = Settings(
+        database_url=(
+            "postgres://user:password@pooler.supabase.com:6543/postgres"
+            "?sslmode=require&supa=base-pooler.x"
+        )
+    )
+
+    get_engine.cache_clear()
+    with (
+        patch("app.core.database.get_settings", return_value=settings),
+        patch("app.core.database.create_engine") as create_engine,
+    ):
+        get_engine()
+
+    called_url = create_engine.call_args.args[0]
+    assert called_url.query == {"sslmode": "require"}
     get_engine.cache_clear()
