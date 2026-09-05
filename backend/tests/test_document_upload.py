@@ -6,10 +6,12 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import get_settings
 from app.core.database import Base, get_db_session
 from app.documents.models import DocumentRecord
 from app.main import create_app
@@ -545,6 +547,31 @@ def test_authenticated_identity_is_persisted(
     account = session.get(AuthAccountRecord, ("google", "google-account-123"))
     assert account is not None
     assert account.user_id == user_id
+
+
+def test_configured_backend_boundary_requires_shared_proxy_secret(
+    client: TestClient,
+) -> None:
+    settings = get_settings()
+    original_secret = settings.backend_proxy_secret
+    settings.backend_proxy_secret = SecretStr("shared-backend-secret")
+    try:
+        forbidden = client.get(
+            "/api/v1/analysis-cases",
+            headers={"X-User-Id": str(uuid4())},
+        )
+        accepted = client.get(
+            "/api/v1/analysis-cases",
+            headers={
+                "X-Backend-Proxy-Secret": "shared-backend-secret",
+                "X-User-Id": str(uuid4()),
+            },
+        )
+    finally:
+        settings.backend_proxy_secret = original_secret
+
+    assert forbidden.status_code == 403
+    assert accepted.status_code == 200
 
 
 def test_identity_profile_is_refreshed_from_authentication(

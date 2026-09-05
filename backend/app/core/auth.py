@@ -1,3 +1,4 @@
+import hmac
 import re
 from typing import Annotated
 from urllib.parse import unquote
@@ -6,6 +7,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import DatabaseSession
 from app.property.models import AuthAccountRecord, UserRecord
 
@@ -63,6 +65,7 @@ def _sync_authenticated_identity(
 
 def get_current_user_id(
     session: DatabaseSession,
+    x_backend_proxy_secret: Annotated[str | None, Header()] = None,
     x_user_id: Annotated[str | None, Header()] = None,
     x_user_name: Annotated[str | None, Header()] = None,
     x_user_email: Annotated[str | None, Header()] = None,
@@ -76,6 +79,20 @@ def get_current_user_id(
     Deployments must protect these headers, and clients must never be allowed to
     assert arbitrary identities at the public edge.
     """
+
+    settings = get_settings()
+    configured_proxy_secret = settings.backend_proxy_secret
+    if configured_proxy_secret is None:
+        if settings.app_env == "production":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication boundary is not configured",
+            )
+    elif not hmac.compare_digest(
+        x_backend_proxy_secret or "",
+        configured_proxy_secret.get_secret_value(),
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     if x_user_id is None:
         raise HTTPException(

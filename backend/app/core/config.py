@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -12,6 +12,7 @@ class Settings(BaseSettings):
         env_file=(REPOSITORY_ROOT / ".env", REPOSITORY_ROOT / "backend" / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "Property Purchase Analysis API"
@@ -19,7 +20,14 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     frontend_origin: str = "http://localhost:3000"
 
-    database_url: str | None = None
+    database_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "DATABASE_URL",
+            "POSTGRES_URL_NON_POOLING",
+            "POSTGRES_URL",
+        ),
+    )
     object_storage_endpoint: str | None = None
     object_storage_bucket: str | None = None
     object_storage_region: str = "eu-west-3"
@@ -31,6 +39,7 @@ class Settings(BaseSettings):
     ademe_dpe_api_url: str = "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
     ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
     contact_proxy_secret: SecretStr | None = None
+    backend_proxy_secret: SecretStr | None = None
     contact_short_rate_limit: int = Field(default=5, ge=1, le=100)
     contact_daily_rate_limit: int = Field(default=20, ge=1, le=1000)
 
@@ -41,16 +50,14 @@ class Settings(BaseSettings):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
 
-    @field_validator("openai_api_key", mode="before")
+    @field_validator(
+        "openai_api_key",
+        "contact_proxy_secret",
+        "backend_proxy_secret",
+        mode="before",
+    )
     @classmethod
-    def empty_openai_api_key_is_unconfigured(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
-
-    @field_validator("contact_proxy_secret", mode="before")
-    @classmethod
-    def empty_contact_proxy_secret_is_unconfigured(cls, value: object) -> object:
+    def empty_secret_is_unconfigured(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value

@@ -81,3 +81,4 @@ The project is largely coded via AI, meaning that short prompt doesn't mean you 
 ## Setup
 
 Github CLI is installed. Accessible via 'gh' in terminal. Already authentificated.
+The app is deployed on OVH, on the domain "acquora.fr".

@@ -3,14 +3,18 @@ name: Test
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   frontend:
-    # Do not run tests for arbitrary pull requests targeting main.
-    if: github.head_ref == 'dev'
     name: Frontend checks
     runs-on: ubuntu-latest
     defaults:
@@ -29,7 +33,6 @@ jobs:
       - run: npm run build
 
   backend:
-    if: github.head_ref == 'dev'
     name: Backend checks
     runs-on: ubuntu-latest
     defaults:
@@ -47,3 +50,5 @@ jobs:
       - run: uv sync --locked --all-groups
       - run: uv run pytest
       - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app tests

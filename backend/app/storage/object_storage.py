@@ -30,7 +30,8 @@ class PrivateObjectStorage(Protocol):
 class S3ObjectStorage:
     def __init__(self, settings: Settings) -> None:
         if (
-            settings.object_storage_bucket is None
+            settings.object_storage_endpoint is None
+            or settings.object_storage_bucket is None
             or settings.object_storage_access_key is None
             or settings.object_storage_secret_key is None
         ):
