@@ -24,8 +24,8 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices(
             "DATABASE_URL",
-            "POSTGRES_URL_NON_POOLING",
             "POSTGRES_URL",
+            "POSTGRES_URL_NON_POOLING",
         ),
     )
     object_storage_endpoint: str | None = None
