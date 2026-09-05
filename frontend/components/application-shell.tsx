@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import posthog from "posthog-js";
 
+import { isPostHogConfigured } from "@/instrumentation-client";
 import { BrandLink } from "@/components/design-system/brand-link";
 import { Icon, type IconName } from "@/components/icons";
 import { marketingRoutes, productRoutes } from "@/lib/routes";
@@ -18,9 +20,14 @@ import {
 
 type ApplicationShellProps = Readonly<{
   children: ReactNode;
+  user: {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+  };
 }>;
 
-export function ApplicationShell({ children }: ApplicationShellProps) {
+export function ApplicationShell({ children, user }: ApplicationShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -34,6 +41,15 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
   ];
   const activeCase = analysisCases.find(({ id }) => id === activeCaseId) ?? null;
   const isGlobalView = pathname === productRoutes.home || pathname === productRoutes.cases;
+
+  useEffect(() => {
+    if (!isPostHogConfigured) return;
+
+    posthog.identify(user.id, {
+      ...(user.email ? { email: user.email } : {}),
+      ...(user.name ? { name: user.name } : {}),
+    });
+  }, [user.email, user.id, user.name]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,8 +87,15 @@ export function ApplicationShell({ children }: ApplicationShellProps) {
     window.dispatchEvent(new Event(CASE_CREATION_REQUEST_EVENT));
   }
 
+  function resetPostHogOnSignOut(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (isPostHogConfigured && target instanceof HTMLElement && target.closest("[data-posthog-reset]")) {
+      posthog.reset();
+    }
+  }
+
   return (
-    <div className="app-frame">
+    <div className="app-frame" onClickCapture={resetPostHogOnSignOut}>
       <aside className={`sidebar${isMenuOpen ? " is-open" : ""}`}>
         <BrandLink
           className="brand"

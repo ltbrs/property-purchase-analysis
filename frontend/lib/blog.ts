@@ -31,7 +31,7 @@ export const blogArticles = [
       "Le vote ne suffit pas à désigner le payeur. Dates d’exigibilité, clause du compromis et documents à contrôler avant d’acheter.",
     category: "Copropriété",
     categoryHref: "/blog/copropriete",
-    publishedAt: "2026-09-02",
+    publishedAt: "2026-04-26",
     modifiedAt: "2026-09-02",
     readingTime: "8 min",
     cover: "/images/blog/travaux-votes-avant-compromis.svg",
@@ -48,7 +48,7 @@ export const blogArticles = [
     category: "Copropriété",
     categoryHref: "/blog/copropriete",
     publishedAt: "2026-02-02",
-    modifiedAt: "2026-09-02",
+    modifiedAt: "2026-08-26",
     readingTime: "10 min",
     cover: "/images/blog/documents-achat-appartement.svg",
     coverAlt:

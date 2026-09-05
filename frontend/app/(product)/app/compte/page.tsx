@@ -39,7 +39,7 @@ export default async function AccountPage() {
             await signOut({ redirectTo: marketingRoutes.home });
           }}
         >
-          <button className="sign-out-button" type="submit">
+          <button className="sign-out-button" data-posthog-reset type="submit">
             Se déconnecter
           </button>
         </form>
