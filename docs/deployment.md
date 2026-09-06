@@ -34,6 +34,13 @@ Both projects use `main` as the Production Branch. Other branches produce
 Preview deployments. The Supabase integration is intentionally absent from the
 frontend because it does not query Supabase directly.
 
+Keep Vercel Authentication enabled for preview deployments only on
+`acquora-api`. Its production URL must be reachable by the frontend's
+server-side proxy. FastAPI separately requires `BACKEND_PROXY_SECRET` and an
+authenticated user identity on every analysis route, while the health route is
+intentionally public. Enabling Vercel Authentication on production API URLs
+causes the proxy to receive Vercel's HTML login page instead of JSON.
+
 The domains `acquora.fr` and `www.acquora.fr` are assigned to the project. At
 OVH, replace the current parking records with the exact records displayed by
 Vercel. At the time this setup was created, Vercel requested:
