@@ -23,6 +23,7 @@ __pycache__/
 
 
 data*
+temp*
 
 # Editors and operating systems
 .idea/

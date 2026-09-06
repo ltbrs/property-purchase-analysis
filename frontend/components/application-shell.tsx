@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import posthog from "posthog-js";
 
-import { isPostHogConfigured } from "@/instrumentation-client";
 import { BrandLink } from "@/components/design-system/brand-link";
 import { Icon, type IconName } from "@/components/icons";
+import {
+  identifyProductUser,
+  resetProductAnalytics,
+} from "@/lib/analytics/product-analytics";
 import { marketingRoutes, productRoutes } from "@/lib/routes";
 import {
   type AnalysisCase,
@@ -22,8 +24,7 @@ type ApplicationShellProps = Readonly<{
   children: ReactNode;
   user: {
     id: string;
-    email?: string | null;
-    name?: string | null;
+    authProvider?: string;
   };
 }>;
 
@@ -43,13 +44,11 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
   const isGlobalView = pathname === productRoutes.home || pathname === productRoutes.cases;
 
   useEffect(() => {
-    if (!isPostHogConfigured) return;
-
-    posthog.identify(user.id, {
-      ...(user.email ? { email: user.email } : {}),
-      ...(user.name ? { name: user.name } : {}),
+    identifyProductUser({
+      id: user.id,
+      authProvider: user.authProvider,
     });
-  }, [user.email, user.id, user.name]);
+  }, [user.authProvider, user.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,15 +86,18 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
     window.dispatchEvent(new Event(CASE_CREATION_REQUEST_EVENT));
   }
 
-  function resetPostHogOnSignOut(event: MouseEvent<HTMLDivElement>) {
+  function resetAnalyticsOnSignOut(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;
-    if (isPostHogConfigured && target instanceof HTMLElement && target.closest("[data-posthog-reset]")) {
-      posthog.reset();
+    if (
+      target instanceof HTMLElement &&
+      target.closest("[data-product-analytics-reset]")
+    ) {
+      resetProductAnalytics();
     }
   }
 
   return (
-    <div className="app-frame" onClickCapture={resetPostHogOnSignOut}>
+    <div className="app-frame" onClickCapture={resetAnalyticsOnSignOut}>
       <aside className={`sidebar${isMenuOpen ? " is-open" : ""}`}>
         <BrandLink
           className="brand"

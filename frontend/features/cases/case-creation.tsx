@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import posthog from "posthog-js";
 import { useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/icons";
 import type { PropertyType } from "@/features/documents/document-catalog";
-import { isPostHogConfigured } from "@/instrumentation-client";
+import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
@@ -75,14 +74,12 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
       if (!response.ok) throw new Error(await readApiError(response));
 
       const analysisCase = (await response.json()) as AnalysisCase;
-      if (isPostHogConfigured) {
-        posthog.capture("analysis_case_created", {
-          property_type: propertyType,
-          has_price: optionalValue(formData, "price_eur") !== null,
-          has_surface: optionalValue(formData, "surface_m2") !== null,
-          has_lot_count: optionalValue(formData, "lot_count") !== null,
-        });
-      }
+      captureProductEvent("analysis_case_created", {
+        property_type: propertyType,
+        has_price: optionalValue(formData, "price_eur") !== null,
+        has_surface: optionalValue(formData, "surface_m2") !== null,
+        has_lot_count: optionalValue(formData, "lot_count") !== null,
+      });
       saveWorkspace(analysisCase.id);
       onCreated?.(analysisCase);
       router.push(productRoutes.caseOverview);

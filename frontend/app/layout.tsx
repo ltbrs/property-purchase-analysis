@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { VercelWebAnalytics } from "@/components/analytics/vercel-web-analytics";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +21,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="fr">
       <body>
         {children}
+        <VercelWebAnalytics />
       </body>
     </html>
   );

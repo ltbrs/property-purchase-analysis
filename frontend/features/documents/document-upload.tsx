@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 
 import { AdemeMark } from "@/components/ademe-mark";
@@ -26,7 +25,7 @@ import {
   RawExtractionViewer,
   type RawExtractionSelection,
 } from "@/features/documents/raw-extraction-viewer";
-import { isPostHogConfigured } from "@/instrumentation-client";
+import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
@@ -471,11 +470,9 @@ export function DocumentUpload() {
       if (!response.ok) throw new Error(await readApiError(response));
       const analysisCase = (await response.json()) as AnalysisCase;
       setPropertyType(analysisCase.property_type);
-      if (isPostHogConfigured) {
-        posthog.capture("property_type_updated", {
-          property_type: analysisCase.property_type,
-        });
-      }
+      captureProductEvent("property_type_updated", {
+        property_type: analysisCase.property_type,
+      });
     } catch (updateError) {
       setError(
         updateError instanceof Error
@@ -539,8 +536,8 @@ export function DocumentUpload() {
     });
     setIsUploading(false);
 
-    if (successfulDocuments.length > 0 && isPostHogConfigured) {
-      posthog.capture("documents_uploaded", {
+    if (successfulDocuments.length > 0) {
+      captureProductEvent("documents_uploaded", {
         document_count: successfulDocuments.length,
         document_types: successfulDocuments.map(
           (document) => document.document_type ?? "unknown",
@@ -628,12 +625,10 @@ export function DocumentUpload() {
       setDocuments((currentDocuments) =>
         currentDocuments.filter(({ id }) => id !== document.id),
       );
-      if (isPostHogConfigured) {
-        posthog.capture("document_deleted", {
-          document_type: document.document_type ?? "unknown",
-          document_status: document.status,
-        });
-      }
+      captureProductEvent("document_deleted", {
+        document_type: document.document_type ?? "unknown",
+        document_status: document.status,
+      });
     } catch (deletionError) {
       setError(
         deletionError instanceof Error

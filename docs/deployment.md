@@ -87,6 +87,8 @@ Add these application variables in Vercel for Production and Preview:
 | `BACKEND_API_URL` | `https://acquora-api-acquora.vercel.app/api/v1`, then `https://api.acquora.fr/api/v1` after DNS validation |
 | `BACKEND_PROXY_SECRET` | A dedicated random value, identical on FastAPI |
 | `CONTACT_PROXY_SECRET` | A second random value, identical on FastAPI |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host, such as `https://eu.i.posthog.com` |
 
 Never prefix the proxy secrets, Google client secret, or Auth.js secret with
 `NEXT_PUBLIC_`. Add these Google OAuth redirect URIs:
@@ -95,6 +97,22 @@ Never prefix the proxy secrets, Google client secret, or Auth.js secret with
 https://acquora.fr/api/auth/callback/google
 https://www.acquora.fr/api/auth/callback/google
 ```
+
+## Product and web analytics
+
+PostHog is the product analytics boundary. Its browser setup lives in
+`frontend/lib/analytics/product-analytics.ts` and is initialized by
+`frontend/instrumentation-client.ts`. It records page views, referrers, campaign
+parameters, browser and device properties, and the explicit product events defined
+in the application. Authenticated users are linked with the stable application user
+ID and an `auth_provider` property. Autocapture, exception capture, and session
+recording stay disabled so document content and rendered report text are not sent.
+
+Vercel Web Analytics is the independent, cookie-free traffic analytics boundary.
+Enable it in the Vercel project dashboard, then keep
+`frontend/components/analytics/vercel-web-analytics.tsx` mounted from the root
+layout. It provides global page, referrer, geography, browser, operating-system, and
+device reporting without receiving PostHog product events.
 
 ## Supabase database
 

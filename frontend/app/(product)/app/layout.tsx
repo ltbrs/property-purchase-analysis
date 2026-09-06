@@ -19,8 +19,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     <ApplicationShell
       user={{
         id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
+        authProvider: session.user.authProvider,
       }}
     >
       {children}

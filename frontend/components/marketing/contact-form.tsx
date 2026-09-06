@@ -1,9 +1,8 @@
 "use client";
 
-import posthog from "posthog-js";
 import { FormEvent, useRef, useState } from "react";
 
-import { isPostHogConfigured } from "@/instrumentation-client";
+import { captureProductEvent } from "@/lib/analytics/product-analytics";
 
 type SubmissionState = "idle" | "pending" | "success" | "error";
 
@@ -45,11 +44,9 @@ export function ContactForm() {
       }
 
       formRef.current?.reset();
-      if (isPostHogConfigured) {
-        posthog.capture("contact_form_submitted", {
-          subject: String(formData.get("subject") ?? "unknown"),
-        });
-      }
+      captureProductEvent("contact_form_submitted", {
+        subject: String(formData.get("subject") ?? "unknown"),
+      });
       setSubmissionState("success");
       setFeedback("Merci, votre message a bien été enregistré.");
     } catch {
