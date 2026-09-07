@@ -441,13 +441,12 @@
 }
 
 .workflow-player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 1.25rem;
   background: var(--green-950);
-}
-
-.workflow-player > div {
-  max-width: 100%;
 }
 
 .home-workflow-steps {
@@ -2939,7 +2938,9 @@
   .marketing-nav {
     order: 3;
     width: 100%;
+    min-width: 0;
     justify-content: flex-start;
+    margin-left: 0;
     overflow-x: auto;
     padding: 0.25rem 0;
     scrollbar-width: none;

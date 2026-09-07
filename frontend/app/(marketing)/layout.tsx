@@ -10,8 +10,8 @@ import "./marketing.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Acquora — Achetez en sachant",
-    template: "%s — Acquora",
+    default: "Analyse des documents d’un achat immobilier | Acquora",
+    template: "%s | Acquora",
   },
 };
 

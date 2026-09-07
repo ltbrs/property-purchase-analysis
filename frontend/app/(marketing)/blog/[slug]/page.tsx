@@ -64,8 +64,16 @@ function JsonLd({ article }: Readonly<{ article: BlogArticle }>) {
         dateModified: article.modifiedAt,
         inLanguage: "fr-FR",
         mainEntityOfPage: articleUrl,
+        articleSection: article.category,
+        author: {
+          "@type": "Organization",
+          "@id": SITE_URL + "/#organization",
+          name: "Acquora",
+          url: SITE_URL,
+        },
         publisher: {
           "@type": "Organization",
+          "@id": SITE_URL + "/#organization",
           name: "Acquora",
           url: SITE_URL,
           logo: `${SITE_URL}/brand/acquora-logo-dark.svg`,
@@ -90,6 +98,21 @@ function JsonLd({ article }: Readonly<{ article: BlogArticle }>) {
   );
 }
 
+function ArticleByline({ article }: Readonly<{ article: BlogArticle }>) {
+  return (
+    <div className="article-byline">
+      <span>Par l’équipe Acquora</span>
+      <time dateTime={article.publishedAt}>
+        Publié le {formatBlogDate(article.publishedAt)}
+      </time>
+      <time dateTime={article.modifiedAt}>
+        Mis à jour le {formatBlogDate(article.modifiedAt)}
+      </time>
+      <span>{article.readingTime} de lecture</span>
+    </div>
+  );
+}
+
 function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
   return (
     <>
@@ -111,12 +134,7 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
             appartement. Voici les pièces à demander, ce qu’elles révèlent et les
             recoupements à faire avant de vous engager.
           </p>
-          <div className="article-byline">
-            <time dateTime={article.publishedAt}>
-              Publié le {formatBlogDate(article.publishedAt)}
-            </time>
-            <span>{article.readingTime} de lecture</span>
-          </div>
+          <ArticleByline article={article} />
         </header>
 
         <figure className="article-cover">
@@ -137,6 +155,7 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               <li><a href="#copropriete">La copropriété</a></li>
               <li><a href="#diagnostics">Les diagnostics</a></li>
               <li><a href="#documents-utiles">Les pièces utiles</a></li>
+              <li><a href="#documents-manquants">Les pièces manquantes</a></li>
               <li><a href="#recouper">Les recoupements</a></li>
               <li><a href="#signature">Avant la signature</a></li>
             </ol>
@@ -162,7 +181,7 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               les documents obligatoires, qui encadrent la vente, des justificatifs
               pratiques que vous pouvez demander pour comprendre le logement.
               La démarche officielle est détaillée dans la fiche de{" "}
-              <a href="https://www.service-public.fr/particuliers/vosdroits/F37190">Service Public consacrée à l’achat d’un logement en copropriété</a>.
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37190">Service Public consacrée à l’achat d’un logement en copropriété</a>.
             </p>
 
             <h2 id="checklist">La checklist des documents à demander</h2>
@@ -289,11 +308,11 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
             </ul>
             <p>
               La liste officielle complète et ses conditions figurent sur{" "}
-              <a href="https://www.service-public.fr/particuliers/vosdroits/F37190">Service Public</a>.
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37190">Service Public</a>.
               Pour le DPE, vérifiez aussi sa date et son numéro d’identification.
               Les DPE réalisés entre le 1er janvier 2018 et le 30 juin 2021 ne sont
               plus valables depuis le 1er janvier 2025, comme le précise la{" "}
-              <a href="https://www.service-public.fr/particuliers/vosdroits/F16096">fiche officielle sur le DPE</a>.
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F16096">fiche officielle sur le DPE</a>.
             </p>
 
             <div className="article-callout article-callout--warning">
@@ -325,10 +344,76 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               lors de l’acte authentique. Il centralise notamment des informations
               sur les matériaux, équipements et travaux énergétiques. Les cas
               concernés sont détaillés par{" "}
-              <a href="https://www.service-public.fr/particuliers/vosdroits/F36759">Service Public</a>.
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F36759">Service Public</a>.
             </p>
 
-            <h2 id="recouper">4. Les recoupements qui comptent vraiment</h2>
+            <h2 id="documents-manquants">4. Que faire lorsqu’un document manque ou semble ancien ?</h2>
+            <p>
+              Un document absent ne prouve ni qu’un problème existe, ni que tout
+              va bien. Il crée une zone d’incertitude. Notez précisément la pièce,
+              la période et le lot concernés, puis demandez une version lisible et
+              datée au vendeur, à l’agence ou au syndic selon le document.
+            </p>
+            <div className="article-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Information manquante</th><th>Ce qui reste inconnu</th><th>Action utile</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Un ou plusieurs PV parmi les trois dernières années</td>
+                    <td>Décisions, incidents, procédures ou travaux discutés pendant la période</td>
+                    <td>Demander les PV disponibles et signaler explicitement la période non couverte</td>
+                  </tr>
+                  <tr>
+                    <td>PPT ou projet de PPT absent</td>
+                    <td>Travaux envisagés sur dix ans, calendrier et estimations disponibles</td>
+                    <td>Demander si un projet a été élaboré, présenté ou adopté, puis vérifier les PV correspondants</td>
+                  </tr>
+                  <tr>
+                    <td>Informations financières incomplètes</td>
+                    <td>Niveau des charges, dépenses hors budget, impayés, dettes fournisseurs et fonds travaux</td>
+                    <td>Demander les deux exercices et distinguer les données du lot de celles de toute la copropriété</td>
+                  </tr>
+                  <tr>
+                    <td>Diagnostic expiré ou rattaché à un autre bien</td>
+                    <td>État actuel du risque ou périmètre réellement contrôlé</td>
+                    <td>Faire confirmer l’applicabilité et la validité par le notaire ou le diagnostiqueur</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Depuis le 1er janvier 2025, un projet de plan pluriannuel de travaux
+              est en principe obligatoire dans les immeubles d’habitation reçus
+              depuis plus de quinze ans. Le{" "}
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F36760">
+                détail des règles applicables au PPT
+              </a>{" "}
+              permet de vérifier le cas de la copropriété. L’absence du document
+              dans votre dossier ne permet pas, à elle seule, de conclure qu’aucun
+              projet n’existe.
+            </p>
+            <div className="article-callout article-callout--warning">
+              <strong>Absence ne signifie pas zéro</strong>
+              <p>
+                Sans montant, calendrier ou décision, conservez le coût comme non
+                chiffré. Ne le transformez ni en dépense certaine, ni en absence de
+                dépense. C’est une question à résoudre avant de finaliser le budget.
+              </p>
+            </div>
+            <p>
+              Pour plusieurs informations déterminantes de la copropriété,
+              l’absence de remise reporte le point de départ du délai légal de
+              rétractation. La{" "}
+              <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37190">
+                liste officielle des documents concernés
+              </a>{" "}
+              doit être vérifiée avec le notaire, car cette conséquence ne
+              s’applique pas indistinctement à toute pièce pratique demandée.
+            </p>
+
+            <h2 id="recouper">5. Les recoupements qui comptent vraiment</h2>
             <p>
               Lire chaque PDF séparément donne une vision incomplète. Les écarts
               entre documents sont souvent plus instructifs que leur contenu pris isolément.
@@ -340,7 +425,7 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               <section><span>04</span><div><h3>DPE et caractéristiques réelles</h3><p>Vérifiez que chauffage, eau chaude, surface, isolation et fenêtres décrits correspondent au logement visité.</p></div></section>
             </div>
 
-            <h2 id="signature">5. Que vérifier avant le compromis puis avant l’acte ?</h2>
+            <h2 id="signature">6. Que vérifier avant le compromis puis avant l’acte ?</h2>
             <h3>Avant le compromis</h3>
             <p>
               Faites inscrire les conditions réellement nécessaires à votre achat,
@@ -393,17 +478,25 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               Le coût réel dépend notamment du climat, du nombre d’occupants, de leurs
               usages et des contrats d’énergie.
             </p>
+            <h3>Que faire si une pièce obligatoire manque avant le compromis ?</h3>
+            <p>
+              Demandez une liste écrite des pièces reçues et manquantes, puis
+              transmettez-la au notaire. Certaines absences ont un effet sur le
+              départ du délai de rétractation. D’autres empêchent surtout de
+              chiffrer un risque ou de vérifier une affirmation du vendeur.
+            </p>
 
             <section className="article-sources" aria-labelledby="sources-title">
               <h2 id="sources-title">Sources officielles</h2>
               <ul>
                 <li><a href="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000028779431">Code de la construction et de l’habitation, article L. 721-2</a></li>
-                <li><a href="https://www.service-public.fr/particuliers/vosdroits/F37190">Service Public, achat d’un logement en copropriété</a></li>
-                <li><a href="https://www.service-public.fr/particuliers/vosdroits/F16096">Service Public, diagnostic de performance énergétique</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37190">Service Public, achat d’un logement en copropriété</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F16096">Service Public, diagnostic de performance énergétique</a></li>
                 <li><a href="https://www.anil.org/aj-copropriete-fiche-synthetique/">ANIL, fiche synthétique de la copropriété</a></li>
-                <li><a href="https://www.service-public.fr/particuliers/vosdroits/F36759">Service Public, carnet d’information du logement</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F36759">Service Public, carnet d’information du logement</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F36760">Service Public, plan pluriannuel de travaux</a></li>
               </ul>
-              <p>Sources consultées le 2 septembre 2026.</p>
+              <p>Sources vérifiées le 6 septembre 2026.</p>
             </section>
 
             <p className="article-disclaimer">
@@ -453,12 +546,7 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
             calendrier des appels de fonds, la date de vente et la clause du
             compromis pour savoir qui règle le syndic et qui supporte le coût final.
           </p>
-          <div className="article-byline">
-            <time dateTime={article.publishedAt}>
-              Publié le {formatBlogDate(article.publishedAt)}
-            </time>
-            <span>{article.readingTime} de lecture</span>
-          </div>
+          <ArticleByline article={article} />
         </header>
 
         <figure className="article-cover">
@@ -476,6 +564,7 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
             <strong>Dans ce guide</strong>
             <ol>
               <li><a href="#reponse">La réponse courte</a></li>
+              <li><a href="#statut">Le statut des travaux</a></li>
               <li><a href="#regle">La règle des appels</a></li>
               <li><a href="#compromis">Le rôle du compromis</a></li>
               <li><a href="#exemple">Un exemple chiffré</a></li>
@@ -505,6 +594,53 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
               authentique, qui marque habituellement la vente et le changement de
               propriétaire, complète cette chronologie. Confondre ces dates peut
               conduire un acquéreur à sous-estimer plusieurs milliers d’euros.
+            </p>
+
+            <h2 id="statut">Distinguer des travaux évoqués, votés, appelés et payés</h2>
+            <p>
+              Le mot « travaux » recouvre plusieurs niveaux d’engagement. Avant
+              d’attribuer un montant à l’acquéreur ou au vendeur, rattachez chaque
+              poste à un document et à un statut précis.
+            </p>
+            <div className="article-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Statut</th><th>Ce que le document confirme</th><th>Traitement dans votre budget</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Évoqués ou mis à l’étude</td>
+                    <td>Un besoin, un devis ou une étude apparaît dans un PV ou un projet de PPT, sans décision de dépense</td>
+                    <td>Coût possible à clarifier, séparé des appels certains</td>
+                  </tr>
+                  <tr>
+                    <td>Votés</td>
+                    <td>Une résolution adoptée précise les travaux et, idéalement, le montant, la clé et le calendrier</td>
+                    <td>Calculer la quote-part et rechercher chaque date d’exigibilité</td>
+                  </tr>
+                  <tr>
+                    <td>Appelés et exigibles</td>
+                    <td>Le syndic réclame une provision déterminée au lot à une date donnée</td>
+                    <td>Identifier le propriétaire à cette date et la clause de l’acte</td>
+                  </tr>
+                  <tr>
+                    <td>Payés</td>
+                    <td>Un règlement apparaît sur l’appel acquitté ou le compte du copropriétaire</td>
+                    <td>Ne pas le compter une seconde fois, vérifier le solde restant</td>
+                  </tr>
+                  <tr>
+                    <td>Réalisés</td>
+                    <td>Le chantier est exécuté, mais des soldes, réserves ou régularisations peuvent subsister</td>
+                    <td>Vérifier les dernières factures et les décisions de clôture</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Le PPT et son projet décrivent un horizon de dix ans. Ils servent à
+              repérer des travaux nécessaires ou utiles, mais un poste inscrit dans
+              ce document n’est pas automatiquement une dépense déjà votée. Il faut
+              retrouver la décision d’assemblée générale correspondante.
             </p>
 
             <h2 id="regle">La date d’exigibilité compte plus que la date du vote</h2>
@@ -575,6 +711,16 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
                 <li><strong>Qui garde le coût à sa charge ?</strong> La personne désignée par la clause du compromis ou de l’acte, si cette clause déroge à la règle.</li>
               </ul>
             </div>
+
+            <h3>La régularisation des charges suit une autre chronologie</h3>
+            <p>
+              Le solde annuel des charges est porté au crédit ou au débit de la
+              personne copropriétaire au moment où l’assemblée générale approuve
+              les comptes. L’acte peut organiser une autre répartition entre le
+              vendeur et l’acquéreur, comme pour les appels de fonds. Vérifiez donc
+              séparément les travaux hors budget et la future régularisation des
+              charges courantes.
+            </p>
 
             <h2 id="exemple">Exemple : trois appels autour de la vente</h2>
             <p>
@@ -686,6 +832,13 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
               toutefois un coût futur possible. Conservez-les dans une estimation
               séparée, avec leur devis, leur niveau de maturité et la date du prochain vote.
             </p>
+            <h3>Un poste du plan pluriannuel est-il déjà à payer ?</h3>
+            <p>
+              Pas nécessairement. Le plan organise les travaux envisagés sur dix
+              ans. Recherchez dans les procès-verbaux une résolution adoptée, puis
+              son montant, sa clé de répartition et ses dates d’exigibilité. Sans
+              ce vote, conservez le poste parmi les coûts possibles à clarifier.
+            </p>
 
             <section className="article-sources" aria-labelledby="sources-title">
               <h2 id="sources-title">Sources officielles</h2>
@@ -694,8 +847,9 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
                 <li><a href="https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006488324">Décret du 17 mars 1967, article 6-3 sur les conventions entre les parties</a></li>
                 <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F32920">Service Public, paiement des charges de copropriété l’année de la vente</a></li>
                 <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F37294">Service Public, contenu et rôle de l’état daté</a></li>
+                <li><a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F36760">Service Public, plan pluriannuel de travaux</a></li>
               </ul>
-              <p>Sources consultées le 2 septembre 2026.</p>
+              <p>Sources vérifiées le 6 septembre 2026.</p>
             </section>
 
             <p className="article-disclaimer">

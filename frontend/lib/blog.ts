@@ -1,4 +1,4 @@
-export const SITE_URL = "https://acquora.fr";
+export { SITE_URL } from "@/lib/seo";
 
 const blogDateFormatter = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
@@ -32,8 +32,8 @@ export const blogArticles = [
     category: "Copropriété",
     categoryHref: "/blog/copropriete",
     publishedAt: "2026-04-26",
-    modifiedAt: "2026-09-02",
-    readingTime: "8 min",
+    modifiedAt: "2026-09-06",
+    readingTime: "10 min",
     cover: "/images/blog/travaux-votes-avant-compromis.svg",
     coverAlt:
       "Calendrier d’appels de fonds, clé et immeuble de copropriété",
@@ -48,8 +48,8 @@ export const blogArticles = [
     category: "Copropriété",
     categoryHref: "/blog/copropriete",
     publishedAt: "2026-02-02",
-    modifiedAt: "2026-08-26",
-    readingTime: "10 min",
+    modifiedAt: "2026-09-06",
+    readingTime: "12 min",
     cover: "/images/blog/documents-achat-appartement.svg",
     coverAlt:
       "Dossier de documents immobiliers devant un immeuble d’habitation",
