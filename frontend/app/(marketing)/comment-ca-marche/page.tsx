@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
-
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon, type IconName } from "@/components/icons";
 import { productRoutes } from "@/lib/routes";
+import { createMarketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Comment ça marche",
+export const metadata = createMarketingMetadata({
+  title: "Comment analyser les documents d’un achat immobilier",
   description:
     "Découvrez comment Acquora transforme les documents de votre achat immobilier en un rapport clair, recoupé et sourcé.",
-};
+  path: "/comment-ca-marche",
+});
 
 const documentRows = [
   { name: "DPE", pages: "18 pages", icon: "leaf" as const },

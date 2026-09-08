@@ -76,6 +76,8 @@ The frontend-specific file recognizes:
 | `BACKEND_API_URL` | Private API base URL used by the authenticated Next.js boundary |
 | `BACKEND_PROXY_SECRET` | Shared secret that protects authenticated identity headers |
 | `CONTACT_PROXY_SECRET` | Shared secret for the public contact proxy and rate limiting |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token for product analytics |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host |
 
 Create a Google OAuth web client with these authorized redirect URIs:
 

@@ -34,6 +34,13 @@ Both projects use `main` as the Production Branch. Other branches produce
 Preview deployments. The Supabase integration is intentionally absent from the
 frontend because it does not query Supabase directly.
 
+Keep Vercel Authentication enabled for preview deployments only on
+`acquora-api`. Its production URL must be reachable by the frontend's
+server-side proxy. FastAPI separately requires `BACKEND_PROXY_SECRET` and an
+authenticated user identity on every analysis route, while the health route is
+intentionally public. Enabling Vercel Authentication on production API URLs
+causes the proxy to receive Vercel's HTML login page instead of JSON.
+
 The domains `acquora.fr` and `www.acquora.fr` are assigned to the project. At
 OVH, replace the current parking records with the exact records displayed by
 Vercel. At the time this setup was created, Vercel requested:
@@ -87,6 +94,8 @@ Add these application variables in Vercel for Production and Preview:
 | `BACKEND_API_URL` | `https://acquora-api-acquora.vercel.app/api/v1`, then `https://api.acquora.fr/api/v1` after DNS validation |
 | `BACKEND_PROXY_SECRET` | A dedicated random value, identical on FastAPI |
 | `CONTACT_PROXY_SECRET` | A second random value, identical on FastAPI |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host, such as `https://eu.i.posthog.com` |
 
 Never prefix the proxy secrets, Google client secret, or Auth.js secret with
 `NEXT_PUBLIC_`. Add these Google OAuth redirect URIs:
@@ -95,6 +104,26 @@ Never prefix the proxy secrets, Google client secret, or Auth.js secret with
 https://acquora.fr/api/auth/callback/google
 https://www.acquora.fr/api/auth/callback/google
 ```
+
+## Product and web analytics
+
+PostHog is the product analytics boundary. Its browser setup lives in
+`frontend/lib/analytics/product-analytics.ts` and is initialized by
+`frontend/instrumentation-client.ts`. It records page views, referrers, campaign
+parameters, browser and device properties, and the explicit product events defined
+in the application. Authenticated users are linked with the stable application user
+ID and an `auth_provider` property. Autocapture and exception capture stay disabled.
+Session recording starts only after an authenticated user is identified and stops on
+logout or when the authenticated application shell unmounts. Product text and input
+values are masked, document frames and file inputs are blocked, and replay network
+payloads, URLs, headers, console logs, cross-origin frames, and canvases are not
+captured. Sampling and recording triggers remain controlled by the PostHog project.
+
+Vercel Web Analytics is the independent, cookie-free traffic analytics boundary.
+Enable it in the Vercel project dashboard, then keep
+`frontend/components/analytics/vercel-web-analytics.tsx` mounted from the root
+layout. It provides global page, referrer, geography, browser, operating-system, and
+device reporting without receiving PostHog product events.
 
 ## Supabase database
 

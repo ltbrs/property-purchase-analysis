@@ -1,15 +1,15 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
-import { blogArticles, formatBlogDate, SITE_URL } from "@/lib/blog";
+import { blogArticles, formatBlogDate } from "@/lib/blog";
+import { createMarketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = createMarketingMetadata({
   title: "Blog immobilier",
   description:
     "Guides pratiques pour lire les documents d’un achat immobilier, comprendre les risques et préparer vos questions.",
-  alternates: { canonical: `${SITE_URL}/blog` },
-};
+  path: "/blog",
+});
 
 export default function BlogPage() {
   return (
@@ -37,7 +37,9 @@ export default function BlogPage() {
             <div className="blog-card-copy">
               <div className="blog-card-meta">
                 <Link href={article.categoryHref}>{article.category}</Link>
-                <time dateTime={article.publishedAt}>{formatBlogDate(article.publishedAt)}</time>
+                <time dateTime={article.modifiedAt}>
+                  Mis à jour le {formatBlogDate(article.modifiedAt)}
+                </time>
                 <span>{article.readingTime} de lecture</span>
               </div>
               <h2>

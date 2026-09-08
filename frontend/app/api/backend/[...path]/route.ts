@@ -74,6 +74,7 @@ async function proxyToBackend(
     method: request.method,
     headers,
     cache: "no-store",
+    redirect: "manual",
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     options.body = request.body;
@@ -82,6 +83,20 @@ async function proxyToBackend(
 
   try {
     const backendResponse = await fetch(target, options);
+    const backendContentType = backendResponse.headers
+      .get("content-type")
+      ?.toLowerCase();
+    if (
+      (backendResponse.status >= 300 && backendResponse.status < 400) ||
+      backendContentType?.includes("text/html")
+    ) {
+      await backendResponse.body?.cancel();
+      return Response.json(
+        { detail: "Le service d’analyse est temporairement indisponible." },
+        { status: 502 },
+      );
+    }
+
     const responseHeaders = new Headers();
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = backendResponse.headers.get(name);

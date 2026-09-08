@@ -1,13 +1,12 @@
-import type { Metadata } from "next";
-
 import { ContactForm } from "@/components/marketing/contact-form";
+import { createMarketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = createMarketingMetadata({
   title: "Nous contacter",
   description:
     "Une question sur Acquora, votre analyse immobilière ou la confidentialité de vos documents ? Écrivez-nous.",
-  alternates: { canonical: "https://acquora.fr/nous-contacter" },
-};
+  path: "/nous-contacter",
+});
 
 export default function ContactPage() {
   return (

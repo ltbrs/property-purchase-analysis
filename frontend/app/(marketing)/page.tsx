@@ -1,14 +1,55 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon, type IconName } from "@/components/icons";
 import { ProductWorkflowPlayer } from "@/components/marketing/product-workflow-player";
 import { productRoutes } from "@/lib/routes";
+import {
+  createMarketingMetadata,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/seo";
 
-export const metadata: Metadata = {
-  description:
-    "Acquora analyse les documents de votre achat immobilier et met en évidence risques, coûts futurs, incohérences et pièces manquantes.",
+export const metadata = createMarketingMetadata({
+  title: "Analyse des documents d’un achat immobilier",
+  description: SITE_DESCRIPTION,
+  path: "/",
+});
+
+const brandEntity = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: `${SITE_URL}/`,
+      name: SITE_NAME,
+      alternateName: "acquora.fr",
+      description: SITE_DESCRIPTION,
+      inLanguage: "fr-FR",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      url: `${SITE_URL}/`,
+      name: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/icon.svg`,
+        width: 64,
+        height: 64,
+      },
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "service client",
+        url: `${SITE_URL}/nous-contacter`,
+        availableLanguage: "fr",
+      },
+    },
+  ],
 };
 
 const trustPoints = [
@@ -65,10 +106,19 @@ const reportItems = [
 export default function MarketingHomePage() {
   return (
     <div className="marketing-home">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(brandEntity).replace(/</g, "\\u003c"),
+        }}
+      />
       <section className="home-hero" aria-labelledby="hero-title">
         <div className="home-hero-copy">
           <p className="home-kicker"><span /> L’analyse documentaire avant d’acheter</p>
-          <h1 id="hero-title">Le bien vous plaît.<br />Vérifiez ce qui compte.</h1>
+          <h1 id="hero-title">
+            Analysez les documents de votre achat immobilier.
+            <br />Vérifiez ce qui compte.
+          </h1>
           <p className="home-hero-lead">
             Acquora lit les documents de votre achat immobilier et transforme
             les informations dispersées en un rapport clair, sourcé et utile

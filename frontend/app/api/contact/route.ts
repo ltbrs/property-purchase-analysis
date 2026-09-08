@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 
 const MAX_BODY_BYTES = 16 * 1024;
+const CONTACT_UPSTREAM_ERROR_MESSAGE =
+  "Le service de contact est temporairement indisponible.";
 
 function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -94,8 +96,27 @@ export async function POST(request: NextRequest) {
       headers,
       body,
       cache: "no-store",
+      redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
+    const backendContentType = backendResponse.headers
+      .get("content-type")
+      ?.toLowerCase();
+    if (
+      backendResponse.status === 401 ||
+      (backendResponse.status >= 300 && backendResponse.status < 400) ||
+      !backendContentType?.includes("application/json")
+    ) {
+      console.error("Contact upstream returned an unexpected response", {
+        status: backendResponse.status,
+        contentType: backendContentType ?? null,
+      });
+      await backendResponse.body?.cancel();
+      return Response.json(
+        { detail: CONTACT_UPSTREAM_ERROR_MESSAGE },
+        { status: 502, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const responseHeaders = new Headers({
       "Cache-Control": "no-store",
       "Content-Type": "application/json",
@@ -107,9 +128,12 @@ export async function POST(request: NextRequest) {
       status: backendResponse.status,
       headers: responseHeaders,
     });
-  } catch {
+  } catch (error) {
+    console.error("Contact upstream request failed", {
+      error: error instanceof Error ? error.name : "UnknownError",
+    });
     return Response.json(
-      { detail: "Le service de contact est temporairement indisponible." },
+      { detail: CONTACT_UPSTREAM_ERROR_MESSAGE },
       { status: 502, headers: { "Cache-Control": "no-store" } },
     );
   }

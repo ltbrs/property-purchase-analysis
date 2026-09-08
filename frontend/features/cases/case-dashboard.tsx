@@ -1,13 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
 import { CaseCreation } from "@/features/cases/case-creation";
 import { propertyTypeLabels } from "@/features/documents/document-catalog";
-import { isPostHogConfigured } from "@/instrumentation-client";
+import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   type AnalysisCase,
@@ -85,11 +84,9 @@ export function CaseDashboard() {
   }, []);
 
   function selectCase(analysisCase: AnalysisCase) {
-    if (isPostHogConfigured) {
-      posthog.capture("analysis_case_selected", {
-        property_type: analysisCase.property_type,
-      });
-    }
+    captureProductEvent("analysis_case_selected", {
+      property_type: analysisCase.property_type,
+    });
     saveWorkspace(analysisCase.id);
     setActiveCaseId(analysisCase.id);
     router.push(productRoutes.caseOverview);

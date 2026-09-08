@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
-
 import { Icon } from "@/components/icons";
+import { createMarketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Tarifs",
+export const metadata = createMarketingMetadata({
+  title: "Tarifs de l’analyse documentaire immobilière",
   description:
     "Découvrez les tarifs Acquora pour analyser les documents d’un achat immobilier : aperçu gratuit, analyse complète ou pack de trois analyses.",
-};
+  path: "/tarifs",
+});
 
 const offers = [
   {
@@ -71,34 +71,16 @@ const comparisons = [
   },
 ] as const;
 
-const questions = [
-  {
-    title: "Quand pourrai-je acheter une analyse ?",
-    answer:
-      "Acquora n’est pas encore ouvert au public. Les offres et les paiements sont donc désactivés pour le moment.",
-  },
-  {
-    title: "Le pack de trois analyses expire-t-il ?",
-    answer:
-      "Non. Les trois analyses du Pack Recherche pourront être utilisées quand vous le souhaitez, sans date limite.",
-  },
-  {
-    title: "Une analyse remplace-t-elle l’avis d’un professionnel ?",
-    answer:
-      "Non. Acquora est un outil d’aide à la compréhension et à la décision. Il ne remplace pas les conseils d’un notaire, d’un diagnostiqueur ou d’un professionnel du bâtiment.",
-  },
-] as const;
-
 export default function PricingPage() {
   return (
     <div className="pricing-page">
       <section className="pricing-hero" aria-labelledby="pricing-title">
-        {/* <p className="pricing-kicker"><span /> Tarifs</p>
+        <p className="pricing-kicker"><span /> Tarifs</p>
         <h1 id="pricing-title">Un prix simple pour une décision importante.</h1>
         <p>
           Commencez par un aperçu, analysez un bien en profondeur ou gardez
           trois analyses pour votre recherche. Aucun abonnement.
-        </p> */}
+        </p>
         <span className="pricing-launch-note">
           <Icon name="info" /> Acquora ouvre bientôt. Les achats sont désactivés pour le moment.
         </span>
