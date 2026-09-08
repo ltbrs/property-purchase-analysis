@@ -35,6 +35,21 @@ export function initializeProductAnalytics() {
       autocapture: false,
       capture_exceptions: false,
       disable_session_recording: true,
+      enable_recording_console_log: false,
+      session_recording: {
+        // Product pages contain property and document data. Keep their text out
+        // of replays while retaining enough layout and interaction context to
+        // diagnose usability issues.
+        maskTextSelector: ".app-frame, .app-frame *",
+        maskAllInputs: true,
+        blockSelector:
+          '.ph-no-capture, input[type="file"], iframe, object, embed, canvas',
+        recordBody: false,
+        recordHeaders: false,
+        recordCrossOriginIframes: false,
+        captureCanvas: { recordCanvas: false },
+        maskCapturedNetworkRequestFn: () => null,
+      },
       debug: process.env.NODE_ENV === "development",
     });
   } catch (error) {
@@ -52,9 +67,16 @@ export function identifyProductUser(user: ProductAnalyticsUser) {
   posthog.identify(user.id, {
     ...(user.authProvider ? { auth_provider: user.authProvider } : {}),
   });
+  posthog.startSessionRecording();
+}
+
+export function stopProductSessionRecording() {
+  if (!isConfigured) return;
+  posthog.stopSessionRecording();
 }
 
 export function resetProductAnalytics() {
   if (!isConfigured) return;
+  posthog.stopSessionRecording();
   posthog.reset();
 }

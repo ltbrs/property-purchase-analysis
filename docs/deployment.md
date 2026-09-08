@@ -112,8 +112,12 @@ PostHog is the product analytics boundary. Its browser setup lives in
 `frontend/instrumentation-client.ts`. It records page views, referrers, campaign
 parameters, browser and device properties, and the explicit product events defined
 in the application. Authenticated users are linked with the stable application user
-ID and an `auth_provider` property. Autocapture, exception capture, and session
-recording stay disabled so document content and rendered report text are not sent.
+ID and an `auth_provider` property. Autocapture and exception capture stay disabled.
+Session recording starts only after an authenticated user is identified and stops on
+logout or when the authenticated application shell unmounts. Product text and input
+values are masked, document frames and file inputs are blocked, and replay network
+payloads, URLs, headers, console logs, cross-origin frames, and canvases are not
+captured. Sampling and recording triggers remain controlled by the PostHog project.
 
 Vercel Web Analytics is the independent, cookie-free traffic analytics boundary.
 Enable it in the Vercel project dashboard, then keep

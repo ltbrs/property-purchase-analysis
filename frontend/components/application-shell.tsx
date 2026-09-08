@@ -9,6 +9,7 @@ import { Icon, type IconName } from "@/components/icons";
 import {
   identifyProductUser,
   resetProductAnalytics,
+  stopProductSessionRecording,
 } from "@/lib/analytics/product-analytics";
 import { marketingRoutes, productRoutes } from "@/lib/routes";
 import {
@@ -48,6 +49,8 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
       id: user.id,
       authProvider: user.authProvider,
     });
+
+    return stopProductSessionRecording;
   }, [user.authProvider, user.id]);
 
   useEffect(() => {
