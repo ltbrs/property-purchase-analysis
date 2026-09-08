@@ -252,14 +252,14 @@ DOCUMENTS = [
                     "body",
                     "Les comptes 2024, arrêtés à 35 480 EUR, sont approuvés. Résolution adoptée.",
                 ),
-                E("h2", "Résolution 4 • Impayés"),
+                E("h2", "Information préalable • Situation des impayés"),
                 E(
                     "callout",
                     "Le montant global des impayés de charges s'élève à 21 600 EUR au 31/05/2025.",
                 ),
                 E(
                     "body",
-                    "L'assemblée autorise le syndic à poursuivre le recouvrement amiable puis judiciaire. Procédure en cours. Aucun impayé n'est affecté aux lots 18 et 42.",
+                    "Le syndic précise que les procédures de recouvrement sont en cours. Aucun impayé n'est affecté aux lots 18 et 42. La décision correspondante figure plus loin dans le procès-verbal.",
                 ),
             ],
             [
@@ -2016,6 +2016,240 @@ EXTRA_PAGES: dict[str, list[list[Element]]] = {
 }
 
 
+# Extra deliberations make the minutes behave more like the documents commonly
+# found in a sale pack.  They deliberately repeat the formal voting vocabulary
+# and include routine decisions: real minutes are mostly administration, vote
+# counts and contract details, not a short list of highlighted risks.
+AG_DETAIL_PAGES: dict[str, list[list[Element]]] = {
+    "ag_2024": [
+        [
+            E("h1", "Ordre du jour et constitution du bureau"),
+            E("body", "L'assemblée a été convoquée par lettre remise ou adressée aux copropriétaires. La feuille de présence, les pouvoirs et les formulaires de vote par correspondance sont déposés sur le bureau."),
+            E("kv", "Copropriétaires présents|9 représentant 5 960 / 10 000 tantièmes"),
+            E("kv", "Copropriétaires représentés|4 représentant 1 740 / 10 000 tantièmes"),
+            E("kv", "Votes par correspondance|2 représentant 540 / 10 000 tantièmes"),
+            E("kv", "Total participant|15 copropriétaires, 8 240 / 10 000 tantièmes"),
+            E("h2", "RÉSOLUTION N° 3 • DÉSIGNATION DU BUREAU"),
+            E("body", "Alex Martin est désigné président de séance, Zoé Bernard scrutatrice et la Régie Démo Lyon secrétaire. Les intéressés déclarent accepter leur mission."),
+            E("kv", "Vote|Pour 8 100, contre 0, abstention 140"),
+            E("kv", "Décision|Résolution adoptée"),
+            E("h2", "Rappel de l'ordre du jour"),
+            E("body", "Comptes, budget, contrats, assurance, entretien courant, infiltrations de toiture, façade sur cour, fonds travaux, conseil syndical et questions diverses."),
+        ],
+        [
+            E("h1", "Comptes, budget et situation de trésorerie"),
+            E("h2", "DÉTAIL DE LA RÉSOLUTION N° 1 • COMPTES 2023"),
+            E("body", "Après lecture du rapport du conseil syndical et examen des pièces, l'assemblée approuve les comptes de l'exercice clos au 31/12/2023 pour 34 610 EUR. Le solde des copropriétaires est réparti conformément aux clés du règlement."),
+            E("kv", "Vote|Pour 7 940, contre 0, abstention 300"),
+            E("kv", "Décision|Résolution adoptée"),
+            E("h2", "DÉTAIL DE LA RÉSOLUTION N° 2 • BUDGET 2024"),
+            E("body", "Le budget est fixé à 35 200 EUR, appelé par quarts égaux les premiers jours de janvier, avril, juillet et octobre. Les dépenses exceptionnelles restent exclues."),
+            E("kv", "Vote|Pour 8 100, contre 0, abstention 140"),
+            E("h2", "Situation communiquée à l'assemblée"),
+            E("kv", "Trésorerie disponible au 31/05/2024|17 860 EUR"),
+            E("kv", "Impayés de charges au 31/05/2024|14 300 EUR"),
+            E("kv", "Fonds travaux au 31/05/2024|21 900 EUR"),
+        ],
+        [
+            E("h1", "Contrats et entretien courant"),
+            E("h2", "RÉSOLUTION N° 4 • CONTRAT D'ASSURANCE"),
+            E("body", "L'assemblée prend acte du renouvellement du contrat multirisque immeuble pour une cotisation annuelle de 4 780 EUR. Le conseil syndical demande que les franchises figurent dans le prochain comparatif."),
+            E("kv", "Vote|Pour 8 240, contre 0, abstention 0"),
+            E("h2", "RÉSOLUTION N° 5 • CONTRAT DE NETTOYAGE"),
+            E("body", "Le contrat de nettoyage des parties communes est renouvelé pour 3 480 EUR TTC par an, avec deux passages hebdomadaires et sortie des conteneurs."),
+            E("kv", "Vote|Pour 7 700, contre 240, abstention 300"),
+            E("h2", "RÉSOLUTION N° 6 • ÉCLAIRAGE DES PALIERS"),
+            E("body", "Le remplacement progressif des minuteries et ampoules par des matériels à basse consommation est autorisé dans la limite de 1 250 EUR TTC."),
+            E("kv", "Vote|Pour 7 960, contre 0, abstention 280"),
+        ],
+        [
+            E("h1", "Clôture, réserves et pièces jointes"),
+            E("h2", "RÉSOLUTION N° 9 • FAÇADE SUR COUR"),
+            E("body", "Les fissures d'enduit et traces d'humidité signalées sur la façade cour feront l'objet d'un avis technique. Aucun marché de travaux n'est voté à cette séance."),
+            E("kv", "Décision|Sujet discuté, sans vote de travaux"),
+            E("h2", "RÉSOLUTION N° 10 • CONSEIL SYNDICAL"),
+            E("body", "Les trois membres sortants sont renouvelés jusqu'à l'assemblée appelée à statuer sur les comptes 2024. Le conseil rendra compte du suivi de la toiture et de la façade cour."),
+            E("kv", "Vote|Pour 7 820, contre 140, abstention 280"),
+            E("h2", "Questions diverses sans vote"),
+            E("bullet", "Rappel de ne pas laisser de poussettes, vélos ou colis dans les circulations."),
+            E("bullet", "Demande de réglage du ferme-porte et de remplacement des étiquettes de boîtes aux lettres."),
+            E("bullet", "Signalement d'une humidité ponctuelle dans la cave n° 7, à surveiller lors des prochaines pluies."),
+            E("h2", "Documents annexés à la convocation"),
+            E("body", "État détaillé des dépenses 2023, situation de trésorerie, projet de budget 2024, contrat d'assurance, proposition de nettoyage et note sur l'intervention conservatoire en toiture."),
+            E("kv", "Clôture de séance|20 h 06"),
+            E("small", "Le présent procès-verbal synthétique est signé par le président, la scrutatrice et le secrétaire de séance. Noms et signatures sont fictifs."),
+        ],
+    ],
+    "ag_2025": [
+        [
+            E("h1", "Ouverture de séance et bureau"),
+            E("body", "La feuille de présence certifiée exacte fait apparaître 7 980 / 10 000 tantièmes présents, représentés ou ayant voté par correspondance. L'assemblée peut valablement délibérer sur l'ordre du jour notifié."),
+            E("kv", "Présents|10 copropriétaires, 5 870 / 10 000 tantièmes"),
+            E("kv", "Représentés|3 copropriétaires, 1 470 / 10 000 tantièmes"),
+            E("kv", "Votes par correspondance|2 copropriétaires, 640 / 10 000 tantièmes"),
+            E("kv", "Présidente de séance|Zoé Bernard, identité fictive"),
+            E("kv", "Scrutateur|Alex Martin, identité fictive"),
+            E("kv", "Secrétaire|Régie Démo Lyon"),
+            E("h2", "RÉSOLUTION N° 2 • CONSTITUTION DU BUREAU"),
+            E("kv", "Vote|Pour 7 680, contre 0, abstention 300"),
+            E("kv", "Décision|Résolution adoptée"),
+        ],
+        [
+            E("h1", "Gestion, budget et fonds travaux"),
+            E("h2", "RÉSOLUTION N° 3 • QUITUS AU SYNDIC"),
+            E("body", "L'assemblée donne quitus au syndic pour sa gestion de l'exercice 2024, sous réserve de la poursuite du recouvrement et de la production du relevé détaillé des frais contentieux."),
+            E("kv", "Vote|Pour 7 180, contre 420, abstention 380"),
+            E("h2", "RÉSOLUTION N° 5 • BUDGET PRÉVISIONNEL 2025"),
+            E("kv", "Montant|37 600 EUR"),
+            E("kv", "Vote|Pour 7 540, contre 120, abstention 320"),
+            E("h2", "RÉSOLUTION N° 6 • BUDGET PRÉVISIONNEL 2026"),
+            E("kv", "Montant|38 400 EUR"),
+            E("kv", "Vote|Pour 7 420, contre 180, abstention 380"),
+            E("h2", "RÉSOLUTION N° 7 • COTISATION AU FONDS TRAVAUX"),
+            E("body", "La cotisation annuelle est maintenue à 5 % du budget prévisionnel, soit 1 920 EUR pour l'exercice 2026."),
+            E("kv", "Vote|Pour 7 800, contre 0, abstention 180"),
+        ],
+        [
+            E("h1", "Recouvrement et situation financière"),
+            E("body", "Le syndic présente une balance anonymisée. Trois comptes concentrent l'essentiel des sommes échues. Aucun arriéré n'est affecté aux lots 18 et 42."),
+            E("kv", "Impayés au 31/05/2025|21 600 EUR"),
+            E("kv", "Dont créances supérieures à 90 jours|18 950 EUR"),
+            E("kv", "Nombre de comptes débiteurs|3"),
+            E("kv", "Dettes fournisseurs à la même date|3 780 EUR"),
+            E("h2", "RÉSOLUTION N° 8 • POURSUITE DES PROCÉDURES"),
+            E("body", "Le syndic est autorisé à poursuivre les relances, mises en demeure et procédures déjà engagées. Toute transaction supérieure à 2 500 EUR devra recevoir l'avis préalable du conseil syndical."),
+            E("kv", "Vote|Pour 7 660, contre 0, abstention 320"),
+            E("kv", "Décision|Résolution adoptée"),
+            E("small", "Les montants globaux sont reproduits pour permettre leur rapprochement avec la fiche synthétique et les comptes."),
+        ],
+        [
+            E("h1", "Contrats, sécurité et parties communes"),
+            E("h2", "RÉSOLUTION N° 14 • EXTINCTEURS"),
+            E("body", "Le contrôle annuel des extincteurs et de l'éclairage de sécurité est reconduit pour 690 EUR TTC, hors remplacement de matériel."),
+            E("kv", "Vote|Pour 7 980, contre 0, abstention 0"),
+            E("h2", "RÉSOLUTION N° 15 • PORTE D'ENTRÉE"),
+            E("body", "Le devis de réglage du ferme-porte et de reprise de la gâche est accepté pour 840 EUR TTC."),
+            E("kv", "Vote|Pour 7 540, contre 180, abstention 260"),
+            E("h2", "RÉSOLUTION N° 16 • ENCOMBRANTS EN COUR"),
+            E("body", "Le syndic adressera une note aux occupants. Les frais d'enlèvement identifiables pourront être imputés selon les règles applicables."),
+            E("kv", "Vote|Pour 7 420, contre 0, abstention 560"),
+            E("h2", "Information du conseil syndical"),
+            E("body", "Deux fuites privatives sans conséquence persistante sur les communs ont été déclarées à l'assureur depuis la précédente assemblée."),
+        ],
+        [
+            E("h1", "Clôture et liste des annexes"),
+            E("h2", "RÉSOLUTION N° 17 • RENOUVELLEMENT DU CONSEIL SYNDICAL"),
+            E("body", "Les membres en fonction sont renouvelés pour une année. Ils reçoivent délégation pour comparer les offres nécessaires à l'étude de toiture dans la limite du budget voté."),
+            E("kv", "Vote|Pour 7 610, contre 0, abstention 370"),
+            E("h2", "Questions diverses sans décision"),
+            E("bullet", "Recherche d'un prestataire pour le remplacement de plusieurs boîtes aux lettres."),
+            E("bullet", "Rappel du relevé des compteurs d'eau prévu en septembre."),
+            E("bullet", "Demande d'étude de la ventilation des caves après apparition d'odeurs et de condensation."),
+            E("h2", "Annexes à la convocation"),
+            E("body", "Comptes 2024, projet de budget, situation des impayés anonymisée, rapport de couverture, estimation sommaire des travaux, déclaration de sinistre et correspondances relatives à l'expertise amiable."),
+            E("kv", "Clôture de séance|21 h 04"),
+            E("small", "Le président, le scrutateur et le secrétaire déclarent le procès-verbal conforme aux délibérations. Signatures fictives."),
+        ],
+    ],
+    "ag_2026": [
+        [
+            E("h1", "Présence et constitution du bureau"),
+            E("body", "La feuille de présence et les mandats sont vérifiés avant l'ouverture des débats. Quinze copropriétaires participent à la séance ou ont adressé un vote par correspondance."),
+            E("kv", "Présents|11 copropriétaires, 6 540 / 10 000 tantièmes"),
+            E("kv", "Représentés|3 copropriétaires, 1 520 / 10 000 tantièmes"),
+            E("kv", "Votes par correspondance|1 copropriétaire, 550 / 10 000 tantièmes"),
+            E("kv", "Total participant|8 610 / 10 000 tantièmes"),
+            E("kv", "Présidente de séance|Zoé Bernard, identité fictive"),
+            E("kv", "Scrutateur|Nicolas Roux, identité fictive"),
+            E("kv", "Secrétaire|Régie Démo Lyon"),
+            E("h2", "RÉSOLUTION N° 3 • CONSTITUTION DU BUREAU"),
+            E("kv", "Vote|Pour 8 360, contre 0, abstention 250"),
+        ],
+        [
+            E("h1", "Comptes 2025 et budgets"),
+            E("h2", "DÉTAIL DE LA RÉSOLUTION N° 1 • COMPTES 2025"),
+            E("body", "Les comptes de l'exercice 2025 sont approuvés pour 36 920 EUR. L'assemblée constate que la régularisation d'eau et les interventions provisoires en toiture expliquent l'essentiel de l'écart avec l'exercice précédent."),
+            E("kv", "Vote|Pour 8 040, contre 180, abstention 390"),
+            E("h2", "RÉSOLUTION N° 4 • QUITUS"),
+            E("body", "Quitus est donné au syndic, à l'exception des démarches de recouvrement qui feront l'objet d'un suivi trimestriel transmis au conseil syndical."),
+            E("kv", "Vote|Pour 7 720, contre 410, abstention 480"),
+            E("h2", "DÉTAIL DE LA RÉSOLUTION N° 2 • BUDGET 2027"),
+            E("kv", "Montant voté|40 800 EUR"),
+            E("kv", "Appels|10 200 EUR exigibles chaque trimestre"),
+            E("kv", "Vote|Pour 8 120, contre 210, abstention 280"),
+        ],
+        [
+            E("h1", "Réfection de la toiture • détails du marché"),
+            E("body", "Le maître d'œuvre présente l'analyse des offres. Le marché retenu comprend installation de chantier, dépose de la couverture, remplacement des liteaux défectueux, écran de sous-toiture, reprises de zinguerie et évacuations d'eaux pluviales."),
+            E("kv", "Entreprise retenue|Couverture Démo, entreprise fictive"),
+            E("kv", "Marché de travaux|88 600 EUR TTC"),
+            E("kv", "Maîtrise d'œuvre et coordination|5 900 EUR TTC"),
+            E("kv", "Provision pour aléas|1 500 EUR TTC"),
+            E("kv", "Total voté|96 000 EUR TTC"),
+            E("kv", "Quote-part lots 18 et 42|6 960 EUR"),
+            E("kv", "Vote|Pour 7 940, contre 420, abstention 250"),
+            E("h2", "Échéancier collectif"),
+            E("body", "35 % au 15/10/2026, 35 % au 15/01/2027 et 30 % au 15/04/2027. Pour les lots vendus, les trois appels sont fixés à 2 320 EUR chacun afin d'intégrer l'affectation partielle du fonds travaux décidée séparément."),
+        ],
+        [
+            E("h1", "Poutre sous cour • prescriptions et financement"),
+            E("body", "L'ingénieur signale une corrosion des appuis métalliques de la poutre située sous la cour. Le devis comprend étaiement provisoire, purge des parties altérées, renforcement métallique, protection anticorrosion et reprises de maçonnerie."),
+            E("kv", "Entreprise retenue|Structure Démo, entreprise fictive"),
+            E("kv", "Montant collectif|42 000 EUR TTC"),
+            E("kv", "Quote-part lots 18 et 42|3 045 EUR"),
+            E("kv", "Appel du 15/11/2026|1 522,50 EUR"),
+            E("kv", "Appel du 15/03/2027|1 522,50 EUR"),
+            E("kv", "Vote|Pour 8 120, contre 280, abstention 210"),
+            E("h2", "Mandat de suivi"),
+            E("body", "Le conseil syndical est autorisé à valider les adaptations techniques n'augmentant pas le marché de plus de 5 %. Tout dépassement supérieur sera soumis à une nouvelle décision."),
+        ],
+        [
+            E("h1", "Fonds travaux et trésorerie"),
+            E("h2", "RÉSOLUTION N° 11 • AFFECTATION DU FONDS TRAVAUX"),
+            E("body", "Une somme de 18 000 EUR prélevée sur le fonds travaux est affectée à la réfection de toiture. Le solde demeure sur le compte séparé du syndicat."),
+            E("kv", "Fonds disponible avant affectation|28 400 EUR"),
+            E("kv", "Montant affecté|18 000 EUR"),
+            E("kv", "Solde indicatif après affectation|10 400 EUR"),
+            E("kv", "Vote|Pour 7 860, contre 300, abstention 450"),
+            E("h2", "RÉSOLUTION N° 13 • COTISATION 2027"),
+            E("body", "La cotisation au fonds travaux est fixée à 5 % du budget prévisionnel 2027, soit 2 040 EUR au total."),
+            E("kv", "Vote|Pour 8 210, contre 0, abstention 400"),
+            E("h2", "Situation des impayés"),
+            E("kv", "Impayés au 31/05/2026|20 940 EUR"),
+            E("kv", "Procédures en cours|2 dossiers, montants anonymisés"),
+        ],
+        [
+            E("h1", "Autres décisions de maintenance"),
+            E("h2", "RÉSOLUTION N° 15 • VENTILATION DES CAVES"),
+            E("body", "Une mission de relevé des entrées et sorties d'air, mesure d'humidité et proposition de travaux est confiée à Bâti Conseil Démo dans la limite de 1 800 EUR TTC."),
+            E("kv", "Vote|Pour 7 970, contre 140, abstention 500"),
+            E("h2", "RÉSOLUTION N° 17 • COLONNES D'EAU"),
+            E("body", "Une recherche de fuite et un repérage des organes de coupure sont autorisés dans la limite de 1 200 EUR TTC. Aucun remplacement complet de colonne n'est voté."),
+            E("kv", "Vote|Pour 8 330, contre 0, abstention 280"),
+            E("h2", "RÉSOLUTION N° 18 • CONTRAT DE NETTOYAGE"),
+            E("body", "Le contrat est renouvelé pour 3 620 EUR TTC par an à compter du 01/07/2026."),
+            E("kv", "Vote|Pour 7 880, contre 230, abstention 500"),
+        ],
+        [
+            E("h1", "Clôture, calendrier et pièces annexées"),
+            E("h2", "Questions diverses sans vote"),
+            E("bullet", "Coordonner les travaux privatifs éventuels dans le grenier avec le chantier de toiture."),
+            E("bullet", "Faire enlever les objets stockés devant les ventilations de caves avant la visite technique."),
+            E("bullet", "Demander un chiffrage du ravalement pour actualiser le plan pluriannuel, sans engagement de travaux."),
+            E("h2", "Calendrier indicatif"),
+            E("kv", "Notification du procès-verbal|12/07/2026"),
+            E("kv", "Premier appel toiture|15/10/2026"),
+            E("kv", "Premier appel poutre|15/11/2026"),
+            E("kv", "Installation prévisionnelle du chantier|Mars 2027"),
+            E("h2", "Annexes"),
+            E("body", "Comptes 2025, budgets 2026 et 2027, balance anonymisée, rapport du conseil syndical, analyse des offres de toiture, rapport de l'ingénieur, devis de structure, projet d'étude des caves et contrat du syndic."),
+            E("kv", "Clôture de séance|21 h 42"),
+            E("small", "Procès-verbal synthétique signé par les membres du bureau. Identités, entreprises et signatures fictives."),
+        ],
+    ],
+}
+
+
 DOCUMENTS = [
     replace(
         document,
@@ -2023,6 +2257,7 @@ DOCUMENTS = [
             PREFIX_PAGES.get(document.logical_id, [])
             + document.pages
             + EXTRA_PAGES.get(document.logical_id, [])
+            + AG_DETAIL_PAGES.get(document.logical_id, [])
         ),
     )
     for document in DOCUMENTS
@@ -2050,6 +2285,108 @@ def wrap_text(value: str, width: int) -> list[str]:
         break_on_hyphens=False,
         replace_whitespace=True,
     ) or [""]
+
+
+def legacy_elements_height(elements: list[Element]) -> float:
+    """Estimate the exact vertical space used by the legacy renderer.
+
+    Source sections stay independent in the data model, then adjacent sections are
+    packed onto a physical page. This mirrors sale packs exported from older office
+    software, where a page usually contains several resolutions or tables.
+    """
+
+    height = 0.0
+    for kind, value in elements:
+        if kind == "space":
+            height += 6
+        elif kind == "h1":
+            height += len(wrap_text(value, 70)) * 16.2 + 7
+        elif kind == "lead":
+            height += len(wrap_text(value, 96)) * 11.5 + 5
+        elif kind == "h2":
+            height += 4 + len(wrap_text(value, 88)) * 11.5 + 1.5
+        elif kind == "body":
+            height += len(wrap_text(value, 108)) * 10.8 + 3
+        elif kind == "bullet":
+            height += len(wrap_text(value, 101)) * 10.8 + 1.5
+        elif kind == "kv":
+            label, _, item_value = value.partition("|")
+            row_lines = max(
+                len(wrap_text(label, 34)), len(wrap_text(item_value, 67))
+            )
+            height += 10.4 * row_lines + 6.5
+        elif kind == "callout":
+            height += 10.8 * len(wrap_text(value, 96)) + 20
+        elif kind == "small":
+            height += 2 + len(wrap_text(value, 122)) * 8.8 + 1
+    return height
+
+
+def compact_legacy_pages(document: DemoDocument) -> DemoDocument:
+    if document.logical_id == "dpe":
+        return document
+
+    source_pages = document.pages
+    fixed_pages: list[list[Element]] = []
+    if document.logical_id.startswith("ag_"):
+        # The first page keeps the notification-letter / cover-page character of
+        # the reference minutes. Interior sections are packed much more tightly.
+        fixed_pages = [source_pages[0]]
+        source_pages = source_pages[1:]
+
+    target_height = 585.0 if document.logical_id.startswith("ag_") else 640.0
+    packed: list[list[Element]] = []
+    current: list[Element] = []
+    current_height = 0.0
+    for section in source_pages:
+        section_height = legacy_elements_height(section)
+        gap_height = 6.0 if current else 0.0
+        if current and current_height + gap_height + section_height > target_height:
+            packed.append(current)
+            current = []
+            current_height = 0.0
+            gap_height = 0.0
+        if gap_height:
+            current.append(E("space"))
+        current.extend(section)
+        current_height += gap_height + section_height
+    if current:
+        packed.append(current)
+
+    return replace(document, pages=fixed_pages + packed)
+
+
+def order_ag_sections(document: DemoDocument) -> DemoDocument:
+    """Put the original summaries and added detail in deliberation order."""
+
+    orders = {
+        "ag_2024": [0, 4, 5, 6, 1, 7],
+        "ag_2025": [0, 4, 5, 6, 1, 2, 7, 8],
+        "ag_2026": [0, 5, 6, 1, 7, 3, 2, 8, 9, 10, 11],
+    }
+    order = orders.get(document.logical_id)
+    if order is None:
+        return document
+    if max(order) >= len(document.pages):
+        raise ValueError(f"Invalid AGM page order for {document.logical_id}")
+
+    pages: list[list[Element]] = []
+    for index in order:
+        page = [
+            element
+            for element in document.pages[index]
+            if not (
+                element[0] == "small"
+                and element[1].startswith("Fin du procès-verbal")
+            )
+        ]
+        pages.append(page)
+    return replace(document, pages=pages)
+
+
+DOCUMENTS = [
+    compact_legacy_pages(order_ag_sections(document)) for document in DOCUMENTS
+]
 
 
 def text_command(
@@ -2439,145 +2776,165 @@ def render_page(
             return render_dpe_cover_page(document, page_number, total)
         return render_dpe_detail_page(document, elements, page_number, total)
 
+    is_ag = document.logical_id.startswith("ag_")
+    is_ag_cover = is_ag and page_number == 1
+    year = (document.document_date or "0000")[:4]
     commands = [
-        "1 1 1 rg 0 0 595 842 re f",
-        "0.08 0.08 0.08 rg 0 800 595 42 re f",
-        text_command(
-            34, 816, document.title.upper(), font="F2", size=8.2, color="1 1 1"
-        ),
-        text_command(
-            561,
-            816,
-            f"{page_number}/{total}",
-            font="F1",
-            size=8,
-            color="0.82 0.82 0.82",
-        ),
-        "0.91 0.91 0.91 rg 0 0 595 28 re f",
-        text_command(34, 10, DEMO_NOTICE, font="F2", size=7.2, color="0.18 0.18 0.18"),
+        # A slightly warm sheet, faint copy edges and plain rules evoke an older
+        # office export or a scanned Word document without sacrificing text search.
+        "0.995 0.992 0.982 rg 0 0 595 842 re f",
+        "0.90 0.90 0.88 RG 0.35 w 16 34 m 16 815 l S",
+        "0.94 0.94 0.92 RG 0.25 w 579 32 m 579 817 l S",
+        text_command(38, 817, "RÉGIE DÉMO LYON", font="N2", size=7.4, color="0.08 0.08 0.08"),
+        text_command(274, 817, f"{page_number} / {total}", font="N1", size=7.4, color="0.08 0.08 0.08"),
+        text_command(455, 817, f"Réf. LT/{year}/{document.logical_id.upper()}", font="N1", size=6.5, color="0.08 0.08 0.08"),
+        "0.28 0.28 0.28 RG 0.45 w 38 807 m 557 807 l S",
+        "0.35 0.35 0.35 RG 0.4 w 38 37 m 557 37 l S",
+        text_command(38, 23, document.title.upper(), font="N2", size=6.4, color="0.18 0.18 0.18"),
+        text_command(458, 23, f"Page {page_number} sur {total}", font="N1", size=6.4, color="0.18 0.18 0.18"),
+        text_command(38, 10, DEMO_NOTICE, font="N3", size=5.8, color="0.30 0.30 0.30"),
     ]
-    y = 763.0
+    if is_ag_cover:
+        commands.extend(
+            [
+                text_command(42, 781, "RÉGIE DÉMO LYON", font="N2", size=12, color="0.05 0.05 0.05"),
+                text_command(42, 766, "Service copropriété • 12 rue Exemple • 69000 LYON", font="N1", size=7.6, color="0.12 0.12 0.12"),
+                text_command(42, 753, "Téléphone et références administratives volontairement fictifs", font="N3", size=6.8, color="0.25 0.25 0.25"),
+                stroked_rect(42, 688, 511, 48, color="0.20 0.20 0.20", line_width=0.7),
+                text_command(53, 716, "COPROPRIÉTÉ :  LES TISSEURS", font="N2", size=9.5, color="0.06 0.06 0.06"),
+                text_command(152, 700, DEMO_ADDRESS.upper(), font="N2", size=9.5, color="0.06 0.06 0.06"),
+            ]
+        )
+        y = 646.0
+    else:
+        y = 784.0
+    first_heading = True
 
     for kind, value in elements:
         if kind == "space":
-            y -= 10
+            y -= 6
             continue
         if kind == "h1":
-            for line in wrap_text(value, 44):
+            heading_size = 15.5 if is_ag_cover and first_heading else 13.2
+            heading_width = 54 if is_ag_cover and first_heading else 70
+            for line in wrap_text(value, heading_width):
+                x = 42.0
+                if is_ag_cover and first_heading:
+                    x = max(42.0, (595.0 - len(line) * heading_size * 0.48) / 2)
                 commands.append(
                     text_command(
-                        34, y, line, font="F2", size=19, color="0.07 0.07 0.07"
+                        x, y, line, font="N2", size=heading_size, color="0.04 0.04 0.04"
                     )
                 )
-                y -= 23
-            y -= 5
-        elif kind == "lead":
-            for line in wrap_text(value, 74):
-                commands.append(
-                    text_command(
-                        34, y, line, font="F3", size=10.5, color="0.32 0.32 0.32"
-                    )
-                )
-                y -= 15
-            y -= 9
-        elif kind == "h2":
+                y -= heading_size + 3
+            commands.append(f"0.18 0.18 0.18 RG 0.5 w 42 {y + 6:.1f} m 553 {y + 6:.1f} l S")
             y -= 7
-            commands.append(f"0.42 0.42 0.42 RG 34 {y + 13:.1f} m 561 {y + 13:.1f} l S")
-            for line in wrap_text(value, 64):
+            first_heading = False
+        elif kind == "lead":
+            for line in wrap_text(value, 96):
+                x = 42.0
+                if is_ag_cover:
+                    x = max(42.0, (595.0 - len(line) * 4.5) / 2)
                 commands.append(
                     text_command(
-                        34, y, line, font="F2", size=11.3, color="0.10 0.10 0.10"
+                        x, y, line, font="N3", size=8.8, color="0.16 0.16 0.16"
                     )
                 )
-                y -= 16
-            y -= 2
-        elif kind == "body":
-            for line in wrap_text(value, 91):
-                commands.append(
-                    text_command(
-                        34, y, line, font="F1", size=9.2, color="0.16 0.16 0.16"
-                    )
-                )
-                y -= 13
+                y -= 11.5
             y -= 5
+        elif kind == "h2":
+            y -= 4
+            for line in wrap_text(value, 88):
+                commands.append(
+                    text_command(
+                        42, y, line, font="N2", size=9.2, color="0.05 0.05 0.05"
+                    )
+                )
+                y -= 11.5
+            y -= 1.5
+        elif kind == "body":
+            for line in wrap_text(value, 108):
+                commands.append(
+                    text_command(
+                        42, y, line, font="N1", size=8.4, color="0.08 0.08 0.08"
+                    )
+                )
+                y -= 10.8
+            y -= 3
         elif kind == "bullet":
-            lines = wrap_text(value, 85)
+            lines = wrap_text(value, 101)
             commands.append(
-                text_command(39, y, "•", font="F2", size=10, color="0.18 0.18 0.18")
+                text_command(49, y, "-", font="N1", size=8.5, color="0.08 0.08 0.08")
             )
             for index, line in enumerate(lines):
                 commands.append(
                     text_command(
-                        52, y, line, font="F1", size=9.2, color="0.16 0.16 0.16"
+                        59, y, line, font="N1", size=8.4, color="0.08 0.08 0.08"
                     )
                 )
-                y -= 13
-            y -= 3
+                y -= 10.8
+            y -= 1.5
         elif kind == "kv":
             label, _, item_value = value.partition("|")
-            label_lines = wrap_text(label, 30)
-            value_lines = wrap_text(item_value, 54)
+            label_lines = wrap_text(label, 34)
+            value_lines = wrap_text(item_value, 67)
             row_lines = max(len(label_lines), len(value_lines))
-            row_height = 13 * row_lines + 11
-            commands.append(
-                f"0.94 0.94 0.94 rg 34 {y - row_height + 7:.1f} 527 {row_height:.1f} re f"
-            )
+            row_height = 10.4 * row_lines + 6.5
+            commands.append(stroked_rect(42, y - row_height + 5, 511, row_height, color="0.58 0.58 0.56", line_width=0.35))
+            commands.append(f"0.58 0.58 0.56 RG 0.35 w 220 {y - row_height + 5:.1f} m 220 {y + 5:.1f} l S")
             for index, line in enumerate(label_lines):
                 commands.append(
                     text_command(
-                        43,
-                        y - index * 13,
+                        47,
+                        y - index * 10.4,
                         line,
-                        font="F2",
-                        size=8.7,
-                        color="0.20 0.20 0.20",
+                        font="N2",
+                        size=7.8,
+                        color="0.08 0.08 0.08",
                     )
                 )
             for index, line in enumerate(value_lines):
                 commands.append(
                     text_command(
-                        232,
-                        y - index * 13,
+                        226,
+                        y - index * 10.4,
                         line,
-                        font="F1",
-                        size=9,
-                        color="0.10 0.10 0.10",
+                        font="N1",
+                        size=8.0,
+                        color="0.06 0.06 0.06",
                     )
                 )
             y -= row_height
         elif kind == "callout":
-            lines = wrap_text(value, 79)
-            height = 14 * len(lines) + 21
-            commands.append(
-                f"0.88 0.88 0.88 rg 34 {y - height + 8:.1f} 527 {height:.1f} re f"
-            )
-            commands.append(
-                f"0.18 0.18 0.18 rg 34 {y - height + 8:.1f} 4 {height:.1f} re f"
-            )
+            lines = wrap_text(value, 96)
+            height = 10.8 * len(lines) + 18
+            commands.append(stroked_rect(42, y - height + 6, 511, height, color="0.22 0.22 0.22", line_width=0.7))
+            commands.append(text_command(49, y, "OBSERVATION IMPORTANTE :", font="N2", size=7.8, color="0.04 0.04 0.04"))
+            line_y = y - 11
             for index, line in enumerate(lines):
                 commands.append(
                     text_command(
-                        48,
-                        y - index * 14,
+                        49,
+                        line_y - index * 10.8,
                         line,
-                        font="F2",
-                        size=9.3,
-                        color="0.10 0.10 0.10",
+                        font="N1",
+                        size=8.2,
+                        color="0.06 0.06 0.06",
                     )
                 )
-            y -= height + 5
+            y -= height + 2
         elif kind == "small":
-            y -= 3
-            for line in wrap_text(value, 104):
+            y -= 2
+            for line in wrap_text(value, 122):
                 commands.append(
                     text_command(
-                        34, y, line, font="F3", size=7.6, color="0.38 0.38 0.38"
+                        42, y, line, font="N3", size=6.8, color="0.25 0.25 0.25"
                     )
                 )
-                y -= 11
-            y -= 2
+                y -= 8.8
+            y -= 1
 
-        if y < 46:
+        if y < 48:
             raise ValueError(
                 f"Page overflow in {document.filename}, page {page_number}"
             )
@@ -2604,6 +2961,15 @@ def build_pdf(document: DemoDocument) -> bytes:
     italic_font_id = add_object(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>"
     )
+    legacy_regular_font_id = add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>"
+    )
+    legacy_bold_font_id = add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>"
+    )
+    legacy_italic_font_id = add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>"
+    )
     info_id = add_object(
         (
             "<< "
@@ -2627,7 +2993,9 @@ def build_pdf(document: DemoDocument) -> bytes:
             (
                 f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 595 842] "
                 f"/Resources << /Font << /F1 {regular_font_id} 0 R /F2 {bold_font_id} 0 R "
-                f"/F3 {italic_font_id} 0 R >> >> /Contents {stream_id} 0 R >>"
+                f"/F3 {italic_font_id} 0 R /N1 {legacy_regular_font_id} 0 R "
+                f"/N2 {legacy_bold_font_id} 0 R /N3 {legacy_italic_font_id} 0 R >> >> "
+                f"/Contents {stream_id} 0 R >>"
             ).encode()
         )
         page_ids.append(page_id)
@@ -2698,15 +3066,19 @@ def build_manifest(generated: list[dict[str, object]]) -> dict[str, object]:
         ],
         "local_layout_references": {
             "files": [
+                "data/22_bd_reuilly/22 Bd Reuilly PV AG 2021.pdf",
+                "data/22_bd_reuilly/22 Bd Reuilly PV AG 2022.pdf",
+                "data/22_bd_reuilly/22 Bd Reuilly PV AG 2024 (1).pdf",
+                "data/22_bd_reuilly/29 aout 1955 -  Depot-RCP.pdf.pdf",
                 "data/22_bd_reuilly/DPE_D.pdf",
                 "data/22_bd_reuilly/Diagnostics T3 22 Bd Reuilly.pdf",
             ],
-            "use": "Structure visuelle et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise.",
+            "use": "Densité, hiérarchie typographique, tableaux, formulation des votes et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise.",
         },
         "generation": {
             "command": "python3 scripts/generate_demo_dossier.py",
             "notice": DEMO_NOTICE,
-            "pdf_profile": "searchable text, built-in fonts, Flate-compressed streams",
+            "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, standard visual hierarchy for DPE, built-in fonts, Flate-compressed streams",
         },
     }
 

@@ -39,9 +39,9 @@
       "covered_period_start": "2025-01-01",
       "covered_period_end": "2025-12-31",
       "purpose": "Identité, caractéristiques techniques et situation financière de la copropriété.",
-      "page_count": 4,
-      "size_bytes": 5100,
-      "sha256": "099b282493aaa368eeb652fc124f380e15fcad42cc3aac1936dd5db2ca1ccb35"
+      "page_count": 2,
+      "size_bytes": 4975,
+      "sha256": "84a17ac383e86ac6c61f68e542550b2207e601b5cefecd171e999bcc24cbb5e9"
     },
     {
       "logical_id": "reglement_edd",
@@ -53,9 +53,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Règles d'usage, définition des lots et répartition des charges.",
-      "page_count": 6,
-      "size_bytes": 7119,
-      "sha256": "e51a6fd8dc138d3e0e1a9e08d113cb96765c9d6d50f5c33430e58491d36a5529"
+      "page_count": 2,
+      "size_bytes": 5483,
+      "sha256": "3bb01d2e8066717c9c2c223b994a4fc324c560c24a8aed320b8f791643eb272f"
     },
     {
       "logical_id": "ag_2024",
@@ -68,8 +68,8 @@
       "covered_period_end": "2024-12-31",
       "purpose": "Première occurrence des infiltrations et décisions de gestion 2024.",
       "page_count": 4,
-      "size_bytes": 4814,
-      "sha256": "23de4b21534379d2d45bf70fec92252c2be24e693ccfe1866f02e2e5fee3046c"
+      "size_bytes": 8059,
+      "sha256": "f7f7970ec66a03e58b7e1ead6835f8f481e642fee1c30306be95e7f1376976c9"
     },
     {
       "logical_id": "ag_2025",
@@ -82,8 +82,8 @@
       "covered_period_end": "2025-12-31",
       "purpose": "Récurrence des infiltrations, impayés et préparation du projet toiture.",
       "page_count": 4,
-      "size_bytes": 4970,
-      "sha256": "0a81093997e94b19d5dbc04c446b5662096afad2b7a8beacbe4bb66ddfb88ce6"
+      "size_bytes": 8862,
+      "sha256": "2324a53882ce48530794bbdf6374b8f3af2c712993a61a49458fe356132f5e3d"
     },
     {
       "logical_id": "ag_2026",
@@ -95,9 +95,9 @@
       "covered_period_start": "2026-01-01",
       "covered_period_end": "2026-12-31",
       "purpose": "Vote des travaux de toiture et calendrier des appels de fonds.",
-      "page_count": 5,
-      "size_bytes": 5824,
-      "sha256": "6f50dc643fd17121e29a47288c0cded7641156c6e09defd90565fd0a471396ce"
+      "page_count": 6,
+      "size_bytes": 11703,
+      "sha256": "abce191fb26ceef65d210b970dec84a0728427872055f22bfa8bd03b66c4eb1d"
     },
     {
       "logical_id": "informations_financieres",
@@ -109,9 +109,9 @@
       "covered_period_start": "2024-01-01",
       "covered_period_end": "2026-08-28",
       "purpose": "Informations financières concernant la copropriété et les lots vendus.",
-      "page_count": 4,
-      "size_bytes": 4805,
-      "sha256": "b395576f69927d72e4297430b8ff1a31ad5c5450ca61c709d622e07edfd8afe3"
+      "page_count": 2,
+      "size_bytes": 4482,
+      "sha256": "2978c6ffbbfc588ffe17cfcf20ee64a6f5eca094d96b4cc3b785e57d0e7fa5b0"
     },
     {
       "logical_id": "comptes_copro",
@@ -123,9 +123,9 @@
       "covered_period_start": "2024-01-01",
       "covered_period_end": "2025-12-31",
       "purpose": "Comparaison des comptes annuels et visibilité sur les impayés.",
-      "page_count": 4,
-      "size_bytes": 4539,
-      "sha256": "041925c4b9f67ef5acc9648889417bef8b512a31d14cc7daf76a478e1538a518"
+      "page_count": 2,
+      "size_bytes": 4211,
+      "sha256": "aef45bab1b5e7bbf9767a49139c2cf35ae16d00fd837f6b0a550f1fe12f7b96c"
     },
     {
       "logical_id": "releve_charges",
@@ -137,9 +137,9 @@
       "covered_period_start": "2025-01-01",
       "covered_period_end": "2026-12-31",
       "purpose": "Charges individuelles passées et provision courante à venir.",
-      "page_count": 4,
-      "size_bytes": 4071,
-      "sha256": "9e091951129adcd098c6bef23a18aed4928923e23195ac571999d12854b59d0c"
+      "page_count": 2,
+      "size_bytes": 3943,
+      "sha256": "28d90b94cc72bcb9667ee7f6daf8f5ab6628a0e142d4cfcf69afe41bedf5746a"
     },
     {
       "logical_id": "appel_fonds_toiture",
@@ -151,9 +151,9 @@
       "covered_period_start": "2026-10-15",
       "covered_period_end": "2027-04-15",
       "purpose": "Échéancier nominatif correspondant aux travaux votés.",
-      "page_count": 3,
-      "size_bytes": 3622,
-      "sha256": "a34e3624bf4cbe57680d9c67f2717a57e6cc34a2fa32e0b20bdddaa11de0ef15"
+      "page_count": 1,
+      "size_bytes": 3073,
+      "sha256": "1941a5c6632dbdda4e5955ae12f2250b7cfc0aee63145c451d86f953944b1585"
     },
     {
       "logical_id": "carnet_entretien",
@@ -165,9 +165,9 @@
       "covered_period_start": "2018-01-01",
       "covered_period_end": "2026-07-15",
       "purpose": "Historique d'entretien, contrats et travaux communs.",
-      "page_count": 4,
-      "size_bytes": 4751,
-      "sha256": "584cda78fed7681402331d6faf62e2bb1cedf894b488cf957ef1d0dd941ef4ad"
+      "page_count": 2,
+      "size_bytes": 4434,
+      "sha256": "1952a230ae18df4e149255d00638359cf8b0394826e9c0bfa4518a8ce3a1ca14"
     },
     {
       "logical_id": "dtg_pppt",
@@ -179,9 +179,9 @@
       "covered_period_start": "2026-01-01",
       "covered_period_end": "2035-12-31",
       "purpose": "État technique global et coûts futurs indicatifs sur dix ans.",
-      "page_count": 5,
-      "size_bytes": 5777,
-      "sha256": "3ed82f9983798b0608f5632170b577b6f320d03d6cb8fa1ab24fc0fc53e960aa"
+      "page_count": 2,
+      "size_bytes": 4894,
+      "sha256": "8fd4b5f23de4377a20e97b2445ef28e38bee115dfd1ee9b78130497bd0f388da"
     },
     {
       "logical_id": "dpe",
@@ -194,8 +194,8 @@
       "covered_period_end": null,
       "purpose": "Performance énergétique, émissions, coûts et recommandations.",
       "page_count": 9,
-      "size_bytes": 12467,
-      "sha256": "8b21fee2ea42de71486b6a5e44ad1f6fd8681ed28d85f2cc434794216712a901"
+      "size_bytes": 13100,
+      "sha256": "fe7885f1c6e664077eca263d21c8aa85e982d7d567971b2d7e803f0bdab57205"
     },
     {
       "logical_id": "diagnostics",
@@ -207,9 +207,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Carrez, amiante, plomb, électricité et gaz dans un PDF page-citable.",
-      "page_count": 18,
-      "size_bytes": 17698,
-      "sha256": "89bc09261e9be55c545ba8be8c572a32c736527d16bf9246e7327e444b51bce1"
+      "page_count": 5,
+      "size_bytes": 12100,
+      "sha256": "2691cdf2db8a05849dd190bca8209613f9544414cfb91af00b996a2175821517"
     },
     {
       "logical_id": "erp_termites_bruit",
@@ -221,9 +221,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Informations environnementales et états locaux applicables au scénario lyonnais.",
-      "page_count": 6,
-      "size_bytes": 6543,
-      "sha256": "2a2d48c42a892a8dad1e00f084369f4e735e2ff8b42817b7b0044362dad01186"
+      "page_count": 2,
+      "size_bytes": 5099,
+      "sha256": "605c7d9955fa9347ea4bfec88d9ce0c0524e1e7884ffd05695de738e129ffa68"
     },
     {
       "logical_id": "taxe_fonciere",
@@ -235,9 +235,9 @@
       "covered_period_start": "2026-01-01",
       "covered_period_end": "2026-12-31",
       "purpose": "Repère annuel de fiscalité locale pour le budget acquéreur.",
-      "page_count": 3,
-      "size_bytes": 3535,
-      "sha256": "37cef2d8f1460d02bf213305060babdd8649740e5bc22a57b1cbfa8377ffcca5"
+      "page_count": 1,
+      "size_bytes": 3086,
+      "sha256": "231524521b79edb341505ad3ca9e91984ec3153d0ac9e9f6164505ac5b8c48a2"
     },
     {
       "logical_id": "cil",
@@ -249,9 +249,9 @@
       "covered_period_start": "2019-01-01",
       "covered_period_end": "2026-08-28",
       "purpose": "Travaux et équipements connus à l'échelle du logement.",
-      "page_count": 4,
-      "size_bytes": 4514,
-      "sha256": "8c181e427c12ac6cd33dcfd3566a2403862f9c1fdda0d30f0dfc8b726ad2d68b"
+      "page_count": 1,
+      "size_bytes": 3408,
+      "sha256": "1e8b46afc55213a76b70a0e47cabb412d11183729627d5639ead75d3fbf286bc"
     },
     {
       "logical_id": "titre_propriete",
@@ -263,9 +263,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Contexte de propriété, désignation et servitudes connues.",
-      "page_count": 4,
-      "size_bytes": 4518,
-      "sha256": "32d4f04178c5d1a2c4484ddf188b0cd970971d569e6b0eff66d7e8308fe2b3e7"
+      "page_count": 1,
+      "size_bytes": 3513,
+      "sha256": "2dafb9f8eec91e7a64ca0cdba338ef0ef21970ab9e77d7e18b10d68d694eab1b"
     },
     {
       "logical_id": "notice_copro",
@@ -277,9 +277,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Notice d'information sur le fonctionnement et les obligations de la copropriété.",
-      "page_count": 4,
-      "size_bytes": 4764,
-      "sha256": "c29e314d713b8793a5c08d3ff41d941dac749053ffde54d631bc06d9761fb2a9"
+      "page_count": 1,
+      "size_bytes": 3318,
+      "sha256": "d16c1ea11bfcb5e4a6e152110b165ac8d3ec95812e196d84981f7cf88469f9fa"
     }
   ],
   "sources_used_to_scope_the_fixture": [
@@ -289,14 +289,18 @@
   ],
   "local_layout_references": {
     "files": [
+      "data/22_bd_reuilly/22 Bd Reuilly PV AG 2021.pdf",
+      "data/22_bd_reuilly/22 Bd Reuilly PV AG 2022.pdf",
+      "data/22_bd_reuilly/22 Bd Reuilly PV AG 2024 (1).pdf",
+      "data/22_bd_reuilly/29 aout 1955 -  Depot-RCP.pdf.pdf",
       "data/22_bd_reuilly/DPE_D.pdf",
       "data/22_bd_reuilly/Diagnostics T3 22 Bd Reuilly.pdf"
     ],
-    "use": "Structure visuelle et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise."
+    "use": "Densité, hiérarchie typographique, tableaux, formulation des votes et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise."
   },
   "generation": {
     "command": "python3 scripts/generate_demo_dossier.py",
     "notice": "DOCUMENT SYNTHÉTIQUE DE DÉMONSTRATION • SANS VALEUR CONTRACTUELLE",
-    "pdf_profile": "searchable text, built-in fonts, Flate-compressed streams"
+    "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, standard visual hierarchy for DPE, built-in fonts, Flate-compressed streams"
   }
 }
