@@ -24,6 +24,7 @@ __pycache__/
 
 data*
 temp*
+notebook*
 
 # Editors and operating systems
 .idea/

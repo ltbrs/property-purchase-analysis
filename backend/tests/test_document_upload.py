@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Generator
 from io import BytesIO
 from typing import BinaryIO, cast
@@ -16,7 +17,11 @@ from app.core.database import Base, get_db_session
 from app.documents.models import DocumentRecord
 from app.main import create_app
 from app.property.models import AnalysisCaseRecord, AuthAccountRecord, UserRecord
-from app.storage.object_storage import ObjectStorageError, get_object_storage
+from app.storage.object_storage import (
+    ObjectStorageError,
+    StoredObjectMetadata,
+    get_object_storage,
+)
 
 PDF_CONTENT = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 
@@ -27,9 +32,23 @@ class MemoryObjectStorage:
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
         self.view_url_requests: list[tuple[str, str, int]] = []
+        self.upload_url_requests: list[tuple[str, int, int]] = []
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
         self.objects[key] = file.read()
+
+    def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str:
+        self.upload_url_requests.append((key, size_bytes, expires_in_seconds))
+        return f"https://storage.test/{self.bucket}/{key}?signed-upload=true"
+
+    def get_object_metadata(self, bucket: str, key: str) -> StoredObjectMetadata:
+        assert bucket == self.bucket
+        content = self.objects[key]
+        return StoredObjectMetadata(size_bytes=len(content), content_type="application/pdf")
+
+    def download_pdf(self, bucket: str, key: str) -> bytes:
+        assert bucket == self.bucket
+        return self.objects[key]
 
     def create_pdf_view_url(self, bucket: str, key: str, expires_in_seconds: int) -> str:
         self.view_url_requests.append((bucket, key, expires_in_seconds))
@@ -79,6 +98,42 @@ def create_case(client: TestClient, user_id: UUID) -> UUID:
     )
     assert response.status_code == 201
     return UUID(response.json()["id"])
+
+
+def upload_document(
+    client: TestClient,
+    storage: MemoryObjectStorage,
+    analysis_case_id: UUID,
+    user_id: UUID,
+    *,
+    filename: str = "dpe.pdf",
+    content: bytes = PDF_CONTENT,
+    content_type: str = "application/pdf",
+) -> object:
+    metadata = {
+        "original_filename": filename,
+        "content_type": content_type,
+        "size_bytes": len(content),
+    }
+    upload_url = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/upload-url",
+        headers=auth(user_id),
+        json=metadata,
+    )
+    if not upload_url.is_success:
+        return upload_url
+
+    storage_key = upload_url.json()["storage_key"]
+    storage.upload_pdf(BytesIO(content), storage_key)
+    return client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(user_id),
+        json={
+            **metadata,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "storage_key": storage_key,
+        },
+    )
 
 
 def test_property_type_updates_the_expected_coproperty_documents(client: TestClient) -> None:
@@ -227,8 +282,12 @@ def test_list_cases_requires_an_authenticated_identity(client: TestClient) -> No
 
 def test_upload_requires_an_authenticated_identity(client: TestClient) -> None:
     response = client.post(
-        f"/api/v1/analysis-cases/{uuid4()}/documents",
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+        f"/api/v1/analysis-cases/{uuid4()}/documents/upload-url",
+        json={
+            "original_filename": "dpe.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": len(PDF_CONTENT),
+        },
     )
 
     assert response.status_code == 401
@@ -241,10 +300,11 @@ def test_a_user_cannot_upload_or_list_another_users_documents(
     analysis_case_id = create_case(client, owner_id)
     other_user_id = uuid4()
 
-    upload_response = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(other_user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
+    upload_response = upload_document(
+        client,
+        storage,
+        analysis_case_id,
+        other_user_id,
     )
     list_response = client.get(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents",
@@ -266,6 +326,7 @@ def test_a_user_cannot_upload_or_list_another_users_documents(
 )
 def test_upload_rejects_invalid_files(
     client: TestClient,
+    storage: MemoryObjectStorage,
     filename: str,
     content: bytes,
     content_type: str,
@@ -274,10 +335,14 @@ def test_upload_rejects_invalid_files(
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
 
-    response = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": (filename, content, content_type)},
+    response = upload_document(
+        client,
+        storage,
+        analysis_case_id,
+        user_id,
+        filename=filename,
+        content=content,
+        content_type=content_type,
     )
 
     assert response.status_code == 422
@@ -292,10 +357,12 @@ def test_upload_persists_private_metadata_and_exposes_status(
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
 
-    response = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("DPE appartement.pdf", PDF_CONTENT, "application/pdf")},
+    response = upload_document(
+        client,
+        storage,
+        analysis_case_id,
+        user_id,
+        filename="DPE appartement.pdf",
     )
 
     assert response.status_code == 201
@@ -312,6 +379,7 @@ def test_upload_persists_private_metadata_and_exposes_status(
     assert persisted.storage_bucket == storage.bucket
     assert persisted.storage_key.startswith(f"analysis-cases/{analysis_case_id}/documents/")
     assert storage.objects[persisted.storage_key] == PDF_CONTENT
+    assert storage.upload_url_requests == [(persisted.storage_key, len(PDF_CONTENT), 300)]
 
     listed = client.get(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents",
@@ -319,6 +387,77 @@ def test_upload_persists_private_metadata_and_exposes_status(
     )
     assert listed.status_code == 200
     assert listed.json() == [body]
+
+
+def test_upload_completion_rejects_a_tampered_checksum_and_removes_the_object(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    analysis_case_id = create_case(client, user_id)
+    metadata = {
+        "original_filename": "dpe.pdf",
+        "content_type": "application/pdf",
+        "size_bytes": len(PDF_CONTENT),
+    }
+    upload_url = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/upload-url",
+        headers=auth(user_id),
+        json=metadata,
+    )
+    storage_key = upload_url.json()["storage_key"]
+    storage.upload_pdf(BytesIO(PDF_CONTENT), storage_key)
+
+    response = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        headers=auth(user_id),
+        json={
+            **metadata,
+            "sha256": "0" * 64,
+            "storage_key": storage_key,
+        },
+    )
+
+    assert response.status_code == 422
+    assert session.scalar(select(DocumentRecord)) is None
+    assert storage.objects == {}
+
+
+def test_upload_completion_cannot_attach_another_cases_storage_key(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    first_case_id = create_case(client, user_id)
+    second_case_id = create_case(client, user_id)
+    metadata = {
+        "original_filename": "dpe.pdf",
+        "content_type": "application/pdf",
+        "size_bytes": len(PDF_CONTENT),
+    }
+    upload_url = client.post(
+        f"/api/v1/analysis-cases/{first_case_id}/documents/upload-url",
+        headers=auth(user_id),
+        json=metadata,
+    )
+    storage_key = upload_url.json()["storage_key"]
+    storage.upload_pdf(BytesIO(PDF_CONTENT), storage_key)
+
+    response = client.post(
+        f"/api/v1/analysis-cases/{second_case_id}/documents",
+        headers=auth(user_id),
+        json={
+            **metadata,
+            "sha256": hashlib.sha256(PDF_CONTENT).hexdigest(),
+            "storage_key": storage_key,
+        },
+    )
+
+    assert response.status_code == 422
+    assert session.scalar(select(DocumentRecord)) is None
+    assert storage.objects[storage_key] == PDF_CONTENT
 
 
 def test_upload_is_idempotent_for_the_same_file(
@@ -329,16 +468,8 @@ def test_upload_is_idempotent_for_the_same_file(
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
 
-    first = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
-    second = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    first = upload_document(client, storage, analysis_case_id, user_id)
+    second = upload_document(client, storage, analysis_case_id, user_id)
 
     assert first.status_code == 201
     assert second.status_code == 200
@@ -354,11 +485,7 @@ def test_document_view_url_is_short_lived_and_requires_ownership(
 ) -> None:
     owner_id = uuid4()
     analysis_case_id = create_case(client, owner_id)
-    uploaded = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(owner_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    uploaded = upload_document(client, storage, analysis_case_id, owner_id)
     document_id = uploaded.json()["id"]
 
     forbidden = client.get(
@@ -381,6 +508,7 @@ def test_document_view_url_is_short_lived_and_requires_ownership(
 
 def test_document_view_url_reports_storage_failure(
     client: TestClient,
+    storage: MemoryObjectStorage,
 ) -> None:
     class FailingViewUrlStorage(MemoryObjectStorage):
         def create_pdf_view_url(self, bucket: str, key: str, expires_in_seconds: int) -> str:
@@ -390,11 +518,7 @@ def test_document_view_url_reports_storage_failure(
     cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
-    uploaded = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    uploaded = upload_document(client, failing_storage, analysis_case_id, user_id)
 
     response = client.get(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}/view-url",
@@ -409,20 +533,25 @@ def test_storage_failure_does_not_persist_metadata(
     client: TestClient,
     session: Session,
 ) -> None:
-    class FailingStorage:
+    class FailingStorage(MemoryObjectStorage):
         bucket = "private-test-documents"
 
-        def upload_pdf(self, file: BinaryIO, key: str) -> None:
+        def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str:
             raise ObjectStorageError("storage unavailable")
 
-    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = FailingStorage
+    failing_storage = FailingStorage()
+    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
 
     response = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/upload-url",
         headers=auth(user_id),
-        files={"file": ("dpe.pdf", BytesIO(PDF_CONTENT), "application/pdf")},
+        json={
+            "original_filename": "dpe.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": len(PDF_CONTENT),
+        },
     )
 
     assert response.status_code == 502
@@ -436,11 +565,7 @@ def test_delete_removes_document_metadata_and_private_file(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
-    uploaded = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    uploaded = upload_document(client, storage, analysis_case_id, user_id)
     document_id = uploaded.json()["id"]
 
     response = client.delete(
@@ -461,11 +586,7 @@ def test_a_user_cannot_delete_another_users_document(
 ) -> None:
     owner_id = uuid4()
     analysis_case_id = create_case(client, owner_id)
-    uploaded = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(owner_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    uploaded = upload_document(client, storage, analysis_case_id, owner_id)
 
     response = client.delete(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}",
@@ -481,23 +602,17 @@ def test_storage_delete_failure_keeps_document_metadata(
     client: TestClient,
     session: Session,
 ) -> None:
-    class FailingDeleteStorage:
+    class FailingDeleteStorage(MemoryObjectStorage):
         bucket = "private-test-documents"
-
-        def upload_pdf(self, file: BinaryIO, key: str) -> None:
-            pass
 
         def delete_pdf(self, bucket: str, key: str) -> None:
             raise ObjectStorageError("storage unavailable")
 
-    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = FailingDeleteStorage
+    failing_storage = FailingDeleteStorage()
+    cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
-    uploaded = client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        files={"file": ("dpe.pdf", PDF_CONTENT, "application/pdf")},
-    )
+    uploaded = upload_document(client, failing_storage, analysis_case_id, user_id)
 
     response = client.delete(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents/{uploaded.json()['id']}",

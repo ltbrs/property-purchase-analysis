@@ -1,8 +1,8 @@
 from datetime import UTC, date, datetime, timedelta
-from typing import Annotated
-from uuid import UUID
+from secrets import compare_digest
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -26,11 +26,18 @@ from app.documents.models import (
     DocumentRead,
     DocumentRecord,
     DocumentStatus,
+    DocumentUploadComplete,
+    DocumentUploadUrlCreate,
+    DocumentUploadUrlRead,
     DocumentViewUrlRead,
 )
 from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
-from app.documents.validation import InvalidDocument, validate_pdf
+from app.documents.validation import (
+    InvalidDocument,
+    validate_pdf_bytes,
+    validate_pdf_metadata,
+)
 from app.jobs.document_processing import DocumentProcessingService
 from app.llm import StructuredOutputClientDependency
 from app.property.models import PropertyType
@@ -69,6 +76,27 @@ class CaseFindingsRefreshRead(BaseModel):
 
 class FindingReviewUpdate(BaseModel):
     review_status: FindingReviewStatus
+
+
+def _validate_upload_storage_key(analysis_case_id: UUID, storage_key: str) -> None:
+    parts = storage_key.split("/")
+    if (
+        len(parts) != 4
+        or parts[:3] != ["analysis-cases", str(analysis_case_id), "documents"]
+        or not parts[3].endswith(".pdf")
+    ):
+        raise InvalidDocument("La référence de téléversement est invalide.")
+    try:
+        UUID(parts[3][:-4])
+    except ValueError as error:
+        raise InvalidDocument("La référence de téléversement est invalide.") from error
+
+
+async def _delete_unpersisted_upload(storage: ObjectStorage, storage_key: str) -> None:
+    try:
+        await run_in_threadpool(storage.delete_pdf, storage.bucket, storage_key)
+    except ObjectStorageError:
+        pass
 
 
 def _load_normalized_case_data(
@@ -323,25 +351,125 @@ def get_dpe_extraction(
 
 
 @router.post(
+    "/{analysis_case_id}/documents/upload-url",
+    response_model=DocumentUploadUrlRead,
+)
+async def create_document_upload_url(
+    analysis_case_id: UUID,
+    payload: DocumentUploadUrlCreate,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+) -> DocumentUploadUrlRead:
+    repository = DocumentRepository(session)
+    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+
+    settings = get_settings()
+    try:
+        validate_pdf_metadata(
+            payload.original_filename,
+            payload.content_type,
+            payload.size_bytes,
+            settings.max_upload_size_bytes,
+        )
+    except InvalidDocument as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    storage_key = f"analysis-cases/{analysis_case_id}/documents/{uuid4()}.pdf"
+    ttl_seconds = settings.document_upload_url_ttl_seconds
+    try:
+        url = await run_in_threadpool(
+            storage.create_pdf_upload_url,
+            storage_key,
+            payload.size_bytes,
+            ttl_seconds,
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="La préparation du téléversement a échoué. Veuillez réessayer.",
+        ) from error
+
+    return DocumentUploadUrlRead(
+        url=url,
+        storage_key=storage_key,
+        headers={"Content-Type": "application/pdf"},
+        expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
+
+
+@router.post(
     "/{analysis_case_id}/documents",
     response_model=DocumentRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_document(
     analysis_case_id: UUID,
+    payload: DocumentUploadComplete,
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     storage: ObjectStorage,
     response: Response,
-    file: Annotated[UploadFile, File(description="PDF document to analyze")],
 ) -> DocumentRead:
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
 
+    settings = get_settings()
     try:
-        validated = await validate_pdf(file, get_settings().max_upload_size_bytes)
+        filename = validate_pdf_metadata(
+            payload.original_filename,
+            payload.content_type,
+            payload.size_bytes,
+            settings.max_upload_size_bytes,
+        )
+        _validate_upload_storage_key(analysis_case_id, payload.storage_key)
     except InvalidDocument as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    try:
+        metadata = await run_in_threadpool(
+            storage.get_object_metadata,
+            storage.bucket,
+            payload.storage_key,
+        )
+        if metadata.size_bytes != payload.size_bytes or metadata.content_type != "application/pdf":
+            raise InvalidDocument("Le fichier téléversé ne correspond pas au fichier attendu.")
+        pdf_bytes = await run_in_threadpool(
+            storage.download_pdf,
+            storage.bucket,
+            payload.storage_key,
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le fichier téléversé ne peut pas être vérifié. Veuillez réessayer.",
+        ) from error
+    except InvalidDocument as error:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    try:
+        validated = validate_pdf_bytes(
+            pdf_bytes,
+            filename,
+            payload.content_type,
+            settings.max_upload_size_bytes,
+        )
+        if not compare_digest(validated.sha256, payload.sha256):
+            raise InvalidDocument("L’empreinte du fichier téléversé est invalide.")
+    except InvalidDocument as error:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
@@ -349,17 +477,10 @@ async def upload_document(
 
     existing = repository.find_by_checksum(analysis_case_id, current_user_id, validated.sha256)
     if existing is not None:
+        if existing.storage_key != payload.storage_key:
+            await _delete_unpersisted_upload(storage, payload.storage_key)
         response.status_code = status.HTTP_200_OK
         return DocumentRead.model_validate(existing)
-
-    storage_key = f"analysis-cases/{analysis_case_id}/documents/{validated.sha256}.pdf"
-    try:
-        await run_in_threadpool(storage.upload_pdf, file.file, storage_key)
-    except ObjectStorageError as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Le stockage du document a échoué. Veuillez réessayer.",
-        ) from error
 
     document = DocumentRecord(
         analysis_case_id=analysis_case_id,
@@ -368,10 +489,17 @@ async def upload_document(
         size_bytes=validated.size_bytes,
         sha256=validated.sha256,
         storage_bucket=storage.bucket,
-        storage_key=storage_key,
+        storage_key=payload.storage_key,
         status=DocumentStatus.UPLOADED.value,
     )
-    persisted = repository.create_document(document, current_user_id)
+    try:
+        persisted = repository.create_document(document, current_user_id)
+    except Exception:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        raise
+    if persisted.storage_key != payload.storage_key:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        response.status_code = status.HTTP_200_OK
     return DocumentRead.model_validate(persisted)
 
 

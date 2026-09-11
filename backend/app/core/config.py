@@ -29,11 +29,13 @@ class Settings(BaseSettings):
         ),
     )
     object_storage_endpoint: str | None = None
+    object_storage_public_endpoint: str | None = None
     object_storage_bucket: str | None = None
     object_storage_region: str = "eu-west-3"
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
     document_view_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
+    document_upload_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
     max_upload_size_bytes: int = 25 * 1024 * 1024
     openai_api_key: SecretStr | None = None
     ademe_dpe_api_url: str = "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"

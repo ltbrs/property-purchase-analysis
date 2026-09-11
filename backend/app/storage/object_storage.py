@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import Annotated, BinaryIO, Protocol
+from typing import Annotated, Any, BinaryIO, Protocol
 
 import boto3  # type: ignore[import-untyped]
 from botocore.client import Config  # type: ignore[import-untyped]
@@ -13,10 +14,20 @@ class ObjectStorageError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class StoredObjectMetadata:
+    size_bytes: int
+    content_type: str
+
+
 class PrivateObjectStorage(Protocol):
     bucket: str
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None: ...
+
+    def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str: ...
+
+    def get_object_metadata(self, bucket: str, key: str) -> StoredObjectMetadata: ...
 
     def download_pdf(self, bucket: str, key: str) -> bytes: ...
 
@@ -27,22 +38,31 @@ class PrivateObjectStorage(Protocol):
 
 class S3ObjectStorage:
     def __init__(self, settings: Settings) -> None:
-        if (
-            settings.object_storage_endpoint is None
-            or settings.object_storage_bucket is None
-            or settings.object_storage_access_key is None
-            or settings.object_storage_secret_key is None
-        ):
+        endpoint = settings.object_storage_endpoint
+        bucket = settings.object_storage_bucket
+        access_key = settings.object_storage_access_key
+        secret_key = settings.object_storage_secret_key
+        if endpoint is None or bucket is None or access_key is None or secret_key is None:
             raise RuntimeError("Object storage is not configured")
 
-        self.bucket = settings.object_storage_bucket
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=settings.object_storage_endpoint,
-            region_name=settings.object_storage_region,
-            aws_access_key_id=settings.object_storage_access_key.get_secret_value(),
-            aws_secret_access_key=settings.object_storage_secret_key.get_secret_value(),
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+        self.bucket = bucket
+
+        def create_client(endpoint_url: str) -> Any:
+            return boto3.client(
+                "s3",
+                endpoint_url=endpoint_url,
+                region_name=settings.object_storage_region,
+                aws_access_key_id=access_key.get_secret_value(),
+                aws_secret_access_key=secret_key.get_secret_value(),
+                config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            )
+
+        self._client = create_client(endpoint)
+        public_endpoint = settings.object_storage_public_endpoint
+        self._presigning_client = (
+            self._client
+            if public_endpoint is None or public_endpoint == endpoint
+            else create_client(public_endpoint)
         )
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
@@ -55,6 +75,33 @@ class S3ObjectStorage:
             )
         except (BotoCoreError, ClientError, OSError) as error:
             raise ObjectStorageError("Could not store document") from error
+
+    def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str:
+        try:
+            return str(
+                self._presigning_client.generate_presigned_url(
+                    "put_object",
+                    Params={
+                        "Bucket": self.bucket,
+                        "Key": key,
+                        "ContentType": "application/pdf",
+                        "ContentLength": size_bytes,
+                    },
+                    ExpiresIn=expires_in_seconds,
+                )
+            )
+        except (BotoCoreError, ClientError, OSError) as error:
+            raise ObjectStorageError("Could not create document upload URL") from error
+
+    def get_object_metadata(self, bucket: str, key: str) -> StoredObjectMetadata:
+        try:
+            response = self._client.head_object(Bucket=bucket, Key=key)
+            return StoredObjectMetadata(
+                size_bytes=int(response["ContentLength"]),
+                content_type=str(response.get("ContentType", "")),
+            )
+        except (BotoCoreError, ClientError, OSError, KeyError, TypeError, ValueError) as error:
+            raise ObjectStorageError("Could not inspect document") from error
 
     def download_pdf(self, bucket: str, key: str) -> bytes:
         try:

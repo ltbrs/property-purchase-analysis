@@ -154,6 +154,27 @@ class DocumentRead(BaseModel):
     updated_at: datetime
 
 
+class DocumentUploadUrlCreate(BaseModel):
+    original_filename: str
+    content_type: str
+    size_bytes: int
+
+
+class DocumentUploadUrlRead(BaseModel):
+    url: str
+    storage_key: str
+    headers: dict[str, str]
+    expires_at: datetime
+
+
+class DocumentUploadComplete(BaseModel):
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    storage_key: str = Field(min_length=1, max_length=1024)
+
+
 class DocumentViewUrlRead(BaseModel):
     url: str
     expires_at: datetime

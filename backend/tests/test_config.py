@@ -60,6 +60,14 @@ def test_document_view_url_ttl_is_bounded() -> None:
         Settings(document_view_url_ttl_seconds=3601)
 
 
+def test_document_upload_url_ttl_is_bounded() -> None:
+    assert Settings().document_upload_url_ttl_seconds == 300
+    with pytest.raises(ValidationError):
+        Settings(document_upload_url_ttl_seconds=59)
+    with pytest.raises(ValidationError):
+        Settings(document_upload_url_ttl_seconds=3601)
+
+
 def test_blank_openai_api_key_is_treated_as_unconfigured() -> None:
     settings = Settings.model_validate({"openai_api_key": "   "})
 

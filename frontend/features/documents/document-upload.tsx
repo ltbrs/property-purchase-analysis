@@ -66,6 +66,13 @@ type UploadedDocument = {
   updated_at: string;
 };
 
+type DocumentUploadUrl = {
+  url: string;
+  storage_key: string;
+  headers: Record<string, string>;
+  expires_at: string;
+};
+
 type AnalysisCase = {
   id: string;
   title: string;
@@ -90,6 +97,13 @@ function formatFileSize(bytes: number) {
     return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+}
+
+async function sha256(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 async function fetchDocuments(workspace: Workspace) {
@@ -503,13 +517,45 @@ export function DocumentUpload() {
     setIsUploading(true);
     const results = await Promise.allSettled(
       files.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
+        const uploadUrlResponse = await fetch(
+          `${API_URL}/analysis-cases/${workspace.caseId}/documents/upload-url`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              original_filename: file.name,
+              content_type: file.type,
+              size_bytes: file.size,
+            }),
+          },
+        );
+        if (!uploadUrlResponse.ok) {
+          throw new Error(`${file.name} : ${await readApiError(uploadUrlResponse)}`);
+        }
+        const upload = (await uploadUrlResponse.json()) as DocumentUploadUrl;
+        const checksum = sha256(file);
+
+        const directUploadResponse = await fetch(upload.url, {
+          method: "PUT",
+          headers: upload.headers,
+          body: file,
+        });
+        if (!directUploadResponse.ok) {
+          throw new Error(`${file.name} : le transfert vers le stockage a échoué.`);
+        }
+
         const response = await fetch(
           `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
           {
             method: "POST",
-            body: formData,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              original_filename: file.name,
+              content_type: file.type,
+              size_bytes: file.size,
+              sha256: await checksum,
+              storage_key: upload.storage_key,
+            }),
           },
         );
         if (!response.ok) {
