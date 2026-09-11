@@ -19,14 +19,56 @@ class ValidatedUpload:
     sha256: str
 
 
-async def validate_pdf(upload: UploadFile, max_size_bytes: int) -> ValidatedUpload:
-    if upload.content_type not in PDF_MIME_TYPES:
+def validate_pdf_metadata(
+    filename: str,
+    content_type: str,
+    size_bytes: int,
+    max_size_bytes: int,
+) -> str:
+    if content_type not in PDF_MIME_TYPES:
         raise InvalidDocument("Seuls les fichiers PDF sont acceptés.")
 
-    raw_filename = upload.filename or ""
-    filename = PurePath(raw_filename.replace("\\", "/")).name.strip()
-    if not filename or len(filename) > 255 or any(ord(char) < 32 for char in filename):
+    safe_filename = PurePath(filename.replace("\\", "/")).name.strip()
+    if (
+        not safe_filename
+        or len(safe_filename) > 255
+        or any(ord(char) < 32 for char in safe_filename)
+    ):
         raise InvalidDocument("Le nom du fichier est invalide.")
+    if size_bytes <= 0:
+        raise InvalidDocument("Le fichier est vide.")
+    if size_bytes > max_size_bytes:
+        raise InvalidDocument(
+            f"Le fichier dépasse la taille maximale de {max_size_bytes // (1024 * 1024)} Mo."
+        )
+    return safe_filename
+
+
+def validate_pdf_bytes(
+    content: bytes,
+    filename: str,
+    content_type: str,
+    max_size_bytes: int,
+) -> ValidatedUpload:
+    safe_filename = validate_pdf_metadata(
+        filename,
+        content_type,
+        len(content),
+        max_size_bytes,
+    )
+    if b"%PDF-" not in content[:1024]:
+        raise InvalidDocument("Le contenu du fichier ne correspond pas à un PDF valide.")
+    return ValidatedUpload(
+        filename=safe_filename,
+        size_bytes=len(content),
+        sha256=hashlib.sha256(content).hexdigest(),
+    )
+
+
+async def validate_pdf(upload: UploadFile, max_size_bytes: int) -> ValidatedUpload:
+    content_type = upload.content_type or ""
+    raw_filename = upload.filename or ""
+    filename = validate_pdf_metadata(raw_filename, content_type, 1, max_size_bytes)
 
     digest = hashlib.sha256()
     size_bytes = 0
@@ -45,8 +87,7 @@ async def validate_pdf(upload: UploadFile, max_size_bytes: int) -> ValidatedUplo
 
     await upload.seek(0)
 
-    if size_bytes == 0:
-        raise InvalidDocument("Le fichier est vide.")
+    validate_pdf_metadata(filename, content_type, size_bytes, max_size_bytes)
     if b"%PDF-" not in signature_buffer:
         raise InvalidDocument("Le contenu du fichier ne correspond pas à un PDF valide.")
 

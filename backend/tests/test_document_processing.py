@@ -1,5 +1,7 @@
+import hashlib
 from collections.abc import Generator
 from datetime import date
+from io import BytesIO
 from typing import BinaryIO, TypeVar
 from uuid import UUID, uuid4
 
@@ -28,7 +30,7 @@ from app.property.normalization.dpe import (
     DpeTextFactCandidate,
 )
 from app.risks.models.findings import RiskFindingRecord
-from app.storage.object_storage import get_object_storage
+from app.storage.object_storage import StoredObjectMetadata, get_object_storage
 from tests.pdf_fixtures import DPE_PDF
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -43,6 +45,13 @@ class MemoryObjectStorage:
 
     def upload_pdf(self, file: BinaryIO, key: str) -> None:
         self.objects[key] = file.read()
+
+    def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str:
+        return f"https://storage.test/{self.bucket}/{key}?signed-upload=true"
+
+    def get_object_metadata(self, bucket: str, key: str) -> StoredObjectMetadata:
+        assert bucket == self.bucket
+        return StoredObjectMetadata(len(self.objects[key]), "application/pdf")
 
     def download_pdf(self, bucket: str, key: str) -> bytes:
         assert bucket == self.bucket
@@ -163,6 +172,37 @@ def auth(user_id: UUID) -> dict[str, str]:
     return {"X-User-Id": str(user_id)}
 
 
+def upload_document(
+    client: TestClient,
+    storage: MemoryObjectStorage,
+    case_id: str,
+    user_id: UUID,
+) -> object:
+    metadata = {
+        "original_filename": "dpe.pdf",
+        "content_type": "application/pdf",
+        "size_bytes": len(DPE_PDF),
+    }
+    upload_url = client.post(
+        f"/api/v1/analysis-cases/{case_id}/documents/upload-url",
+        headers=auth(user_id),
+        json=metadata,
+    )
+    storage_key = upload_url.json()["storage_key"]
+    storage.upload_pdf(BytesIO(DPE_PDF), storage_key)
+    response = client.post(
+        f"/api/v1/analysis-cases/{case_id}/documents",
+        headers=auth(user_id),
+        json={
+            **metadata,
+            "sha256": hashlib.sha256(DPE_PDF).hexdigest(),
+            "storage_key": storage_key,
+        },
+    )
+    storage.download_count = 0
+    return response
+
+
 def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
     session: Session,
 ) -> None:
@@ -183,11 +223,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
             json={"title": "Appartement test", "property_type": "house"},
         )
         case_id = created.json()["id"]
-        uploaded = client.post(
-            f"/api/v1/analysis-cases/{case_id}/documents",
-            headers=auth(user_id),
-            files={"file": ("dpe.pdf", DPE_PDF, "application/pdf")},
-        )
+        uploaded = upload_document(client, storage, case_id, user_id)
         document_id = uploaded.json()["id"]
         process_url = f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/process"
 
@@ -234,11 +270,7 @@ def test_process_enforces_document_ownership(session: Session) -> None:
             json={"title": "Appartement test"},
         )
         case_id = created.json()["id"]
-        uploaded = client.post(
-            f"/api/v1/analysis-cases/{case_id}/documents",
-            headers=auth(owner_id),
-            files={"file": ("dpe.pdf", DPE_PDF, "application/pdf")},
-        )
+        uploaded = upload_document(client, storage, case_id, owner_id)
         response = client.post(
             f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
             headers=auth(uuid4()),

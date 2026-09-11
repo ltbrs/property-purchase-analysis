@@ -161,11 +161,17 @@ OBJECT_STORAGE_BUCKET=property-documents
 OBJECT_STORAGE_REGION=PROJECT_REGION
 OBJECT_STORAGE_ACCESS_KEY=SERVER_SIDE_S3_ACCESS_KEY
 OBJECT_STORAGE_SECRET_KEY=SERVER_SIDE_S3_SECRET_KEY
+DOCUMENT_UPLOAD_URL_TTL_SECONDS=300
 ```
 
 These S3 keys bypass Storage RLS and can access every bucket in the project.
 Keep them only on the backend. Supabase Storage deletion is permanent, so the
 application's document deletion behavior must be treated accordingly.
+
+The browser uploads PDFs directly with a short-lived, server-generated S3 URL.
+The S3 endpoint must therefore be reachable from the browser and allow `PUT`
+requests from the frontend origin. Set `OBJECT_STORAGE_PUBLIC_ENDPOINT` only
+when the backend's `OBJECT_STORAGE_ENDPOINT` uses a private hostname.
 
 ## FastAPI environment
 
@@ -181,6 +187,7 @@ OBJECT_STORAGE_BUCKET=property-documents
 OBJECT_STORAGE_REGION=PROJECT_REGION
 OBJECT_STORAGE_ACCESS_KEY=SERVER_SIDE_S3_ACCESS_KEY
 OBJECT_STORAGE_SECRET_KEY=SERVER_SIDE_S3_SECRET_KEY
+DOCUMENT_UPLOAD_URL_TTL_SECONDS=300
 OPENAI_API_KEY=SERVER_SIDE_OPENAI_KEY
 BACKEND_PROXY_SECRET=SAME_VALUE_AS_VERCEL
 CONTACT_PROXY_SECRET=SAME_VALUE_AS_VERCEL
