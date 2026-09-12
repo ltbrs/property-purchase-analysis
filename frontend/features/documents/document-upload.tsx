@@ -517,6 +517,7 @@ export function DocumentUpload() {
     setIsUploading(true);
     const results = await Promise.allSettled(
       files.map(async (file) => {
+        const checksum = await sha256(file);
         const uploadUrlResponse = await fetch(
           `${API_URL}/analysis-cases/${workspace.caseId}/documents/upload-url`,
           {
@@ -533,7 +534,6 @@ export function DocumentUpload() {
           throw new Error(`${file.name} : ${await readApiError(uploadUrlResponse)}`);
         }
         const upload = (await uploadUrlResponse.json()) as DocumentUploadUrl;
-        const checksum = sha256(file);
 
         const directUploadResponse = await fetch(upload.url, {
           method: "PUT",
@@ -553,7 +553,7 @@ export function DocumentUpload() {
               original_filename: file.name,
               content_type: file.type,
               size_bytes: file.size,
-              sha256: await checksum,
+              sha256: checksum,
               storage_key: upload.storage_key,
             }),
           },

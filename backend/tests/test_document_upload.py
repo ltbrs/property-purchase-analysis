@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx import Response
 from pydantic import SecretStr
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -109,7 +110,7 @@ def upload_document(
     filename: str = "dpe.pdf",
     content: bytes = PDF_CONTENT,
     content_type: str = "application/pdf",
-) -> object:
+) -> Response:
     metadata = {
         "original_filename": filename,
         "content_type": content_type,
