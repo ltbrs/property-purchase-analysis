@@ -16,6 +16,8 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_db_session
 from app.documents.classification.models import (
     DocumentClassificationCandidate,
+    DocumentClassificationRecord,
+    DocumentClassificationSegmentCandidate,
     DocumentType,
     ExtractionStrategy,
 )
@@ -24,12 +26,19 @@ from app.documents.parsers import get_pdf_parser
 from app.documents.parsers.base import ParsedPage, ParsedPdf
 from app.llm import StructuredOutputResult, get_structured_output_client
 from app.main import create_app
+from app.property.normalization.diagnostics import (
+    DiagnosticExtractionCandidate,
+    DiagnosticFindingCandidate,
+    DiagnosticKind,
+    DiagnosticResult,
+)
 from app.property.normalization.dpe import (
     DpeDateFactCandidate,
     DpeExtractionCandidate,
     DpeNumberFactCandidate,
     DpeTextFactCandidate,
 )
+from app.property.normalization.structured import StructuredExtractionRecord
 from app.risks.models.findings import RiskFindingRecord
 from app.storage.object_storage import StoredObjectMetadata, get_object_storage
 from tests.pdf_fixtures import DPE_PDF
@@ -64,15 +73,17 @@ class FakePdfParser:
     name = "fake-xberg"
     version = "test-1"
 
-    def __init__(self) -> None:
+    def __init__(self, pages: list[ParsedPage] | None = None) -> None:
         self.parse_count = 0
+        self.pages = pages
 
     async def parse(self, pdf_bytes: bytes, filename: str | None = None) -> ParsedPdf:
         assert pdf_bytes == DPE_PDF
         assert filename == "dpe.pdf"
         self.parse_count += 1
         return ParsedPdf(
-            pages=[
+            pages=self.pages
+            or [
                 ParsedPage(
                     page_number=1,
                     text=(
@@ -88,6 +99,7 @@ class FakeStructuredOutputClient:
     def __init__(self, outputs: list[BaseModel]) -> None:
         self.outputs = outputs
         self.calls = 0
+        self.user_contents: list[str] = []
 
     async def parse(
         self,
@@ -97,7 +109,8 @@ class FakeStructuredOutputClient:
         response_model: type[OutputModel],
     ) -> StructuredOutputResult[OutputModel]:
         assert system_prompt
-        assert '<page number="1">' in user_content
+        assert '<page number="' in user_content
+        self.user_contents.append(user_content)
         output = self.outputs[self.calls]
         self.calls += 1
         assert isinstance(output, response_model)
@@ -124,13 +137,19 @@ def null_date() -> DpeDateFactCandidate:
 def dpe_outputs() -> list[BaseModel]:
     return [
         DocumentClassificationCandidate(
-            document_type=DocumentType.DPE,
-            confidence=0.99,
-            document_date=date(2024, 6, 15),
-            covered_period_start=None,
-            covered_period_end=None,
-            issuer="Cabinet Exemple",
-            extraction_strategy=ExtractionStrategy.TEXT,
+            segments=[
+                DocumentClassificationSegmentCandidate(
+                    start_page=1,
+                    end_page=1,
+                    document_type=DocumentType.DPE,
+                    confidence=0.99,
+                    document_date=date(2024, 6, 15),
+                    covered_period_start=None,
+                    covered_period_end=None,
+                    issuer="Cabinet Exemple",
+                    extraction_strategy=ExtractionStrategy.TEXT,
+                )
+            ]
         ),
         DpeExtractionCandidate(
             dpe_rating=DpeTextFactCandidate(value="D", page_number=1, quote="Classe énergie D"),
@@ -155,6 +174,50 @@ def dpe_outputs() -> list[BaseModel]:
             recommendations=[],
         ),
     ]
+
+
+def composite_outputs() -> list[BaseModel]:
+    classification = DocumentClassificationCandidate(
+        segments=[
+            DocumentClassificationSegmentCandidate(
+                start_page=1,
+                end_page=1,
+                document_type=DocumentType.DPE,
+                confidence=0.99,
+                document_date=date(2024, 6, 15),
+                covered_period_start=None,
+                covered_period_end=None,
+                issuer="Cabinet Exemple",
+                extraction_strategy=ExtractionStrategy.TEXT,
+            ),
+            DocumentClassificationSegmentCandidate(
+                start_page=2,
+                end_page=2,
+                document_type=DocumentType.DIAGNOSTICS,
+                confidence=0.98,
+                document_date=date(2024, 6, 16),
+                covered_period_start=None,
+                covered_period_end=None,
+                issuer="Cabinet Exemple",
+                extraction_strategy=ExtractionStrategy.TEXT,
+            ),
+        ]
+    )
+    diagnostics = DiagnosticExtractionCandidate(
+        findings=[
+            DiagnosticFindingCandidate(
+                kind=DiagnosticKind.ELECTRICITY,
+                result=DiagnosticResult.ANOMALY,
+                description="Une anomalie électrique a été constatée",
+                diagnostic_date="2024-06-16",
+                valid_until=None,
+                measured_surface_m2=None,
+                page_number=2,
+                quote="Une anomalie électrique a été constatée",
+            )
+        ]
+    )
+    return [classification, dpe_outputs()[1], diagnostics]
 
 
 @pytest.fixture
@@ -281,3 +344,82 @@ def test_process_enforces_document_ownership(session: Session) -> None:
     assert storage.download_count == 0
     assert parser.parse_count == 0
     assert llm_client.calls == 0
+
+
+def test_process_extracts_each_type_from_its_pages_in_a_composite_pdf(
+    session: Session,
+) -> None:
+    storage = MemoryObjectStorage()
+    parser = FakePdfParser(
+        pages=[
+            ParsedPage(
+                page_number=1,
+                text=(
+                    "DPE établi le 15/06/2024. Classe énergie D. "
+                    "Classe climat B. Consommation 182 kWh/m²/an."
+                ),
+            ),
+            ParsedPage(
+                page_number=2,
+                text=(
+                    "Diagnostic électricité du 16/06/2024. Une anomalie électrique a été constatée."
+                ),
+            ),
+        ]
+    )
+    llm_client = FakeStructuredOutputClient(composite_outputs())
+    application = create_app()
+    application.dependency_overrides[get_db_session] = lambda: session
+    application.dependency_overrides[get_object_storage] = lambda: storage
+    application.dependency_overrides[get_pdf_parser] = lambda: parser
+    application.dependency_overrides[get_structured_output_client] = lambda: llm_client
+    user_id = uuid4()
+
+    with TestClient(application) as client:
+        created = client.post(
+            "/api/v1/analysis-cases",
+            headers=auth(user_id),
+            json={"title": "Appartement test", "property_type": "house"},
+        )
+        case_id = created.json()["id"]
+        uploaded = upload_document(client, storage, case_id, user_id)
+        processed = client.post(
+            f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
+            headers=auth(user_id),
+        )
+        listed = client.get(
+            f"/api/v1/analysis-cases/{case_id}/documents",
+            headers=auth(user_id),
+        )
+        report = client.post(
+            f"/api/v1/analysis-cases/{case_id}/report/refresh",
+            headers=auth(user_id),
+        )
+
+    assert processed.status_code == 200
+    assert processed.json()["document_types"] == ["dpe", "diagnostics"]
+    assert listed.json()[0]["document_types"] == ["dpe", "diagnostics"]
+    report_codes = {
+        finding["code"] for section in report.json()["sections"] for finding in section["findings"]
+    }
+    assert "MISSING_DPE_DOCUMENT" not in report_codes
+    assert "INSUFFICIENT_DPE_DOCUMENT" not in report_codes
+    assert llm_client.calls == 3
+    classification_content, dpe_content, diagnostic_content = llm_client.user_contents
+    assert 'filename="dpe.pdf"' in classification_content
+    assert '<page number="1">' in classification_content
+    assert '<page number="2">' in classification_content
+    assert '<page number="1">' in dpe_content
+    assert '<page number="2">' not in dpe_content
+    assert '<page number="1">' not in diagnostic_content
+    assert '<page number="2">' in diagnostic_content
+    classifications = list(
+        session.scalars(
+            select(DocumentClassificationRecord).order_by(DocumentClassificationRecord.start_page)
+        )
+    )
+    assert [
+        (classification.document_type, classification.start_page, classification.end_page)
+        for classification in classifications
+    ] == [("dpe", 1, 1), ("diagnostics", 2, 2)]
+    assert session.scalar(select(StructuredExtractionRecord)) is not None

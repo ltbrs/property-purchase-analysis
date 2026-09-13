@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.documents.classification.models import (
-    DocumentClassificationCandidate,
     DocumentClassificationRecord,
+    DocumentClassificationSegmentCandidate,
     DocumentType,
     ExtractionStrategy,
 )
@@ -168,10 +168,36 @@ class DocumentRepository:
             .where(DocumentExtractionRecord.document_id == document_id)
         )
 
-    def get_classification(self, document_id: UUID) -> DocumentClassificationRecord | None:
+    def get_classification(
+        self,
+        document_id: UUID,
+        document_type: DocumentType | None = None,
+    ) -> DocumentClassificationRecord | None:
+        statement = select(DocumentClassificationRecord).where(
+            DocumentClassificationRecord.document_id == document_id
+        )
+        if document_type is not None:
+            statement = statement.where(
+                DocumentClassificationRecord.document_type == document_type.value
+            )
         return self.session.scalar(
-            select(DocumentClassificationRecord).where(
-                DocumentClassificationRecord.document_id == document_id
+            statement.order_by(
+                DocumentClassificationRecord.start_page,
+                DocumentClassificationRecord.end_page,
+            )
+        )
+
+    def list_document_classifications(
+        self, document_id: UUID
+    ) -> list[DocumentClassificationRecord]:
+        return list(
+            self.session.scalars(
+                select(DocumentClassificationRecord)
+                .where(DocumentClassificationRecord.document_id == document_id)
+                .order_by(
+                    DocumentClassificationRecord.start_page,
+                    DocumentClassificationRecord.end_page,
+                )
             )
         )
 
@@ -187,7 +213,10 @@ class DocumentRepository:
                     DocumentRecord.analysis_case_id == analysis_case_id,
                     AnalysisCaseRecord.user_id == user_id,
                 )
-                .order_by(DocumentClassificationRecord.created_at)
+                .order_by(
+                    DocumentClassificationRecord.created_at,
+                    DocumentClassificationRecord.start_page,
+                )
             )
         )
 
@@ -299,34 +328,43 @@ class DocumentRepository:
         self.session.refresh(extraction, attribute_names=["pages"])
         return extraction
 
-    def save_classification(
+    def save_classifications(
         self,
         *,
         document: DocumentRecord,
-        candidate: DocumentClassificationCandidate,
-        normalized_document_type: DocumentType,
-        normalized_strategy: ExtractionStrategy | None,
+        segments: list[
+            tuple[
+                DocumentClassificationSegmentCandidate,
+                DocumentType,
+                ExtractionStrategy | None,
+            ]
+        ],
         requested_model: str,
         resolved_model: str,
         response_id: str,
         prompt_version: str,
-    ) -> DocumentClassificationRecord:
-        classification = DocumentClassificationRecord(
-            document_id=document.id,
-            document_type=normalized_document_type.value,
-            confidence=candidate.confidence,
-            document_date=candidate.document_date,
-            covered_period_start=candidate.covered_period_start,
-            covered_period_end=candidate.covered_period_end,
-            issuer=candidate.issuer,
-            extraction_strategy=(normalized_strategy.value if normalized_strategy else None),
-            requested_model=requested_model,
-            resolved_model=resolved_model,
-            response_id=response_id,
-            prompt_version=prompt_version,
-            raw_output=candidate.model_dump(mode="json"),
-        )
-        self.session.add(classification)
+    ) -> list[DocumentClassificationRecord]:
+        classifications = [
+            DocumentClassificationRecord(
+                document_id=document.id,
+                start_page=candidate.start_page,
+                end_page=candidate.end_page,
+                document_type=normalized_document_type.value,
+                confidence=candidate.confidence,
+                document_date=candidate.document_date,
+                covered_period_start=candidate.covered_period_start,
+                covered_period_end=candidate.covered_period_end,
+                issuer=candidate.issuer,
+                extraction_strategy=(normalized_strategy.value if normalized_strategy else None),
+                requested_model=requested_model,
+                resolved_model=resolved_model,
+                response_id=response_id,
+                prompt_version=prompt_version,
+                raw_output=candidate.model_dump(mode="json"),
+            )
+            for candidate, normalized_document_type, normalized_strategy in segments
+        ]
+        self.session.add_all(classifications)
         document.status = DocumentStatus.EXTRACTED.value
         document.failure_reason = None
         try:
@@ -334,8 +372,9 @@ class DocumentRepository:
         except Exception:
             self.session.rollback()
             raise
-        self.session.refresh(classification)
-        return classification
+        for classification in classifications:
+            self.session.refresh(classification)
+        return classifications
 
     def save_dpe_extraction(
         self,

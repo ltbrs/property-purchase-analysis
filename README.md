@@ -187,10 +187,13 @@ extraction rather than parsing the document again. Parser failures set the docum
 to `failed` without saving partial page output and can be retried.
 
 Classification is a separate operation after PDF extraction. Its version-controlled
-prompt requests one of the initial document categories, confidence, dates/covered
-period, issuer, and extraction strategy. A model confidence below `0.70` is
-deterministically stored as `unknown`; the original validated output and the requested
-and resolved model identifiers remain persisted for audit.
+prompt receives the original upload filename and a cost-bounded excerpt of every page.
+It returns one or more inclusive page segments with a category, confidence,
+dates/covered period, issuer, and extraction strategy. Segments must cover every page
+without gaps or overlaps. This lets one uploaded PDF contain, for example, both a DPE
+and technical diagnostics. A segment confidence below `0.70` is deterministically
+stored as `unknown`; the original validated output and the requested and resolved model
+identifiers remain persisted for audit.
 
 DPE extraction is available only after the document is classified as `dpe`. Each
 non-null normalized fact contains the source document ID, one-based page number, and
@@ -207,13 +210,15 @@ the label stays missing. Both analysis operations are authenticated and idempote
 ADEME lookups emit start, completion/not-found, failure, and skipped events in the API
 logs with the document ID and request duration, without logging document text.
 
-The structured extractor routes classified AG minutes, copropriété financial/charge
-documents, diagnostics, and ERP statements into separate strict schemas behind one
-small persistence boundary. AG items preserve meeting date, resolution, exact status,
-explicit total and lot-share amounts, and source page. Financial items preserve covered
-periods and due dates. Diagnostics cover asbestos, lead, electricity, gas, ERP, and
-Carrez without inferring legal consequences. Unsupported classifications return a
-conflict rather than being forced through the wrong schema.
+The downstream extractors receive only the pages assigned to their classified
+segments. The structured extractor routes classified AG minutes, copropriété
+financial/charge documents, diagnostics, and ERP statements into separate strict
+schemas behind one small persistence boundary. AG items preserve meeting date,
+resolution, exact status, explicit total and lot-share amounts, and source page.
+Financial items preserve covered periods and due dates. Diagnostics cover asbestos,
+lead, electricity, gas, ERP, and Carrez without inferring legal consequences.
+Unsupported classifications return a conflict rather than being forced through the
+wrong schema.
 
 Refreshing case findings runs deterministic rules only. It evaluates DPE energy and
 validity facts; voted and repeatedly discussed copropriété work; recurring infiltration;
@@ -270,8 +275,8 @@ available for retries and diagnostics.
 ## Evaluation fixtures
 
 Golden classification and DPE fixtures live in `backend/evals/fixtures`. They include
-multiple DPE layouts, a copropriété AG example, and incomplete content. Live evaluation
-is opt-in because it calls the API:
+multiple DPE layouts, a concatenated DPE and diagnostics example, a copropriété AG
+example, and incomplete content. Live evaluation is opt-in because it calls the API:
 
 ```bash
 cd backend

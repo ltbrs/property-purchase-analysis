@@ -61,6 +61,7 @@ type UploadedDocument = {
   status: DocumentStatus;
   failure_reason: string | null;
   document_type: DocumentType | null;
+  document_types: DocumentType[];
   ademe_verification_status: AdemeVerificationStatus | null;
   created_at: string;
   updated_at: string;
@@ -97,6 +98,11 @@ function formatFileSize(bytes: number) {
     return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+}
+
+function classifiedTypes(document: UploadedDocument): DocumentType[] {
+  if (document.document_types.length > 0) return document.document_types;
+  return document.document_type ? [document.document_type] : [];
 }
 
 async function sha256(file: File) {
@@ -225,7 +231,9 @@ function DocumentFile({
             <strong>{document.original_filename}</strong>
             <span>
               {showType
-                ? `${documentTypeLabels[document.document_type ?? "unknown"]} · `
+                ? `${classifiedTypes(document)
+                    .map((documentType) => documentTypeLabels[documentType])
+                    .join(" + ") || documentTypeLabels.unknown} · `
                 : ""}
               {formatFileSize(document.size_bytes)} · {dateFormatter.format(new Date(document.created_at))}
             </span>
@@ -271,7 +279,7 @@ function DocumentFile({
           >
             <Icon name="eye" /> Visualiser
           </button>
-          {document.document_type === "dpe" && document.status === "completed" ? (
+          {classifiedTypes(document).includes("dpe") && document.status === "completed" ? (
             <button
               className="dpe-data-button"
               type="button"
@@ -595,9 +603,7 @@ export function DocumentUpload() {
     if (successfulDocuments.length > 0) {
       captureProductEvent("documents_uploaded", {
         document_count: successfulDocuments.length,
-        document_types: successfulDocuments.map(
-          (document) => document.document_type ?? "unknown",
-        ),
+        document_types: successfulDocuments.flatMap(classifiedTypes),
       });
     }
 
@@ -702,8 +708,9 @@ export function DocumentUpload() {
     const matchingDocuments = documents.filter(
       (document) =>
         document.status !== "failed" &&
-        document.document_type !== null &&
-        expectation.acceptedTypes.includes(document.document_type),
+        classifiedTypes(document).some((documentType) =>
+          expectation.acceptedTypes.includes(documentType),
+        ),
     );
     for (const document of matchingDocuments) matchedDocumentIds.add(document.id);
     return { expectation, documents: matchingDocuments };

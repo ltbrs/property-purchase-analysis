@@ -51,16 +51,29 @@ async def run_classification(client: OpenAIStructuredOutputClient) -> int:
     for fixture in load_fixtures("classification"):
         result = await client.parse(
             system_prompt=CLASSIFICATION_SYSTEM_PROMPT,
-            user_content=numbered_pages(fixture["pages"]),
+            user_content=(
+                f'<document filename="{fixture["filename"]}">\n'
+                f"{numbered_pages(fixture['pages'])}\n"
+                "</document>"
+            ),
             response_model=DocumentClassificationCandidate,
         )
-        actual = result.output.document_type
-        if result.output.confidence < MIN_KNOWN_TYPE_CONFIDENCE:
-            actual = DocumentType.UNKNOWN
-        expected = fixture["expected_document_type"]
-        passed = actual.value == expected
+        actual = [
+            {
+                "start_page": segment.start_page,
+                "end_page": segment.end_page,
+                "document_type": (
+                    segment.document_type.value
+                    if segment.confidence >= MIN_KNOWN_TYPE_CONFIDENCE
+                    else DocumentType.UNKNOWN.value
+                ),
+            }
+            for segment in result.output.segments
+        ]
+        expected = fixture["expected_segments"]
+        passed = actual == expected
         failures += not passed
-        outcome = "PASS" if passed else f"FAIL expected={expected} actual={actual.value}"
+        outcome = "PASS" if passed else f"FAIL expected={expected} actual={actual}"
         print(f"{fixture['id']}: {outcome}")
     return failures
 

@@ -3,7 +3,18 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, Float, ForeignKey, String, Uuid, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -31,11 +42,13 @@ class ExtractionStrategy(StrEnum):
     NONE = "none"
 
 
-class DocumentClassificationCandidate(BaseModel):
-    """Strict schema returned by the model before deterministic normalization."""
+class DocumentClassificationSegmentCandidate(BaseModel):
+    """One page range returned by the model before deterministic normalization."""
 
     model_config = ConfigDict(extra="forbid")
 
+    start_page: int = Field(gt=0)
+    end_page: int = Field(gt=0)
     document_type: DocumentType
     confidence: float = Field(ge=0, le=1)
     document_date: date | None
@@ -53,7 +66,9 @@ class DocumentClassificationCandidate(BaseModel):
         return normalized[:500] or None
 
     @model_validator(mode="after")
-    def validate_period(self) -> "DocumentClassificationCandidate":
+    def validate_ranges(self) -> "DocumentClassificationSegmentCandidate":
+        if self.start_page > self.end_page:
+            raise ValueError("segment start page must not be after its end page")
         if (
             self.covered_period_start is not None
             and self.covered_period_end is not None
@@ -63,12 +78,34 @@ class DocumentClassificationCandidate(BaseModel):
         return self
 
 
+class DocumentClassificationCandidate(BaseModel):
+    """Strict segmented classification returned by the model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    segments: list[DocumentClassificationSegmentCandidate] = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+
 class DocumentClassificationRecord(Base):
     __tablename__ = "document_classifications"
     __table_args__ = (
         CheckConstraint(
             "confidence >= 0 AND confidence <= 1",
             name="ck_classification_confidence",
+        ),
+        CheckConstraint(
+            "start_page > 0 AND end_page >= start_page",
+            name="ck_classification_page_range",
+        ),
+        UniqueConstraint(
+            "document_id",
+            "document_type",
+            "start_page",
+            "end_page",
+            name="uq_classification_document_type_pages",
         ),
     )
 
@@ -77,9 +114,10 @@ class DocumentClassificationRecord(Base):
         Uuid,
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
         index=True,
     )
+    start_page: Mapped[int] = mapped_column(nullable=False)
+    end_page: Mapped[int] = mapped_column(nullable=False)
     document_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     document_date: Mapped[date | None] = mapped_column(Date)
@@ -102,6 +140,8 @@ class DocumentClassificationRead(BaseModel):
 
     id: UUID
     document_id: UUID
+    start_page: int
+    end_page: int
     document_type: DocumentType
     confidence: float
     document_date: date | None
