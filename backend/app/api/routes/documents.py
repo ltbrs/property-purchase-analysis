@@ -9,7 +9,11 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import CurrentUserId
 from app.core.config import get_settings
 from app.core.database import DatabaseSession
-from app.documents.classification.models import DocumentClassificationRead
+from app.documents.classification.models import (
+    DocumentClassificationRead,
+    DocumentClassificationRecord,
+    DocumentType,
+)
 from app.documents.classification.service import (
     DocumentClassificationFailed,
     DocumentClassificationService,
@@ -58,6 +62,7 @@ from app.property.normalization.structured_service import (
     StructuredExtractionFailed,
     StructuredExtractionService,
     UnsupportedStructuredDocument,
+    structured_extraction_type,
 )
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
@@ -76,6 +81,23 @@ class CaseFindingsRefreshRead(BaseModel):
 
 class FindingReviewUpdate(BaseModel):
     review_status: FindingReviewStatus
+
+
+def _ordered_document_types(
+    classifications: list[DocumentClassificationRecord],
+) -> list[str]:
+    return list(dict.fromkeys(classification.document_type for classification in classifications))
+
+
+def _primary_document_type(document_types: list[str]) -> str | None:
+    return next(
+        (
+            document_type
+            for document_type in document_types
+            if document_type != DocumentType.UNKNOWN.value
+        ),
+        document_types[0] if document_types else None,
+    )
 
 
 def _validate_upload_storage_key(analysis_case_id: UUID, storage_key: str) -> None:
@@ -245,27 +267,30 @@ def list_documents(
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
-    classifications = {
-        classification.document_id: classification.document_type
-        for classification in repository.list_case_classifications(
-            analysis_case_id, current_user_id
+    classifications_by_document: dict[UUID, list[DocumentClassificationRecord]] = {}
+    for classification in repository.list_case_classifications(analysis_case_id, current_user_id):
+        classifications_by_document.setdefault(classification.document_id, []).append(
+            classification
         )
-    }
     ademe_verification_statuses = {
         extraction.document_id: NormalizedDpeFacts.model_validate(
             extraction.normalized_facts
         ).ademe_verification.status.value
         for extraction in repository.list_case_dpe_extractions(analysis_case_id, current_user_id)
     }
-    return [
-        DocumentRead.model_validate(document).model_copy(
-            update={
-                "document_type": classifications.get(document.id),
-                "ademe_verification_status": ademe_verification_statuses.get(document.id),
-            }
+    documents: list[DocumentRead] = []
+    for document in repository.list_documents(analysis_case_id, current_user_id):
+        document_types = _ordered_document_types(classifications_by_document.get(document.id, []))
+        documents.append(
+            DocumentRead.model_validate(document).model_copy(
+                update={
+                    "document_type": _primary_document_type(document_types),
+                    "document_types": document_types,
+                    "ademe_verification_status": ademe_verification_statuses.get(document.id),
+                }
+            )
         )
-        for document in repository.list_documents(analysis_case_id, current_user_id)
-    ]
+    return documents
 
 
 @router.get(
@@ -530,7 +555,7 @@ async def process_document(
         )
 
     try:
-        classification = await DocumentProcessingService(
+        classifications = await DocumentProcessingService(
             repository, storage, parser, llm_client
         ).process(document)
     except ObjectStorageError as error:
@@ -567,7 +592,8 @@ async def process_document(
     )
     return DocumentRead.model_validate(document).model_copy(
         update={
-            "document_type": classification.document_type,
+            "document_type": _primary_document_type(_ordered_document_types(classifications)),
+            "document_types": _ordered_document_types(classifications),
             "ademe_verification_status": ademe_verification_status,
         }
     )
@@ -654,7 +680,7 @@ async def extract_document(
 
 @router.post(
     "/{analysis_case_id}/documents/{document_id}/classify",
-    response_model=DocumentClassificationRead,
+    response_model=list[DocumentClassificationRead],
 )
 async def classify_document(
     analysis_case_id: UUID,
@@ -662,7 +688,7 @@ async def classify_document(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     llm_client: StructuredOutputClientDependency,
-) -> DocumentClassificationRead:
+) -> list[DocumentClassificationRead]:
     repository = DocumentRepository(session)
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
@@ -676,7 +702,7 @@ async def classify_document(
         )
     if (
         document.status == DocumentStatus.ANALYZING.value
-        and repository.get_classification(document.id) is None
+        and not repository.list_document_classifications(document.id)
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -684,7 +710,7 @@ async def classify_document(
         )
 
     try:
-        classification = await DocumentClassificationService(repository, llm_client).classify(
+        classifications = await DocumentClassificationService(repository, llm_client).classify(
             document, extraction
         )
     except DocumentClassificationFailed as error:
@@ -692,7 +718,10 @@ async def classify_document(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(error),
         ) from error
-    return DocumentClassificationRead.model_validate(classification)
+    return [
+        DocumentClassificationRead.model_validate(classification)
+        for classification in classifications
+    ]
 
 
 @router.post(
@@ -712,8 +741,12 @@ async def extract_dpe_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     extraction = repository.get_extraction(document.id)
-    classification = repository.get_classification(document.id)
-    if extraction is None or classification is None:
+    classifications = [
+        classification
+        for classification in repository.list_document_classifications(document.id)
+        if classification.document_type == DocumentType.DPE.value
+    ]
+    if extraction is None or not classifications:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Extract and classify the document before DPE extraction",
@@ -729,7 +762,7 @@ async def extract_dpe_document(
 
     try:
         dpe_extraction = await DpeExtractionService(repository, llm_client).extract(
-            document, extraction, classification
+            document, extraction, classifications
         )
     except DpeClassificationRequired as error:
         raise HTTPException(
@@ -746,7 +779,7 @@ async def extract_dpe_document(
 
 @router.post(
     "/{analysis_case_id}/documents/{document_id}/extract-structured",
-    response_model=StructuredExtractionRead,
+    response_model=list[StructuredExtractionRead],
 )
 async def extract_structured_document(
     analysis_case_id: UUID,
@@ -754,27 +787,47 @@ async def extract_structured_document(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     llm_client: StructuredOutputClientDependency,
-) -> StructuredExtractionRead:
+) -> list[StructuredExtractionRead]:
     repository = DocumentRepository(session)
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     extraction = repository.get_extraction(document.id)
-    classification = repository.get_classification(document.id)
-    if extraction is None or classification is None:
+    classifications = repository.list_document_classifications(document.id)
+    if extraction is None or not classifications:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Extract and classify the document before structured extraction",
         )
     try:
-        result = await StructuredExtractionService(repository, llm_client).extract(
-            document, extraction, classification
-        )
+        grouped_classifications: dict[
+            StructuredExtractionType, list[DocumentClassificationRecord]
+        ] = {}
+        for classification in classifications:
+            try:
+                extraction_type = structured_extraction_type(
+                    DocumentType(classification.document_type)
+                )
+            except UnsupportedStructuredDocument:
+                continue
+            grouped_classifications.setdefault(extraction_type, []).append(classification)
+        if not grouped_classifications:
+            raise UnsupportedStructuredDocument(
+                "No structured extractor is available for this document"
+            )
+        results = [
+            await StructuredExtractionService(repository, llm_client).extract(
+                document,
+                extraction,
+                grouped_segments,
+            )
+            for grouped_segments in grouped_classifications.values()
+        ]
     except UnsupportedStructuredDocument as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except StructuredExtractionFailed as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
-    return StructuredExtractionRead.model_validate(result)
+    return [StructuredExtractionRead.model_validate(result) for result in results]
 
 
 @router.post(

@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from app.documents.classification.models import DocumentClassificationRecord, DocumentType
 from app.documents.llm_content import extraction_as_numbered_text, page_source_text
 from app.documents.models import DocumentExtractionRecord, DocumentRecord
@@ -45,6 +47,22 @@ class UnsupportedStructuredDocument(RuntimeError):
     pass
 
 
+def structured_extraction_type(document_type: DocumentType) -> StructuredExtractionType:
+    if document_type == DocumentType.AG_MINUTES:
+        return StructuredExtractionType.AG_MINUTES
+    if document_type in {
+        DocumentType.COPRO_FINANCIALS,
+        DocumentType.CHARGES,
+        DocumentType.WORKS_CALL,
+    }:
+        return StructuredExtractionType.FINANCIALS
+    if document_type in {DocumentType.DIAGNOSTICS, DocumentType.RISK_STATEMENT}:
+        return StructuredExtractionType.DIAGNOSTICS
+    raise UnsupportedStructuredDocument(
+        f"No structured extractor is available for {document_type.value}"
+    )
+
+
 class StructuredExtractionService:
     def __init__(self, repository: DocumentRepository, llm_client: StructuredOutputClient) -> None:
         self.repository = repository
@@ -54,30 +72,31 @@ class StructuredExtractionService:
         self,
         document: DocumentRecord,
         extraction: DocumentExtractionRecord,
-        classification: DocumentClassificationRecord,
+        classifications: Sequence[DocumentClassificationRecord],
     ) -> StructuredExtractionRecord:
-        document_type = DocumentType(classification.document_type)
-        if document_type == DocumentType.AG_MINUTES:
-            extraction_type = StructuredExtractionType.AG_MINUTES
-        elif document_type in {
-            DocumentType.COPRO_FINANCIALS,
-            DocumentType.CHARGES,
-            DocumentType.WORKS_CALL,
-        }:
-            extraction_type = StructuredExtractionType.FINANCIALS
-        elif document_type in {DocumentType.DIAGNOSTICS, DocumentType.RISK_STATEMENT}:
-            extraction_type = StructuredExtractionType.DIAGNOSTICS
-        else:
+        if not classifications:
+            raise UnsupportedStructuredDocument("No classified segment was supplied")
+        extraction_types = {
+            structured_extraction_type(DocumentType(classification.document_type))
+            for classification in classifications
+        }
+        if len(extraction_types) != 1:
             raise UnsupportedStructuredDocument(
-                f"No structured extractor is available for {document_type.value}"
+                "Classified segments require different structured extractors"
             )
+        extraction_type = extraction_types.pop()
 
         existing = self.repository.get_structured_extraction(document.id, extraction_type)
         if existing is not None:
             return existing
         self.repository.mark_analyzing(document)
-        content = extraction_as_numbered_text(extraction)
-        pages = page_source_text(extraction)
+        page_numbers = {
+            page_number
+            for classification in classifications
+            for page_number in range(classification.start_page, classification.end_page + 1)
+        }
+        content = extraction_as_numbered_text(extraction, page_numbers=page_numbers)
+        pages = page_source_text(extraction, page_numbers=page_numbers)
         try:
             if extraction_type == StructuredExtractionType.AG_MINUTES:
                 ag_result = await self.llm_client.parse(

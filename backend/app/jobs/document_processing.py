@@ -11,7 +11,11 @@ from app.documents.parsers.base import PdfParser
 from app.documents.repository import DocumentRepository
 from app.llm import StructuredOutputClient
 from app.property.normalization.dpe_service import DpeExtractionService
-from app.property.normalization.structured_service import StructuredExtractionService
+from app.property.normalization.structured import StructuredExtractionType
+from app.property.normalization.structured_service import (
+    StructuredExtractionService,
+    structured_extraction_type,
+)
 from app.storage.object_storage import PrivateObjectStorage
 
 STRUCTURED_DOCUMENT_TYPES = {
@@ -39,7 +43,7 @@ class DocumentProcessingService:
         self.parser = parser
         self.llm_client = llm_client
 
-    async def process(self, document: DocumentRecord) -> DocumentClassificationRecord:
+    async def process(self, document: DocumentRecord) -> list[DocumentClassificationRecord]:
         extraction = self.repository.get_extraction(document.id)
         if extraction is None:
             pdf_bytes = await run_in_threadpool(
@@ -51,20 +55,34 @@ class DocumentProcessingService:
                 document, pdf_bytes
             )
 
-        classification = await DocumentClassificationService(
+        classifications = await DocumentClassificationService(
             self.repository, self.llm_client
         ).classify(document, extraction)
-        document_type = DocumentType(classification.document_type)
 
-        if document_type == DocumentType.DPE:
+        dpe_classifications = [
+            classification
+            for classification in classifications
+            if classification.document_type == DocumentType.DPE.value
+        ]
+        if dpe_classifications:
             await DpeExtractionService(self.repository, self.llm_client).extract(
-                document, extraction, classification
+                document, extraction, dpe_classifications
             )
-        elif document_type in STRUCTURED_DOCUMENT_TYPES:
-            await StructuredExtractionService(self.repository, self.llm_client).extract(
-                document, extraction, classification
-            )
-        else:
-            self.repository.mark_completed(document)
 
-        return classification
+        structured_groups: dict[StructuredExtractionType, list[DocumentClassificationRecord]] = {}
+        for classification in classifications:
+            document_type = DocumentType(classification.document_type)
+            if document_type not in STRUCTURED_DOCUMENT_TYPES:
+                continue
+            extraction_type = structured_extraction_type(document_type)
+            structured_groups.setdefault(extraction_type, []).append(classification)
+        for grouped_classifications in structured_groups.values():
+            await StructuredExtractionService(self.repository, self.llm_client).extract(
+                document,
+                extraction,
+                grouped_classifications,
+            )
+
+        self.repository.mark_completed(document)
+
+        return classifications
