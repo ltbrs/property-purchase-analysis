@@ -83,3 +83,4 @@ Do not hesitate to ask for clarifications or credentials if required.
 
 Github CLI is installed. Accessible via 'gh' in terminal. Already authentificated.
 The app is deployed on OVH, on the domain "acquora.fr", vercel and supabase (data and file store).
+Vercel CLI is authentificated.
