@@ -1,3 +1,4 @@
+from uuid import UUID
 from xml.sax.saxutils import quoteattr
 
 from app.documents.classification.models import (
@@ -34,6 +35,7 @@ class DocumentClassificationService:
         self,
         document: DocumentRecord,
         extraction: DocumentExtractionRecord,
+        user_id: UUID,
     ) -> list[DocumentClassificationRecord]:
         existing = self.repository.list_document_classifications(document.id)
         if existing:
@@ -53,6 +55,8 @@ class DocumentClassificationService:
                     "</document>"
                 ),
                 response_model=DocumentClassificationCandidate,
+                user_id=user_id,
+                document_id=document.id,
             )
             segments = self._validated_segments(result.output, extraction)
             normalized_segments: list[

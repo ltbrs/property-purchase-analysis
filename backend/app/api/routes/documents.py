@@ -557,7 +557,7 @@ async def process_document(
     try:
         classifications = await DocumentProcessingService(
             repository, storage, parser, llm_client
-        ).process(document)
+        ).process(document, current_user_id)
     except ObjectStorageError as error:
         repository.mark_extraction_failed(
             document, "Le document n’a pas pu être relu depuis le stockage privé."
@@ -711,7 +711,7 @@ async def classify_document(
 
     try:
         classifications = await DocumentClassificationService(repository, llm_client).classify(
-            document, extraction
+            document, extraction, current_user_id
         )
     except DocumentClassificationFailed as error:
         raise HTTPException(
@@ -762,7 +762,7 @@ async def extract_dpe_document(
 
     try:
         dpe_extraction = await DpeExtractionService(repository, llm_client).extract(
-            document, extraction, classifications
+            document, extraction, classifications, current_user_id
         )
     except DpeClassificationRequired as error:
         raise HTTPException(
@@ -820,6 +820,7 @@ async def extract_structured_document(
                 document,
                 extraction,
                 grouped_segments,
+                current_user_id,
             )
             for grouped_segments in grouped_classifications.values()
         ]

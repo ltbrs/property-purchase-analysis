@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from starlette.concurrency import run_in_threadpool
 
 from app.documents.classification.models import (
@@ -43,7 +45,9 @@ class DocumentProcessingService:
         self.parser = parser
         self.llm_client = llm_client
 
-    async def process(self, document: DocumentRecord) -> list[DocumentClassificationRecord]:
+    async def process(
+        self, document: DocumentRecord, user_id: UUID
+    ) -> list[DocumentClassificationRecord]:
         extraction = self.repository.get_extraction(document.id)
         if extraction is None:
             pdf_bytes = await run_in_threadpool(
@@ -57,7 +61,7 @@ class DocumentProcessingService:
 
         classifications = await DocumentClassificationService(
             self.repository, self.llm_client
-        ).classify(document, extraction)
+        ).classify(document, extraction, user_id)
 
         dpe_classifications = [
             classification
@@ -66,7 +70,7 @@ class DocumentProcessingService:
         ]
         if dpe_classifications:
             await DpeExtractionService(self.repository, self.llm_client).extract(
-                document, extraction, dpe_classifications
+                document, extraction, dpe_classifications, user_id
             )
 
         structured_groups: dict[StructuredExtractionType, list[DocumentClassificationRecord]] = {}
@@ -81,6 +85,7 @@ class DocumentProcessingService:
                 document,
                 extraction,
                 grouped_classifications,
+                user_id,
             )
 
         self.repository.mark_completed(document)

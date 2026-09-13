@@ -46,9 +46,13 @@ class FakeClient:
         system_prompt: str,
         user_content: str,
         response_model: type[OutputModel],
+        user_id: UUID,
+        document_id: UUID,
     ) -> StructuredOutputResult[OutputModel]:
         assert "vot" in system_prompt
         assert '<page number="1">' in user_content
+        assert isinstance(user_id, UUID)
+        assert isinstance(document_id, UUID)
         assert isinstance(self.output, response_model)
         self.calls += 1
         return StructuredOutputResult(
