@@ -20,7 +20,7 @@ async def request_delete_preflight() -> Response:
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "DELETE",
-                "Access-Control-Request-Headers": "X-User-Id",
+                "Access-Control-Request-Headers": "Authorization",
             },
         )
 
@@ -33,7 +33,7 @@ async def request_patch_preflight() -> Response:
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "PATCH",
-                "Access-Control-Request-Headers": "Content-Type, X-User-Id",
+                "Access-Control-Request-Headers": "Authorization, Content-Type",
             },
         )
 
@@ -58,4 +58,4 @@ def test_cors_allows_property_type_update_preflight() -> None:
     assert response.status_code == 200
     assert "PATCH" in response.headers["access-control-allow-methods"]
     assert "content-type" in response.headers["access-control-allow-headers"].casefold()
-    assert "x-user-id" in response.headers["access-control-allow-headers"].casefold()
+    assert "authorization" in response.headers["access-control-allow-headers"].casefold()

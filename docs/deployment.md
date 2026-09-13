@@ -27,12 +27,13 @@ The Vercel team contains two projects connected to the same GitHub repository:
 
 | Project | Git root | Runtime | Data integration |
 | --- | --- | --- | --- |
-| `acquora` | `frontend` | Next.js, Node.js 22 | None |
+| `acquora` | `frontend` | Next.js, Node.js 22 | Supabase Auth only |
 | `acquora-api` | `backend` | FastAPI, Python 3.12, Fluid compute in `cdg1` | `acquora-prod` |
 
 Both projects use `main` as the Production Branch. Other branches produce
-Preview deployments. The Supabase integration is intentionally absent from the
-frontend because it does not query Supabase directly.
+Preview deployments. The frontend uses the Supabase project only for Auth.
+Application data continues to travel through FastAPI and is never queried
+through the browser Data API.
 
 Keep Vercel Authentication enabled for preview deployments only on
 `acquora-api`. Its production URL must be reachable by the frontend's
@@ -87,23 +88,28 @@ Add these application variables in Vercel for Production and Preview:
 
 | Variable | Value or source |
 | --- | --- |
-| `AUTH_URL` | `https://acquora.fr` in Production |
-| `AUTH_SECRET` | A random value generated with `openssl rand -hex 32` |
-| `AUTH_GOOGLE_ID` | Google OAuth web client ID |
-| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `NEXT_PUBLIC_SITE_URL` | `https://acquora.fr` in Production |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-safe Supabase publishable key |
 | `BACKEND_API_URL` | `https://acquora-api-acquora.vercel.app/api/v1`, then `https://api.acquora.fr/api/v1` after DNS validation |
 | `BACKEND_PROXY_SECRET` | A dedicated random value, identical on FastAPI |
 | `CONTACT_PROXY_SECRET` | A second random value, identical on FastAPI |
 | `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host, such as `https://eu.i.posthog.com` |
 
-Never prefix the proxy secrets, Google client secret, or Auth.js secret with
-`NEXT_PUBLIC_`. Add these Google OAuth redirect URIs:
+Never prefix the proxy secrets, Google client secret, SMTP secret, or a Supabase
+secret key with `NEXT_PUBLIC_`. Configure Google with the callback URL shown by
+the Supabase Google provider page:
 
 ```text
-https://acquora.fr/api/auth/callback/google
-https://www.acquora.fr/api/auth/callback/google
+https://PROJECT_REF.supabase.co/auth/v1/callback
 ```
+
+Set the Supabase Auth Site URL to `https://acquora.fr`. Allow
+`https://acquora.fr/auth/callback` and the required local or preview callbacks.
+Enable confirmed e-mail addresses, custom SMTP, security notifications, bot
+protection, and an asymmetric ES256 signing key. The frontend uses PKCE callback
+routes and cookie-backed sessions through `@supabase/ssr`.
 
 ## Product and web analytics
 
@@ -191,11 +197,15 @@ DOCUMENT_UPLOAD_URL_TTL_SECONDS=300
 OPENAI_API_KEY=SERVER_SIDE_OPENAI_KEY
 BACKEND_PROXY_SECRET=SAME_VALUE_AS_VERCEL
 CONTACT_PROXY_SECRET=SAME_VALUE_AS_VERCEL
+SUPABASE_URL=https://PROJECT_REF.supabase.co
+SUPABASE_JWT_AUDIENCE=authenticated
 ```
 
 The backend rejects authenticated requests when the backend boundary secret is
-missing in production. The contact endpoint independently requires its contact
-proxy secret. Only `/api/v1/health` is intentionally public.
+or Supabase configuration is missing in production. Every analysis request
+requires both the private proxy secret and a Supabase access token verified
+through the project JWKS endpoint. The contact endpoint independently requires
+its contact proxy secret. Only `/api/v1/health` is intentionally public.
 
 ### Large upload boundary
 
@@ -234,6 +244,6 @@ Vercel Git deployments are connected for both `acquora` and `acquora-api`.
 Vercel creates Preview deployments for other branches and Production deployments
 for `main`. No Vercel token or deployment secret is needed in GitHub Actions.
 
-The GitHub `Test` workflow also needs no secrets. The remaining credentials are
-Vercel project environment variables, specifically `AUTH_SECRET`,
-`AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET` for the frontend authentication flow.
+The GitHub `Test` workflow also needs no secrets. The frontend also needs the
+Supabase project URL and publishable key. Google and SMTP secrets are configured
+in Supabase Auth rather than in the Vercel frontend.

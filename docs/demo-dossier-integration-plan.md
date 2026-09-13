@@ -42,7 +42,7 @@ Le provisionneur utilisateur :
 5. référence les PDF partagés avec `storage_ownership = 'shared_demo'` ;
 6. valide puis commit toute la copie dans une seule transaction.
 
-Le provisionnement peut être déclenché lors de la première requête authentifiée qui liste les dossiers. Il doit rester idempotent et sûr en cas de deux requêtes concurrentes. Une alternative plus explicite consiste à appeler une route interne depuis le callback de première connexion, mais elle ajoute un couplage inutile entre Auth.js et FastAPI.
+Le provisionnement peut être déclenché lors de la première requête authentifiée qui liste les dossiers. Il doit rester idempotent et sûr en cas de deux requêtes concurrentes. Une alternative plus explicite consiste à appeler une route interne depuis le callback de première connexion, mais elle ajoute un couplage inutile entre Supabase Auth et FastAPI.
 
 ## Pourquoi pré-calculer l'analyse
 
