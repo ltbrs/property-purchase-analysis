@@ -327,6 +327,7 @@ function ExpectedDocumentRow({
   onView: (document: UploadedDocument) => void;
 }) {
   const isPresent = documents.length > 0;
+  const hasScrollableFiles = documents.length > 3;
   const state = isPresent ? "present" : propertyType === "unknown" ? "pending" : "missing";
   const stateLabel = isPresent ? "Reçu" : propertyType === "unknown" ? "À confirmer" : "Manquant";
 
@@ -339,7 +340,11 @@ function ExpectedDocumentRow({
         <div className="coverage-copy">
           <div>
             <strong>{expectation.label}</strong>
-            {!isPresent ? (
+            {isPresent && documents.length > 1 ? (
+              <span className="coverage-badge is-present">
+                {documents.length} fichiers
+              </span>
+            ) : !isPresent ? (
               <span className={`coverage-badge is-${state}`}>{stateLabel}</span>
             ) : null}
           </div>
@@ -350,7 +355,12 @@ function ExpectedDocumentRow({
         </div>
       </div>
       {documents.length > 0 ? (
-        <div className="coverage-files">
+        <div
+          className={`coverage-files${hasScrollableFiles ? " is-scrollable" : ""}`}
+          role={hasScrollableFiles ? "region" : undefined}
+          aria-label={hasScrollableFiles ? `Fichiers pour ${expectation.label}` : undefined}
+          tabIndex={hasScrollableFiles ? 0 : undefined}
+        >
           {documents.map((document) => (
             <DocumentFile
               key={document.id}

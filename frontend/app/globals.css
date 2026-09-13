@@ -2252,6 +2252,7 @@ svg {
 .coverage-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 0.7rem;
   margin: 0;
   padding: 0;
@@ -2354,6 +2355,19 @@ svg {
 .coverage-files {
   border-top: 1px solid var(--line);
   background: #fbfcfb;
+}
+
+.coverage-files.is-scrollable {
+  max-height: min(23rem, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #b6c3bb transparent;
+  scrollbar-gutter: stable;
+}
+
+.coverage-files.is-scrollable:focus-visible {
+  outline: 3px solid rgba(49, 94, 82, 0.25);
+  outline-offset: -3px;
 }
 
 .document-file {
