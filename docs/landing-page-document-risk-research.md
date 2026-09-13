@@ -1,198 +1,131 @@
-# Risques documentaires avant un achat immobilier
+# Risques documentaires avant un achat immobilier : sources et positionnement Acquora
 
-Date de vérification : 6 septembre 2026  
-Périmètre : achat d'un logement existant en France, avec un focus sur l'appartement en copropriété  
-Objectif : identifier les chiffres utilisables sur la landing page d'Acquora sans exagérer la fréquence des erreurs
+## Conclusion
 
-## Conclusion éditoriale
+La recherche ne permet pas de soutenir l’affirmation « 50 % des DPE sont faux », ni de produire neuf taux comparables de documents erronés. La promesse commerciale pertinente est de **comprendre les travaux, charges, anomalies, contradictions et informations manquantes avant de s’engager**. Une pièce parfaitement exacte peut contenir une information défavorable à l’achat. À l’inverse, une incohérence documentaire ne prouve pas une fraude.
 
-Il n'existe pas de statistique publique robuste montrant que « 50 % des DPE sont faux ». Il n'existe pas non plus de taux national d'erreur pour chacune des autres familles de documents analysées par Acquora.
+Trois données peuvent illustrer les enjeux, avec leur périmètre visible : les anomalies électriques observées à la vente par l’ONSE, l’ancienneté de certaines dates d’AG enregistrées au RNIC et l’exposition des maisons aux argiles selon Géorisques. Elles ne mesurent ni la performance d’Acquora ni la probabilité qu’un dossier donné comporte un problème.
 
-La source institutionnelle la plus solide est le rapport 2025 de la Cour des comptes. Il retient une estimation de **1,7 % de DPE réalisés entre juillet 2021 et décembre 2023 qui pourraient avoir été manipulés près des seuils de classe**. Cette estimation provient d'une analyse économétrique du Conseil d'analyse économique. La Cour l'extrapole à environ 68 000 DPE suspects sur 4 millions de DPE en 2024. Il s'agit de soupçons statistiques de manipulation, pas d'un comptage de tous les DPE contenant une erreur.
+Cette note couvre les logements existants en France, maisons et appartements, avec une attention particulière à la copropriété. Les sources ont été consultées le 12 septembre 2026. Les dates des observations restent précisées lorsqu’elles sont antérieures à cette consultation. Les recommandations marketing sont des hypothèses à mesurer, pas des résultats d’expérimentation.
 
-Les chiffres proches de 50 %, 70 % ou 80 % que l'on rencontre en ligne mesurent généralement autre chose :
+## Périmètre du produit
 
-- des différences de classement sur de très petits échantillons de logements diagnostiqués plusieurs fois ;
-- l'écart entre consommation conventionnelle et consommation réelle, deux notions qui ne sont pas directement comparables ;
-- la part de professionnels ciblés par la DGCCRF qui présentent au moins un manquement commercial ou administratif ;
-- la part des logements anciens dans lesquels le diagnostic révèle effectivement une anomalie électrique.
+Le catalogue actuel comporte **huit familles attendues pour un appartement en copropriété, DPE inclus**, et quatre familles communes aux maisons. Les charges, comptes et appels de fonds sont regroupés dans une même famille d’interface. Ces catégories ne constituent pas une liste réglementaire exhaustive.
 
-La promesse la plus juste pour Acquora n'est donc pas « détecter des documents faux ». Elle est : **repérer dans un dossier réel les informations défavorables, les pièces périmées ou absentes, les contradictions entre documents et les coûts qui restent à clarifier avant de signer**.
+Référence produit : [catalogue des documents](../frontend/features/documents/document-catalog.ts). Le nombre de PDF peut être supérieur au nombre de familles : plusieurs exercices comptables, plusieurs PV, annexes ou diagnostics séparés. Le DPE et l’état des risques peuvent aussi être fournis à l’intérieur d’un dossier de diagnostics.
 
-## Ce que mesure vraiment le chiffre sur le DPE
+Le rapport doit distinguer quatre situations : un fait défavorable explicite, une conséquence possible à confirmer, une contradiction entre pièces et une absence d’information. Les statistiques nationales ne doivent jamais remplacer les preuves propres au bien.
 
-### Le chiffre institutionnel défendable
+## Fiabilité du DPE
 
-Le [rapport de la Cour des comptes sur la mise en œuvre du DPE](https://www.ccomptes.fr/sites/default/files/2025-06/20250603-Mise-en-oeuvre-diagnostic-performance-energetique.pdf), publié en juin 2025, distingue trois sujets :
+Le Focus n° 105 du Conseil d’analyse économique examine les concentrations de DPE du côté favorable des seuils de classes. Il estime à **1,7 %** la part de l’ensemble des DPE après la réforme de 2021 soupçonnés de manipulation aux seuils. Ce résultat ne mesure pas toutes les erreurs possibles, et ne permet pas d’identifier avec certitude un diagnostic frauduleux. La publication donne également 13 % au voisinage des seuils, un autre dénominateur qu’il faut impérativement conserver.[^1]
 
-1. Les limites de la méthode conventionnelle de calcul.
-2. Les erreurs de saisie ou d'application par le diagnostiqueur.
-3. Les manipulations intentionnelles destinées à franchir un seuil de classe.
+La Cour des comptes reprend le 1,7 % pour juillet 2021 à décembre 2023 dans son rapport de juin 2025. Elle souligne aussi les limites des tests de consommateurs sur de petits échantillons. Les tableaux de contrôle DGCCRF recensent **316 établissements avec anomalie sur 457 contrôlés en 2023, soit 69,2 %**. Ces contrôles portent sur les pratiques professionnelles et commerciales, auprès d’opérateurs ciblés. Ce n’est pas un taux de DPE inexacts.[^2]
 
-Aux pages 39 et 90, la Cour reprend l'étude du [Conseil d'analyse économique sur la fiabilité du DPE](https://cae-eco.fr/static/pdf/focus-105-fiabilite-dpe-240626.pdf). L'analyse observe une concentration anormale des DPE juste du côté favorable des seuils D/E, E/F et F/G. Elle estime :
+Une divergence mérite d’être conservée dans le dossier de sources : le Focus CAE accessible indique **3,2 % avant 2021** à sa page 5, tandis que la Cour reprend **3,9 %** à sa page 91. Sans explication établie de cet écart, aucune comparaison historique chiffrée n’est retenue dans la landing page. Le chiffre commun de 1,7 % reste une estimation historique, pas un indicateur de qualité des DPE établis en 2026.[^1][^2]
 
-- 3,9 % de l'ensemble des DPE suspects de manipulation avant juillet 2021 ;
-- 1,7 % pour les DPE réalisés entre juillet 2021 et décembre 2023 ;
-- environ 68 000 DPE susceptibles de présenter une aberration si ce taux est appliqué aux 4 millions de DPE de 2024.
+L’affirmation « 50 % des DPE sont faux » est donc écartée. Un écart entre facture réelle et consommation conventionnelle n’est pas non plus une démonstration suffisante : ces indicateurs ne décrivent pas le même usage du logement. La lecture des documents n’équivaut pas à une nouvelle mesure sur place.
 
-Cette méthode détecte un comportement agrégé autour des seuils. Elle ne détecte pas toutes les erreurs de mesure ou de saisie et elle ne prouve pas que chaque DPE repéré est frauduleux.
+**Décision éditoriale :** expliquer les limites de la vérification du DPE dans la FAQ, sans faire de la détection de fraude la promesse principale.
 
-### Pourquoi le chiffre de 50 % ne doit pas être utilisé
+## Électricité : une donnée récente et directement liée à la vente
 
-La Cour des comptes mentionne les enquêtes de 60 Millions de consommateurs et de l'UFC-Que Choisir dans lesquelles les mêmes logements ont reçu des classes différentes. Elle précise que ces tests reposent sur de petits échantillons, dont la représentativité et les conditions ne permettent pas une généralisation scientifique.
+Le baromètre ONSE 2025, fondé sur une analyse Diagamter, distingue **84,6 % d’installations présentant au moins une anomalie parmi 320 000 diagnostics de vente** et 74 % parmi 80 000 diagnostics de location. Il concerne des installations de plus de 15 ans. La valeur globale de 82,6 % mélange les deux populations.[^3]
 
-Une autre confusion fréquente consiste à comparer la consommation réelle d'un ménage avec la consommation conventionnelle du DPE. Le DPE décrit le logement pour un usage standardisé. Les factures dépendent aussi du nombre d'occupants, de la température choisie, de la météo et de la durée d'occupation. Un écart ne prouve donc pas que le DPE est erroné.
+Pour Acquora, le sous-ensemble vente est le plus pertinent. Il remplace le 83 % du baromètre 2024. L’ONSE est un observatoire de filière, pas un service statistique ministériel. Le corpus d’un opérateur ne doit pas être présenté comme un tirage aléatoire de toutes les ventes françaises. Une anomalie n’est pas systématiquement un danger immédiat ni un devis de rénovation.
 
-### Le chiffre de 69,2 % sur les diagnostiqueurs
+Formulation retenue : « 84,6 % des installations électriques de plus de 15 ans étudiées à la vente présentent une anomalie », avec taille du corpus, opérateur, édition et lien vers la page 2. **Le chiffre mesure les installations examinées, pas les erreurs de diagnostic.**
 
-En 2023, la DGCCRF a contrôlé 457 établissements de diagnostic immobilier et en a trouvé 316 avec au moins une anomalie, soit **69,2 %**. Le tableau complet figure page 94 du rapport de la Cour des comptes.
+## Copropriété : l’ancienneté des informations est un problème en soi
 
-Ce taux ne mesure pas la part de diagnostics faux :
+Le Sénat constate en 2024 une date de dernière AG approuvant les comptes vieille de plus de deux ans pour **90 000 copropriétés parmi 438 000 ayant renseigné cette date**. Le rapport précise que l’estimation dépend de la qualité des informations du RNIC. La référence correcte est la **page imprimée 28, également page 28 du PDF**, et non la page 27 indiquée précédemment.[^4]
 
-- les contrôles sont ciblés, notamment sur des professionnels déjà signalés ou ayant déjà présenté des manquements ;
-- la DGCCRF contrôle surtout le droit de la consommation, l'assurance, le matériel, l'indépendance et l'information précontractuelle ;
-- la Cour précise que la DGCCRF n'est pas compétente pour vérifier la qualité des DPE ;
-- la grande majorité des anomalies concernait l'information commerciale et administrative ;
-- les enquêtes ne permettent pas toujours de distinguer le DPE des autres diagnostics immobiliers.
+Une donnée ancienne dans le registre peut refléter une absence de mise à jour. Elle ne prouve donc pas qu’aucune AG ne s’est tenue, qu’un PV est faux ou qu’un immeuble est insolvable. La landing conserve la formulation « date d’AG », son dénominateur et cette réserve.
 
-Ce chiffre peut être expliqué dans un article de fond, mais il est trop facile à mal comprendre pour être utilisé seul comme accroche commerciale.
+Les données ANIL apportent un autre éclairage : parmi 41 655 consultations copropriété en 2018, 17,3 % concernaient les travaux, 14,1 % les charges ou impayés et 6,7 % le règlement. Elles décrivent des besoins de conseil, pas la fréquence des problèmes chez tous les acquéreurs. Elles confortent qualitativement les thèmes éditoriaux, sans devenir des chiffres de conversion.[^5]
 
-## Les huit familles de documents Acquora
+**Décision éditoriale :** montrer une question concrète sur des travaux évoqués mais non chiffrés. Distinguer explicitement une demande de devis, un vote et une somme effectivement imputable à l’acquéreur.
 
-Le produit demande actuellement huit familles, DPE inclus : DPE, dossier de diagnostics techniques, état des risques, taxe foncière, procès-verbaux d'assemblée générale, charges et comptes, règlement de copropriété, carnet d'entretien. Le dossier de diagnostics techniques contient lui-même plusieurs diagnostics. Il n'est donc pas exact de parler uniformément du « DPE et des huit autres documents ».
+## Risques naturels : actualiser la carte, conserver les unités
 
-| Famille | Existe-t-il un taux public d'erreur du document ? | Chiffre fiable et utile | Ce que ce chiffre signifie réellement | Usage recommandé |
-|---|---:|---|---|---|
-| DPE | Partiel | 1,7 % des DPE postérieurs à juillet 2021 pourraient être manipulés près d'un seuil | Soupçon statistique, pas taux de toutes les erreurs | Utilisable avec le mot « suspects » et la période |
-| Diagnostics techniques | Non | 69,2 % des établissements ciblés par la DGCCRF en 2023 avaient au moins un manquement | Manquements professionnels, surtout commerciaux, pas diagnostics faux | Ne pas utiliser seul sur la landing page |
-| État des risques | Non | Environ 11 millions de logements se trouvent dans l'enveloppe approchée du risque d'inondation, 54 % des maisons sont en zone d'exposition moyenne ou forte au retrait-gonflement des argiles | Exposition du bien, pas qualité du document | Très utile pour expliquer l'enjeu de lecture |
-| Taxe foncière | Partiel et non comparable | De 2017 à 2024, 394 391 dossiers par an en moyenne ont fait l'objet d'un dégrèvement pour erreur d'attribution, environ 1,2 % des contribuables assujettis | Avis envoyé au mauvais contribuable, pas erreur de montant ou de contenu du document vendeur | Réserver à la note de recherche |
-| PV d'assemblée générale | Non | Pour 90 000 copropriétés, la dernière AG approuvant les comptes remontait à plus de deux ans | Signal d'inactivité ou de donnée ancienne parmi 438 000 copropriétés renseignées | Utilisable avec le périmètre et la réserve sur la qualité du RNIC |
-| Charges et comptes | Non | 28 700 demandes en paiement de charges en justice en 2017, soit 29 % de plus qu'en 2007 | Volume de contentieux, pas erreurs comptables | Contexte éditorial, pas preuve de document erroné |
-| Règlement de copropriété | Non | 6,7 % des consultations copropriété des ADIL en 2018 concernaient le règlement | Besoin d'information juridique, pas taux de règlements incomplets | Contexte éditorial uniquement |
-| Carnet d'entretien | Non | Besoin de travaux en copropriété estimé à près de 9 milliards d'euros par an | Enjeu financier de l'entretien futur, pas qualité des carnets | Utilisable pour expliquer l'importance des coûts futurs |
+Géorisques indique que la carte actualisée en 2026 couvre **12,1 millions de maisons** en zone moyenne ou forte d’exposition au retrait-gonflement des argiles. Le dossier expert donne 61,5 % des maisons ; l’Observatoire national des risques naturels arrondit à 62 %. Les 55 % également cités concernent la **surface du territoire**, pas les maisons.[^6][^7]
 
-## Si les « huit autres documents » désignent les diagnostics réglementaires
+Le chiffre de 54 % repris du SDES dans la première recherche correspondait à une cartographie antérieure. Il ne doit pas être présenté comme l’état courant en septembre 2026. La page retient le nombre de maisons, qui évite la confusion entre pourcentages et leurs arrondis.
 
-Le nombre de diagnostics annexés à une vente n'est pas fixe. L'article L. 271-4 du Code de la construction et de l'habitation en liste jusqu'à douze, mais leur applicabilité dépend de l'âge du bâtiment, de celui des installations, de la localisation, du type d'assainissement, des équipements et de la nature du bien. Le tableau suivant répond séparément aux principaux diagnostics que l'on rencontre avec le DPE.
+L’exposition ne signifie pas qu’une maison présente des fissures. Acquora peut aider à lire un état des risques fourni ; la landing ne promet pas une interrogation automatique de Géorisques ni une expertise géotechnique. Une vérification à l’adresse et sur la cartographie actuelle reste distincte de la lecture du PDF.
 
-| Diagnostic | Taux public de rapports erronés | Donnée publique disponible | Conclusion |
-|---|---:|---|---|
-| Plomb, CREP | Non trouvé | Santé publique France mesure l'exposition et les cas de saturnisme, pas la fiabilité des CREP remis lors des ventes | Aucun pourcentage de CREP faux ne peut être avancé |
-| Amiante | Non trouvé | Un [rapport du Sénat de 2005](https://www.senat.fr/rap/r05-037-1/r05-037-185.html) décrit des limites de repérage et des diagnostics incomplets, sans produire de taux national | Le risque de faux négatif est reconnu qualitativement, pas quantifié à l'échelle nationale |
-| Termites | Non trouvé | Les sources publiques décrivent les zones et l'obligation de diagnostic, sans série nationale de contre-expertises | Aucun taux défendable trouvé |
-| Gaz | Non trouvé | Le [ministère de la Transition écologique](https://www.ecologie.gouv.fr/politiques-publiques/diagnostics-techniques-immobiliers) rappelle que 98 % des accidents, fuites et explosions recensés concernent les installations intérieures, mais ce chiffre ne mesure pas la fiabilité du diagnostic | Utiliser ce chiffre seulement pour expliquer l'enjeu de sécurité |
-| Électricité | Non trouvé | L'ONSE estime que 83 % des installations de plus de 15 ans présentent au moins une anomalie | Ce taux mesure ce que le diagnostic révèle dans le logement, pas les erreurs du rapport |
-| État des risques | Non trouvé | Le SDES mesure l'exposition des logements aux inondations et aux argiles, pas les erreurs des états remis aux acquéreurs | Vérifier l'adresse, la date et les arrêtés plutôt que promettre un taux d'erreur |
-| Assainissement non collectif | Non trouvé | [Eaufrance indique que 63 % des dispositifs étaient conformes en 2024](https://www.eaufrance.fr/chiffres-cles/part-des-dispositifs-dassainissement-non-collectif-conformes-en-2024) | Environ 37 % ne sont donc pas classés conformes dans cet indicateur, mais le document de contrôle peut les décrire correctement |
-| Bruit des aérodromes | Non trouvé | Les sources publiques cartographient les plans d'exposition au bruit, sans audit national des formulaires de vente | Aucun taux défendable trouvé |
-| Mérule | Non trouvé | Il s'agit d'une information de risque dans les zones définies par arrêté, pas toujours d'un diagnostic réalisé par un opérateur | Aucun taux défendable trouvé |
+**Décision éditoriale :** employer cette donnée pour rappeler que la visite ne suffit pas à apprécier tous les risques, avec le lien de source directement accessible.
 
-La recherche n'a donc identifié **aucun taux national de rapports erronés comparable au travail économétrique disponible sur le DPE**. Pour ces pièces, la bonne approche produit consiste à vérifier l'applicabilité, l'identité du bien, la certification de l'opérateur, la date de validité, les zones non inspectées, les conclusions et les contradictions avec les autres documents.
+## Résultats pour les huit familles Acquora
 
-## Chiffres complémentaires par problème acheteur
+« Non trouvé » signifie qu’aucun indicateur national suffisamment étayé n’a été identifié dans les sources consultées. Ce n’est ni une preuve d’absence d’erreurs ni un recensement exhaustif de toutes les publications.
 
-### Sécurité électrique
+| Famille | Taux de documents erronés | Donnée ou source pertinente | Utilité pour l’acheteur | Décision landing |
+|---|---|---|---|---|
+| DPE | Estimation partielle de manipulations aux seuils, pas de toutes les erreurs | CAE, Cour des comptes [1, 2] | Comprendre les données et repérer des divergences apparentes | FAQ sur les limites, aucun taux d’erreur promis |
+| Diagnostics techniques | Non trouvé par diagnostic | ONSE 2025 pour l’état électrique [3] | Lire anomalies, réserves et parties non visitées | Chiffre vente avec périmètre |
+| État des risques | Non trouvé | Cartographie Géorisques 2026 [6, 7] | Vérifier exposition mentionnée, adresse et date | Nombre de maisons exposées, sans diagnostic individuel |
+| Taxe foncière | Pas de taux d’erreur des avis remis à la vente | Rapport parlementaire sur les erreurs d’attribution [8] | Relire année, bien concerné et montant | Description du budget, sans statistique accrocheuse |
+| PV d’AG | Non trouvé | Dates renseignées au RNIC, Sénat [4] | Retrouver travaux, décisions et suites d’une AG à l’autre | Date d’AG avec réserve déclarative |
+| Charges et comptes | Non trouvé | Consultations ADIL [5] | Distinguer budget, dépenses, provisions et impayés | Exemple de montants à rapprocher |
+| Règlement de copropriété | Non trouvé | ANIL et pièces de vente, Service Public [5, 9] | Comprendre lot, destination, restrictions et modificatifs | Famille visible dans la liste des documents |
+| Carnet d’entretien | Non trouvé | Pièces de vente, Service Public [9] | Lire historique et entretien des équipements | Exemple d’une pièce à demander |
 
-Le [baromètre 2024 de l'Observatoire national de la sécurité électrique](https://www.onse.fr/resultats-publications/), cité dans une [question écrite au Sénat](https://www.senat.fr/questions/base/2024/qSEQ240511619.html), indique que **83 % des installations électriques de plus de 15 ans dans les logements comportent au moins une anomalie**. Les plus fréquentes concernent la terre, le matériel vétuste ou inadapté et le risque de contact avec des éléments sous tension.
+Le rapport parlementaire sur les impôts locaux mentionne en moyenne **394 391 dossiers annuels** de dégrèvement pour erreur d’attribution entre 2017 et 2024, environ 1,2 % des contribuables concernés. En 2024, il indique 134 642 dossiers. L’erreur d’attribution correspond à un avis envoyé au mauvais contribuable ; elle ne mesure pas les erreurs de montant des avis fournis aux acheteurs. Cette donnée reste en recherche, hors landing.[^8]
 
-Ce chiffre montre pourquoi le diagnostic mérite d'être lu. Il ne montre pas que 83 % des diagnostics sont faux. Il porte précisément sur les installations qui entrent dans le champ du diagnostic obligatoire en raison de leur ancienneté.
+L’étude ministérielle de 2019 sur les contentieux de copropriété compte près de 28 700 demandes en paiement des charges en 2017, contre 22 300 en 2007. Ce volume historique de contentieux n’est ni une proportion de comptabilités erronées ni un indicateur actuel. Il n’est pas retenu en accroche.[^10]
 
-### Risques naturels
+## Diagnostics susceptibles d’être compris comme les « huit autres documents »
 
-Le [Service des données et études statistiques du ministère de la Transition écologique](https://www.statistiques.developpement-durable.gouv.fr/les-risques-naturels-en-france-etat-des-connaissances-en-2025) estime :
+Les diagnostics regroupés avec le DPE varient selon le logement. Les sources publiques décrivent des obligations, des expositions ou des anomalies physiques. Elles ne fournissent pas un même dispositif de contre-expertise permettant de comparer leur taux d’erreur.[^11]
 
-- qu'environ 11 millions de logements sont implantés dans l'enveloppe approchée du risque d'inondation par débordement de cours d'eau ;
-- que ces logements abritent près de 18 millions de personnes, soit 26,5 % de la population ;
-- que 54 % des maisons individuelles sont situées dans une zone d'exposition moyenne ou forte au retrait-gonflement des argiles.
+| Diagnostic ou information | Résultat de la recherche | Conséquence éditoriale |
+|---|---|---|
+| Plomb, CREP | Service Public décrit le diagnostic et Santé publique France la surveillance du saturnisme. Aucun taux national de CREP erronés identifié [12, 13] | Ne pas transformer des cas sanitaires en probabilité de rapport faux |
+| Amiante | Le Sénat documentait les limites du repérage en 2005, puis en 2014. Sources historiques qualitatives [14] | Ne pas en déduire un taux de faux négatifs en 2026 |
+| Termites | Le ministère décrit les zones et modalités du diagnostic, sans série nationale d’erreurs identifiée [11] | Parler de conclusions, localisation et périmètre inspecté |
+| Gaz | Le ministère cite 98 % des accidents, fuites et explosions dans les installations intérieures, sans millésime statistique suffisamment explicite pour une accroche actuelle [11] | Exclure ce chiffre de la landing ; ce n’est pas un taux de diagnostics faux |
+| Électricité | Anomalies d’installations documentées par l’ONSE, pas taux de rapports incorrects [3] | Utilisable avec les limites exposées plus haut |
+| État des risques | Données d’exposition Géorisques, pas audit national des formulaires [6, 7] | Ne pas confondre zone exposée et sinistre avéré |
+| Assainissement non collectif | Eaufrance publie 63 % de dispositifs conformes en 2024 [15] | Ne pas transformer le complément en 37 % de rapports erronés ou en devis automatique |
+| Bruit des aérodromes | Service Public décrit l’information liée aux plans d’exposition, sans taux d’erreur identifié [16] | Lire localisation et zone ; ne pas inventer de fréquence nationale |
+| Mérule | Information contextuelle décrite parmi les diagnostics et informations immobilières [11] | Ne pas promettre la détection d’un champignon absent des pièces |
 
-L'état des risques est déclaratif et dépend de la localisation précise, de la date et des arrêtés applicables. Un chiffre national ne permet pas de conclure sur un bien, d'où l'importance d'une vérification à l'adresse.
+Pour l’assainissement, l’indicateur SISPEA et son périmètre doivent être examinés avant tout usage commercial plus précis. La conformité d’un dispositif constitue une observation technique ; le rapport peut parfaitement décrire un dispositif non conforme.[^15]
 
-### Copropriété et assemblées générales
+## Ce que la landing doit faire comprendre
 
-La [commission d'enquête du Sénat sur la paupérisation des copropriétés](https://www.senat.fr/rap/r23-736-1/r23-736-11.pdf) indique page 27 que, parmi 438 000 copropriétés ayant renseigné la date de leur dernière AG dans le registre national :
+La première visite donne envie d’acheter. Les pièces permettent de poser des questions sur les dépenses, l’état du bien et la copropriété. Acquora doit relier ces deux moments avec un bénéfice précis : rendre les points documentés plus faciles à trouver et à discuter.
 
-- 90 000 avaient une dernière AG approuvant les comptes datant de plus de deux ans ;
-- 23 000 avaient une dernière AG datant de plus de cinq ans.
+L’ordre proposé est : promesse acheteur, préoccupations concrètes, exemple de rapport, chiffres de contexte, familles de documents, fonctionnement, objections et création de dossier. L’exemple arrive avant les statistiques pour montrer la valeur réelle du service. Les institutions sont citées comme sources, sans logos suggérant une validation d’Acquora.
 
-Le rapport formule une réserve explicite sur la qualité des données saisies dans le registre. Ces chiffres ne prouvent pas qu'un PV remis à l'acheteur est erroné. Ils montrent que l'absence de document récent peut elle-même être une information importante.
+Les formulations suivantes sont exclues : garantie d’absence de risque, détection certaine de fraude, économies moyennes sans données clients, délais d’analyse non mesurés, avis ou clients inventés. Un exemple fictif doit être identifié visiblement. Ses pages ne doivent jamais passer pour des citations de documents réellement fournis.
 
-La même commission estime, à partir des travaux de la Banque des territoires, un besoin de financement proche de **9 milliards d'euros de travaux par an**, correspondant à un peu plus de 18 000 copropriétés et 366 000 logements, pour un coût moyen d'environ 24 000 euros par logement. Le montant collectif ne doit jamais être transformé en quote-part acheteur sans appliquer la bonne clé de charges et vérifier les décisions votées.
+Pour chaque constat, la bonne articulation est : **ce que dit la pièce, pourquoi cela mérite attention, ce qui reste inconnu, puis la question à poser**. Une somme de travaux d’immeuble ne devient pas une charge personnelle sans clé de répartition et contexte de paiement. Deux montants différents ne sont contradictoires qu’après vérification de leur périmètre.
 
-### Questions réellement posées aux ADIL
+## Limites et mise à jour
 
-Dans son [étude sur la réforme du droit de la copropriété](https://www.anil.org/etudes-reforme-droit-copropriete-reseau-anil-adil/), l'ANIL analyse 41 655 consultations copropriété réalisées en 2018. Près de 65,8 % portaient sur quatre thèmes :
+Le corpus contient des publications institutionnelles, une étude économique et un baromètre professionnel. Leur autorité ne rend pas leurs populations interchangeables. Les échantillons ciblés, les déclarations de registre et les données historiques conservent leurs limites même lorsqu’un organisme public les reprend.
 
-- les travaux, 17,3 % ;
-- le syndic, 17,2 % ;
-- l'organisation de l'assemblée générale, 16,3 % ;
-- le décompte de charges ou les impayés, 14,1 %.
+L’absence de taux national par document interdit une promesse chiffrée générale sur les « dossiers faux ». Elle laisse une proposition utile : aider l’acheteur à comprendre les éléments réellement présents, les pièces absentes et les contradictions possibles.
 
-Ces données confortent un positionnement par problèmes concrets : travaux, décisions, charges et gestion. Elles ne mesurent ni des erreurs ni la fréquence des risques dans l'ensemble des copropriétés.
+Les statistiques choisies sont du contexte. Une hausse de conversion, une baisse des mauvaises décisions ou une fiabilité accrue d’Acquora doivent être établies séparément. Le plan d’acquisition, de mesure et les choix d’implémentation figurent dans [la stratégie SEO et conversion](landing-page-seo-conversion-strategy.md).
 
-### Taxe foncière
+## Sources
 
-Un [rapport d'information de l'Assemblée nationale sur les dysfonctionnements des impôts locaux](https://questions.assemblee-nationale.fr/dyn/opendata/RINFANR5L17B1594.html), publié en 2025, indique que les dégrèvements pour erreurs d'attribution de taxe foncière ont concerné en moyenne 394 391 dossiers par an de 2017 à 2024, environ 1,2 % des contribuables assujettis. Ces erreurs provenaient principalement des retards de mise à jour du fichier immobilier après un changement de propriétaire.
-
-Ce taux ne permet pas d'affirmer qu'environ 1,2 % des avis de taxe foncière fournis dans un dossier de vente sont faux. Il ne couvre pas les erreurs de surface, de catégorie, d'éléments de confort ou de montant.
-
-## Sources juridiques qui justifient le contrôle de complétude
-
-L'[article L. 271-4 du Code de la construction et de l'habitation](https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000049398848/2026-03-31) liste les pièces du dossier de diagnostic technique applicables selon le bien : plomb, amiante, termites, gaz, état des risques, DPE et audit éventuel, électricité, assainissement, information mérule, bruit et autres pièces contextuelles.
-
-Le [ministère de la Transition écologique](https://www.ecologie.gouv.fr/politiques-publiques/diagnostics-techniques-immobiliers) rappelle que les diagnostics n'ont pas tous le même champ ni la même durée de validité. Par exemple, les diagnostics gaz et électricité pour une vente ont une validité de trois ans et l'état des risques doit dater de moins de six mois.
-
-Pour une vente en copropriété, [Service Public](https://www.service-public.gouv.fr/particuliers/vosdroits/F37190) liste notamment les documents suivants : règlement et état descriptif de division, fiche synthétique, carnet d'entretien, conclusions du diagnostic technique global, plan pluriannuel de travaux ou projet, procès-verbaux des trois dernières AG, charges payées sur deux exercices, fonds travaux, impayés et dettes fournisseurs.
-
-La complexité ne vient donc pas d'un nombre fixe de PDF. Elle vient de l'applicabilité, de la période couverte, des versions, du périmètre du lot et des rapprochements nécessaires entre les pièces.
-
-## Recommandation pour la landing page
-
-### Positionnement
-
-Parler d'abord de la décision de l'acheteur :
-
-> Le bien vous plaît. Les documents peuvent encore changer la décision.
-
-Puis nommer les quatre peurs concrètes :
-
-1. Découvrir des travaux ou des appels de fonds après la signature.
-2. Sous-estimer les charges et la fragilité financière de la copropriété.
-3. Se fier à une étiquette, une surface ou une conclusion sans vérifier son périmètre.
-4. Ne pas voir qu'une pièce manque, est périmée ou contredit une autre source.
-
-### Chiffres à afficher
-
-Trois chiffres sont assez robustes et complémentaires :
-
-- **1,7 %** de DPE postérieurs à juillet 2021 statistiquement suspects de manipulation près d'un seuil, avec mention de la période et du caractère estimatif ;
-- **83 %** des installations électriques de plus de 15 ans comportant au moins une anomalie, présenté comme risque détecté par le diagnostic et non comme défaut du diagnostic ;
-- **90 000** copropriétés dont la dernière AG approuvant les comptes datait de plus de deux ans dans l'échantillon renseigné du RNIC, avec la réserve méthodologique accessible.
-
-Le chiffre de 1,7 % est utile pour corriger une croyance, mais il n'est pas le meilleur titre de conversion. Il peut donner l'impression que le risque documentaire est rare alors que le produit traite surtout des faits défavorables, des omissions et des incohérences. La landing page peut donc privilégier les deux autres chiffres et réserver le détail DPE à une note de source.
-
-### Formulations à éviter
-
-- « 50 % des DPE sont faux »
-- « 70 % des diagnostiqueurs fraudent »
-- « 83 % des diagnostics électriques sont erronés »
-- « Acquora vérifie juridiquement les documents »
-- « Acquora garantit qu'il n'y a aucun risque »
-- « Acquora calcule le coût certain des travaux »
-
-### Formulations sûres
-
-- « Repérez ce qui mérite une vérification avant de signer. »
-- « Voyez les travaux évoqués, les charges à venir et les informations manquantes. »
-- « Chaque constat renvoie au document et à la page qui le justifient. »
-- « Acquora distingue les faits confirmés, les incohérences et les points à clarifier. »
-- « Le rapport aide à préparer les bonnes questions pour le vendeur, le syndic et le notaire. »
-
-## Limites de cette recherche
-
-- Les données de contrôle de la DGCCRF sont ciblées et ne décrivent pas l'ensemble de la profession.
-- Les organismes de certification ne publient pas de base nationale consolidée donnant le taux d'erreur des rapports par domaine.
-- Les décisions de justice décrivent les dossiers arrivés au contentieux, pas tous les achats immobiliers.
-- Les données du RNIC sont déclaratives et leur qualité est explicitement discutée par le Sénat.
-- Les statistiques d'exposition ou d'anomalie d'une installation mesurent le risque contenu dans le bien, pas l'exactitude du PDF.
-- Une absence de statistique ne signifie pas une absence de risque. Elle interdit seulement d'afficher un pourcentage national non démontré.
+[^1]: Conseil d’analyse économique, [Les effets des réformes du diagnostic de performance énergétique sur sa fiabilité, Focus n° 105](https://cae-eco.fr/static/pdf/focus-105-fiabilite-dpe-240626.pdf), juin 2024, notamment pages PDF 1 et 5. Étude économétrique des distributions aux seuils.
+[^2]: Cour des comptes, [La mise en œuvre du diagnostic de performance énergétique](https://www.ccomptes.fr/sites/default/files/2025-06/20250603-Mise-en-oeuvre-diagnostic-performance-energetique.pdf), juin 2025, notamment pages 39, 90, 91 et 94. La page 91 porte la synthèse de l’étude CAE ; la page 94 contient les contrôles DGCCRF.
+[^3]: Observatoire national de la sécurité électrique, [Baromètre 2025](https://www.onse.fr/wp-content/uploads/2025/05/Barometre-ONSE-2025_020525.pdf), édition 2025, pages PDF 1 et 2, analyse Diagamter. La page 2 sépare vente et location.
+[^4]: Sénat, commission d’enquête, [La paupérisation des copropriétés immobilières](https://www.senat.fr/rap/r23-736-1/r23-736-11.pdf#page=28), rapport n° 736, juillet 2024, page 28, note 5 pour le dénominateur et la réserve RNIC.
+[^5]: ANIL, [Réforme du droit de la copropriété : remarques du réseau ANIL-ADIL](https://www.anil.org/etudes-reforme-droit-copropriete-reseau-anil-adil/), février 2020, consultations de 2018.
+[^6]: Géorisques, [Dossier expert sur le retrait-gonflement des argiles](https://www.georisques.gouv.fr/consulter-les-dossiers-thematiques/retrait-gonflement-des-argiles), cartographie actualisée en 2026, rubrique sur les 12 millions de maisons exposées.
+[^7]: Géorisques, [Observatoire national des risques naturels](https://www.georisques.gouv.fr/observatoire-national-des-risques-naturels), indicateurs d’exposition RGA 2026. Arrondi à 62 % à distinguer du 61,5 % du dossier expert et des 55 % de surface territoriale.
+[^8]: Assemblée nationale, [Rapport d’information sur les dysfonctionnements dans la gestion des impôts locaux](https://www.assemblee-nationale.fr/dyn/opendata/RINFANR5L17B1594.html), n° 1594, 18 juin 2025, partie sur les erreurs d’attribution.
+[^9]: Service Public, [Achat d’un logement en copropriété](https://www.service-public.gouv.fr/particuliers/vosdroits/F37190), fiche en vigueur consultée le 12 septembre 2026, documents remis lors de la vente.
+[^10]: Ministère de la Justice, [Les contentieux de la copropriété](https://www.dalloz-actualite.fr/sites/dalloz-actualite.fr/files/resources/2019/02/dacsmjcontentieuxcopro.pdf), étude de 2019 sur 2007 à 2017, copie de la publication ministérielle hébergée par Dalloz. Source historique exclue des accroches.
+[^11]: Ministère chargé du logement, [Diagnostics techniques immobiliers](https://www.ecologie.gouv.fr/politiques-publiques/diagnostics-techniques-immobiliers), page consultée le 12 septembre 2026, rubriques par diagnostic. La présence d’une règle sur cette page n’établit pas son implémentation dans Acquora.
+[^12]: Service Public, [Constat de risque d’exposition au plomb](https://www.service-public.gouv.fr/particuliers/vosdroits/F1142), fiche consultée le 12 septembre 2026.
+[^13]: Santé publique France, [Surveillance du saturnisme infantile en Occitanie](https://www.santepubliquefrance.fr/content/download/730036/4702772?version=1), bulletin du 13 juin 2025. Surveillance sanitaire distincte d’une évaluation de la fiabilité des CREP.
+[^14]: Sénat, [Amiante : des enjeux toujours actuels, relever le défi du désamiantage](https://www.senat.fr/notice-rapport/2013/r13-668-notice.html), rapport n° 668, 2014 ; antécédent : [rapport sur le drame de l’amiante](https://www.senat.fr/rap/r05-037-1/r05-037-1.html), 26 octobre 2005.
+[^15]: Eaufrance, [Part des dispositifs d’assainissement non collectif conformes en 2024](https://www.eaufrance.fr/chiffres-cles/part-des-dispositifs-dassainissement-non-collectif-conformes-en-2024), indicateur 2024 fondé sur SISPEA, consulté le 12 septembre 2026.
+[^16]: Service Public, [Diagnostic Bruit des aéroports](https://www.service-public.gouv.fr/particuliers/vosdroits/F35266), vérifié le 20 août 2026.
