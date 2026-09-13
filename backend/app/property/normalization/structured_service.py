@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from uuid import UUID
 
 from app.documents.classification.models import DocumentClassificationRecord, DocumentType
 from app.documents.llm_content import extraction_as_numbered_text, page_source_text
@@ -73,6 +74,7 @@ class StructuredExtractionService:
         document: DocumentRecord,
         extraction: DocumentExtractionRecord,
         classifications: Sequence[DocumentClassificationRecord],
+        user_id: UUID,
     ) -> StructuredExtractionRecord:
         if not classifications:
             raise UnsupportedStructuredDocument("No classified segment was supplied")
@@ -103,6 +105,8 @@ class StructuredExtractionService:
                     system_prompt=AG_EXTRACTION_SYSTEM_PROMPT,
                     user_content=content,
                     response_model=AgMinutesExtractionCandidate,
+                    user_id=user_id,
+                    document_id=document.id,
                 )
                 facts = normalize_ag_minutes_candidate(
                     ag_result.output, document_id=document.id, pages=pages
@@ -121,6 +125,8 @@ class StructuredExtractionService:
                     system_prompt=FINANCIAL_EXTRACTION_SYSTEM_PROMPT,
                     user_content=content,
                     response_model=FinancialExtractionCandidate,
+                    user_id=user_id,
+                    document_id=document.id,
                 )
                 financial_facts = normalize_financial_candidate(
                     financial_result.output, document_id=document.id, pages=pages
@@ -139,6 +145,8 @@ class StructuredExtractionService:
                     system_prompt=DIAGNOSTIC_EXTRACTION_SYSTEM_PROMPT,
                     user_content=content,
                     response_model=DiagnosticExtractionCandidate,
+                    user_id=user_id,
+                    document_id=document.id,
                 )
                 diagnostic_facts = normalize_diagnostics_candidate(
                     diagnostic_result.output, document_id=document.id, pages=pages

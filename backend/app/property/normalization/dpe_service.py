@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from time import perf_counter
+from uuid import UUID
 
 from starlette.concurrency import run_in_threadpool
 
@@ -61,6 +62,7 @@ class DpeExtractionService:
         document: DocumentRecord,
         extraction: DocumentExtractionRecord,
         classifications: Sequence[DocumentClassificationRecord],
+        user_id: UUID,
     ) -> DpeExtractionRecord:
         existing = self.repository.get_dpe_extraction(document.id)
         if existing is not None:
@@ -92,6 +94,8 @@ class DpeExtractionService:
                     page_numbers=page_numbers,
                 ),
                 response_model=DpeExtractionCandidate,
+                user_id=user_id,
+                document_id=document.id,
             )
             pages = page_source_text(extraction, page_numbers=page_numbers)
             facts = normalize_dpe_candidate(

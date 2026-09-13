@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Protocol, TypeVar
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from openai import AsyncOpenAI
@@ -28,6 +29,8 @@ class StructuredOutputClient(Protocol):
         system_prompt: str,
         user_content: str,
         response_model: type[StructuredModel],
+        user_id: UUID,
+        document_id: UUID,
     ) -> StructuredOutputResult[StructuredModel]: ...
 
 
@@ -43,6 +46,8 @@ class OpenAIStructuredOutputClient:
         system_prompt: str,
         user_content: str,
         response_model: type[StructuredModel],
+        user_id: UUID,
+        document_id: UUID,
     ) -> StructuredOutputResult[StructuredModel]:
         response = await self._client.responses.parse(
             model=OPENAI_MODEL,
@@ -51,6 +56,10 @@ class OpenAIStructuredOutputClient:
                 {"role": "user", "content": user_content},
             ],
             text_format=response_model,
+            metadata={
+                "user_id": str(user_id),
+                "document_id": str(document_id),
+            },
             store=True,
         )
         if response.output_parsed is None:
