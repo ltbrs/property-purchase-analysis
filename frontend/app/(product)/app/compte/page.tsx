@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { auth, signOut } from "@/auth";
-import { marketingRoutes, productRoutes } from "@/lib/routes";
+import { signOutCurrentSession } from "@/features/auth/actions";
+import { productRoutes } from "@/lib/routes";
+import { createClient } from "@/lib/supabase/server";
 
 function initials(name: string | null | undefined) {
   if (!name) return "A";
@@ -13,8 +14,28 @@ function initials(name: string | null | undefined) {
 }
 
 export default async function AccountPage() {
-  const session = await auth();
-  if (!session?.user) redirect(productRoutes.signIn);
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) redirect(productRoutes.signIn);
+
+  const user = data.user;
+  const metadata = user.user_metadata;
+  const displayName =
+    typeof metadata.full_name === "string"
+      ? metadata.full_name
+      : typeof metadata.name === "string"
+        ? metadata.name
+        : null;
+  const providers = Array.from(
+    new Set(user.identities?.map(({ provider }) => provider) ?? []),
+  );
+  const providerLabels: Record<string, string> = {
+    email: "E-mail et mot de passe",
+    google: "Google",
+  };
+  const providerDescription = providers.length
+    ? providers.map((provider) => providerLabels[provider] ?? provider).join(", ")
+    : "Compte Supabase";
 
   return (
     <section className="account-page" aria-labelledby="account-title">
@@ -26,19 +47,14 @@ export default async function AccountPage() {
 
       <div className="account-card">
         <div className="account-avatar" aria-hidden="true">
-          {initials(session.user.name)}
+          {initials(displayName)}
         </div>
         <div className="account-identity">
-          <strong>{session.user.name ?? "Compte Google"}</strong>
-          <span>{session.user.email}</span>
-          <small>Connecté avec Google</small>
+          <strong>{displayName ?? "Compte Acquora"}</strong>
+          <span>{user.email}</span>
+          <small>{providerDescription}</small>
         </div>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: marketingRoutes.home });
-          }}
-        >
+        <form action={signOutCurrentSession}>
           <button
             className="sign-out-button"
             data-product-analytics-reset

@@ -15,4 +15,6 @@ export const productRoutes = {
   analysis: "/app/analyse",
   account: "/app/compte",
   signIn: "/connexion",
+  forgotPassword: "/mot-de-passe-oublie",
+  updatePassword: "/reinitialiser-mot-de-passe",
 } as const;

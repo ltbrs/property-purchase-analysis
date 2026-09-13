@@ -79,3 +79,15 @@ def test_blank_proxy_secrets_are_treated_as_unconfigured() -> None:
 
     assert settings.contact_proxy_secret is None
     assert settings.backend_proxy_secret is None
+
+
+def test_supabase_url_is_normalized() -> None:
+    settings = Settings.model_validate({"supabase_url": " https://project.supabase.co/ "})
+
+    assert settings.supabase_url == "https://project.supabase.co"
+
+
+def test_blank_supabase_url_is_treated_as_unconfigured() -> None:
+    settings = Settings.model_validate({"supabase_url": "  "})
+
+    assert settings.supabase_url is None

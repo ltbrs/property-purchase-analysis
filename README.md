@@ -32,7 +32,7 @@ backend/              FastAPI application managed with uv
 
 ## Prerequisites
 
-- Node.js 20.9 or newer and npm
+- Node.js 22 or newer and npm
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
 - Docker with Compose, only if running PostgreSQL locally
@@ -52,6 +52,8 @@ The initial scaffold recognizes these variables:
 | --- | --- |
 | `APP_ENV` | Backend runtime environment (`development` by default) |
 | `FRONTEND_ORIGIN` | Allowed browser origin for the API |
+| `SUPABASE_URL` | Supabase project URL used to validate Auth access tokens |
+| `SUPABASE_JWT_AUDIENCE` | Required Auth token audience (`authenticated` by default) |
 | `DATABASE_URL` | PostgreSQL connection URL |
 | `POSTGRES_DB` | Local Compose database name |
 | `POSTGRES_USER` | Local Compose database user |
@@ -71,24 +73,26 @@ The frontend-specific file recognizes:
 
 | Variable | Purpose |
 | --- | --- |
-| `AUTH_SECRET` | Random secret used to encrypt Auth.js sessions |
-| `AUTH_URL` | Canonical Auth.js URL (`https://acquora.fr` in production) |
-| `AUTH_GOOGLE_ID` | Google OAuth client ID |
-| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `NEXT_PUBLIC_SITE_URL` | Canonical application origin (`https://acquora.fr` in production) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL used by Auth |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-safe Supabase publishable key |
 | `BACKEND_API_URL` | Private API base URL used by the authenticated Next.js boundary |
-| `BACKEND_PROXY_SECRET` | Shared secret that protects authenticated identity headers |
+| `BACKEND_PROXY_SECRET` | Shared secret that protects the private frontend-to-backend boundary |
 | `CONTACT_PROXY_SECRET` | Shared secret for the public contact proxy and rate limiting |
 | `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token for product analytics |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host |
 
-Create a Google OAuth web client with these authorized redirect URIs:
+Create a Google OAuth web client with the Supabase callback shown on the Google
+provider page. It has this form:
 
 ```text
-http://localhost:3000/api/auth/callback/google
-https://your-domain.example/api/auth/callback/google
+https://PROJECT_REF.supabase.co/auth/v1/callback
 ```
 
-Generate `AUTH_SECRET` with `npx auth secret` from the `frontend` directory.
+Configure `http://localhost:3000/auth/callback` and
+`https://acquora.fr/auth/callback` in the Supabase Auth redirect allow list.
+Production password authentication also requires custom SMTP and confirmed-email
+templates in Supabase Auth.
 
 The model is deliberately fixed to `gpt-5.6-luna` in the server-side adapter; it
 cannot be selected by a request or changed through environment configuration.
@@ -245,11 +249,12 @@ a chatbot. The document list exposes a dedicated DPE detail view containing norm
 facts, provenance pages, the ADEME verification result, and the origin of the rating.
 Secure source-document links and in-document page inspection remain step 14.
 
-Ownership is checked in every case-scoped database query. Google OAuth sessions are
-handled by Auth.js in Next.js. Browser API calls pass through an authenticated Next.js
-route, which derives a stable UUID from the Google account and injects `X-User-Id`
-server-side. The FastAPI service must remain private behind that boundary in production
-so clients cannot assert this header directly.
+Ownership is checked in every case-scoped database query. Supabase Auth handles Google
+OAuth and confirmed e-mail and password sessions through PKCE and server-managed
+cookies. Browser API calls pass through an authenticated Next.js route that forwards
+the short-lived Supabase access token. FastAPI verifies its signature, issuer,
+audience, expiry, role, and user UUID before any repository access. The private proxy
+secret remains a second server-to-server boundary in production.
 
 ## Architecture direction
 

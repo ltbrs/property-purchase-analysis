@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
     contact_proxy_secret: SecretStr | None = None
     backend_proxy_secret: SecretStr | None = None
+    supabase_url: str | None = None
+    supabase_jwt_audience: str = "authenticated"
     contact_short_rate_limit: int = Field(default=5, ge=1, le=100)
     contact_daily_rate_limit: int = Field(default=20, ge=1, le=1000)
 
@@ -64,6 +66,14 @@ class Settings(BaseSettings):
     def empty_secret_is_unconfigured(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("supabase_url", mode="before")
+    @classmethod
+    def normalize_optional_url(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip().rstrip("/")
+            return value or None
         return value
 
 
