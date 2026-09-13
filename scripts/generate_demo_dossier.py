@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pymupdf==1.26.7"]
+# ///
 """Generate the lightweight, synthetic Lyon demo dossier.
 
-The PDFs intentionally use only built-in Type 1 fonts and compressed text streams.
-This keeps them small, searchable, and suitable for the same extraction pipeline as
-user-uploaded PDFs. No third-party Python dependency is required.
+The DPE populates a pinned official PDF specimen using PyMuPDF. Other documents
+use built-in Type 1 fonts and compressed text streams. All remain searchable.
+Run with: uv run scripts/generate_demo_dossier.py
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ import zlib
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
+
+from demo_dpe import PAGE_TITLES as DPE_PAGE_TITLES, TEMPLATE_URL, build_dpe_pdf
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "docs" / "demo-dossier-lyon"
@@ -638,66 +644,7 @@ DOCUMENTS = [
         covered_period_start=None,
         covered_period_end=None,
         purpose="Performance énergétique, émissions, coûts et recommandations.",
-        pages=[
-            [
-                E("h1", "Diagnostic de performance énergétique"),
-                E("lead", "Logement existant • établi le 25/08/2026"),
-                E(
-                    "callout",
-                    "Identifiant : DEMO-DPE-LYON-001 • non interrogeable dans le registre ADEME",
-                ),
-                E("kv", "Adresse|24 rue des Tisseurs, 69004 Lyon"),
-                E("kv", "Lot principal|18"),
-                E("kv", "Surface habitable prise en compte|64,80 m²"),
-                E("kv", "Année de construction|1898"),
-                E("kv", "Type|Appartement au 3e étage"),
-                E("kv", "Date de visite|25/08/2026"),
-                E("kv", "Valable jusqu'au|24/08/2036"),
-            ],
-            [
-                E("h1", "Performance énergétique"),
-                E("lead", "Méthode conventionnelle 3CL"),
-                E("callout", "Classe énergie : E"),
-                E("kv", "Consommation énergie primaire|302 kWh/m²/an"),
-                E("kv", "Émissions de gaz à effet de serre|9 kg CO2/m²/an"),
-                E("kv", "Classe climat|B"),
-                E("kv", "Chauffage|Électrique individuel, radiateurs à effet Joule"),
-                E("kv", "Eau chaude sanitaire|Ballon électrique individuel"),
-                E(
-                    "kv",
-                    "Estimation des coûts annuels|Entre 1 880 EUR et 2 650 EUR par an",
-                ),
-                E(
-                    "small",
-                    "Prix moyens des énergies indexés sur les années de référence du diagnostic fictif.",
-                ),
-            ],
-            [
-                E("h1", "Recommandations"),
-                E("h2", "Travaux prioritaires"),
-                E(
-                    "bullet",
-                    "Isoler les rampants donnant sur le grenier privatif, sous réserve des autorisations nécessaires.",
-                ),
-                E(
-                    "bullet",
-                    "Remplacer les radiateurs les plus anciens par des appareils à régulation électronique.",
-                ),
-                E(
-                    "bullet",
-                    "Améliorer l'étanchéité à l'air des menuiseries sans dégrader la ventilation.",
-                ),
-                E("h2", "Scénario indicatif"),
-                E(
-                    "body",
-                    "Après isolation ciblée et régulation du chauffage, le gain estimé pourrait être de 45 à 60 kWh/m²/an. Cette estimation ne constitue ni un devis ni un audit énergétique.",
-                ),
-                E(
-                    "small",
-                    "Diagnostiqueur, certification et assurance : références fictives réservées à la démonstration.",
-                ),
-            ],
-        ],
+        pages=[[E("h1", title)] for title in DPE_PAGE_TITLES],
     ),
     DemoDocument(
         logical_id="diagnostics",
@@ -1518,116 +1465,6 @@ EXTRA_PAGES: dict[str, list[list[Element]]] = {
             ),
         ],
     ],
-    "dpe": [
-        [
-            E("h1", "Déperditions et confort"),
-            E("lead", "Répartition conventionnelle issue du calcul synthétique"),
-            E("kv", "Murs donnant sur l'extérieur|31 %"),
-            E("kv", "Renouvellement d'air et ventilation|29 %"),
-            E("kv", "Fenêtres et portes|18 %"),
-            E("kv", "Ponts thermiques|15 %"),
-            E("kv", "Plafond sous grenier|7 %"),
-            E(
-                "callout",
-                "Performance de l'isolation : insuffisante. Confort d'été : insuffisant.",
-            ),
-            E(
-                "body",
-                "Le logement est traversant, mais les pièces sous rampant présentent un risque de surchauffe en période chaude.",
-            ),
-        ],
-        [
-            E("h1", "Montants et consommations annuelles"),
-            E("kv", "Chauffage|5 980 kWh énergie finale, 70 % des dépenses"),
-            E("kv", "Eau chaude sanitaire|1 630 kWh énergie finale, 19 %"),
-            E("kv", "Éclairage|310 kWh énergie finale, 4 %"),
-            E(
-                "kv",
-                "Auxiliaires et autres usages conventionnels|590 kWh énergie finale, 7 %",
-            ),
-            E("kv", "Total énergie finale|8 510 kWh/an"),
-            E("kv", "Total énergie primaire|19 570 kWh/an"),
-            E("kv", "Rapporté à la surface|302 kWh/m²/an"),
-            E(
-                "callout",
-                "Fourchette de coûts conventionnels : 1 880 EUR à 2 650 EUR par an.",
-            ),
-        ],
-        [
-            E("h1", "Recommandations d'usage"),
-            E(
-                "bullet",
-                "Maintenir une température de consigne de 19 °C en période de chauffe.",
-            ),
-            E(
-                "bullet",
-                "Ne pas obstruer les entrées d'air et nettoyer les grilles de ventilation.",
-            ),
-            E(
-                "bullet",
-                "Fermer les protections solaires pendant les heures chaudes en été.",
-            ),
-            E(
-                "bullet",
-                "Programmer le ballon d'eau chaude en heures creuses si le contrat le permet.",
-            ),
-            E(
-                "bullet",
-                "Adapter la durée des douches et surveiller les fuites d'eau chaude.",
-            ),
-            E("h2", "Limite"),
-            E(
-                "body",
-                "Les consommations conventionnelles ne prédisent pas exactement les factures, qui dépendent de l'occupation, de la météo et des contrats d'énergie.",
-            ),
-        ],
-        [
-            E("h1", "Bouquet de travaux n° 1"),
-            E("lead", "Actions prioritaires, montants indicatifs"),
-            E("kv", "Régulation et remplacement de radiateurs|2 200 à 3 800 EUR"),
-            E("kv", "Calfeutrement et entrées d'air adaptées|600 à 1 200 EUR"),
-            E("kv", "Isolation ciblée du rampant accessible|4 500 à 7 500 EUR"),
-            E("kv", "Montant total indicatif|7 300 à 12 500 EUR"),
-            E(
-                "callout",
-                "Classe projetée après travaux : D, sous réserve d'une étude et de la réalisation conforme des travaux.",
-            ),
-            E(
-                "body",
-                "Les travaux sur l'enveloppe peuvent nécessiter l'accord de la copropriété et une coordination avec la réfection de toiture.",
-            ),
-        ],
-        [
-            E("h1", "Fiche technique du logement • enveloppe"),
-            E("kv", "Mur nord|Pierre, environ 45 cm, isolation non observée"),
-            E("kv", "Mur sud|Pierre, donnant sur rue, isolation non observée"),
-            E("kv", "Plafond|Sous grenier partiellement aménagé"),
-            E("kv", "Plancher bas|Sur logement chauffé"),
-            E("kv", "Fenêtres|Double vitrage, cadres bois, pose déclarée en 2019"),
-            E("kv", "Volets|Persiennes bois sur rue"),
-            E("kv", "Orientation principale|Nord-sud"),
-            E("kv", "Inertie|Lourde"),
-            E(
-                "small",
-                "Origine des données : observation simulée et documents synthétiques fournis.",
-            ),
-        ],
-        [
-            E("h1", "Fiche technique du logement • systèmes"),
-            E("kv", "Générateur de chauffage|Radiateurs électriques à effet Joule"),
-            E("kv", "Années estimées des émetteurs|2008 à 2024 selon les pièces"),
-            E("kv", "Régulation|Thermostats individuels, programmation partielle"),
-            E("kv", "Eau chaude|Ballon électrique 150 litres, installé en 2020"),
-            E("kv", "Ventilation|Conduits naturels, débits non mesurés"),
-            E("kv", "Climatisation|Absente"),
-            E("kv", "Énergie renouvelable|Aucun équipement individuel"),
-            E("h2", "Point défavorable"),
-            E(
-                "body",
-                "Le renouvellement d'air conventionnel contribue fortement aux déperditions et doit être traité sans supprimer la ventilation nécessaire.",
-            ),
-        ],
-    ],
     "diagnostics": [
         [
             E("h1", "Détail du mesurage par pièce"),
@@ -2395,10 +2232,6 @@ def text_command(
     return f"BT /{font} {size:.1f} Tf {color} rg {x:.1f} {y:.1f} Td ({pdf_escape(value)}) Tj ET"
 
 
-def filled_rect(x: float, y: float, width: float, height: float, color: str) -> str:
-    return f"{color} rg {x:.1f} {y:.1f} {width:.1f} {height:.1f} re f"
-
-
 def stroked_rect(
     x: float,
     y: float,
@@ -2414,368 +2247,9 @@ def stroked_rect(
     )
 
 
-def filled_arrow(x: float, y: float, width: float, height: float, color: str) -> str:
-    point = min(12.0, width * 0.22)
-    return (
-        f"{color} rg {x:.1f} {y:.1f} m "
-        f"{x + width - point:.1f} {y:.1f} l "
-        f"{x + width:.1f} {y + height / 2:.1f} l "
-        f"{x + width - point:.1f} {y + height:.1f} l "
-        f"{x:.1f} {y + height:.1f} l h f"
-    )
-
-
-DPE_COLORS = {
-    "mint": "0.89 0.95 0.92",
-    "green": "0.00 0.66 0.47",
-    "dark_green": "0.00 0.48 0.35",
-    "pink": "0.92 0.05 0.42",
-    "light_blue": "0.59 0.83 0.95",
-    "text": "0.08 0.12 0.11",
-    "muted": "0.38 0.45 0.42",
-}
-
-DPE_ENERGY_SCALE = [
-    ("A", "0.15 0.68 0.39"),
-    ("B", "0.29 0.71 0.32"),
-    ("C", "0.58 0.76 0.28"),
-    ("D", "0.97 0.86 0.05"),
-    ("E", "0.98 0.69 0.03"),
-    ("F", "0.94 0.34 0.08"),
-    ("G", "0.82 0.08 0.08"),
-]
-
-DPE_GHG_COLORS = [
-    "0.70 0.86 0.96",
-    "0.55 0.74 0.88",
-    "0.42 0.59 0.75",
-    "0.34 0.43 0.62",
-    "0.27 0.30 0.49",
-    "0.22 0.20 0.39",
-    "0.17 0.11 0.31",
-]
-
-
-def append_wrapped_text(
-    commands: list[str],
-    x: float,
-    y: float,
-    value: str,
-    *,
-    width: int,
-    font: str,
-    size: float,
-    color: str,
-    leading: float,
-) -> float:
-    for line in wrap_text(value, width):
-        commands.append(text_command(x, y, line, font=font, size=size, color=color))
-        y -= leading
-    return y
-
-
-def render_dpe_cover_page(document: DemoDocument, page_number: int, total: int) -> bytes:
-    """Render the recognizable first page of a post-2021 French DPE.
-
-    The layout deliberately resembles the standardized information hierarchy, while
-    the bright simulation banner, fake identifier and absent logo prevent it from
-    being mistaken for an issued diagnostic.
-    """
-
-    mint = DPE_COLORS["mint"]
-    green = DPE_COLORS["green"]
-    dark_green = DPE_COLORS["dark_green"]
-    pink = DPE_COLORS["pink"]
-    text = DPE_COLORS["text"]
-    muted = DPE_COLORS["muted"]
-    commands = [
-        filled_rect(0, 0, 595, 842, "1 1 1"),
-        filled_rect(14, 20, 567, 808, mint),
-        filled_rect(332, 808, 239, 24, pink),
-        text_command(
-            343,
-            816,
-            "EXEMPLE DE DPE • DONNÉES ENTIÈREMENT FICTIVES",
-            font="F2",
-            size=7.5,
-            color="1 1 1",
-        ),
-        filled_rect(27, 742, 541, 66, "1 1 1"),
-        text_command(39, 771, "DPE", font="F2", size=32, color=green),
-        text_command(
-            118,
-            787,
-            "diagnostic de performance",
-            font="F2",
-            size=13.2,
-            color=text,
-        ),
-        text_command(118, 770, "énergétique", font="F2", size=13.2, color=text),
-        text_command(208, 770, "(logement)", font="F1", size=6.4, color=text),
-        text_command(
-            441,
-            791,
-            "n° : DEMO-DPE-LYON-001",
-            font="F1",
-            size=6.4,
-            color=dark_green,
-        ),
-        text_command(
-            464,
-            778,
-            "établi le : 25/08/2026",
-            font="F1",
-            size=6.4,
-            color=dark_green,
-        ),
-        text_command(
-            448,
-            765,
-            "valable jusqu'au : 24/08/2036",
-            font="F2",
-            size=6.4,
-            color=dark_green,
-        ),
-        text_command(
-            39,
-            750,
-            "Ce document simulé décrit la performance énergétique d'un logement fictif.",
-            font="F1",
-            size=6.3,
-            color=dark_green,
-        ),
-        filled_rect(27, 648, 541, 86, "1 1 1"),
-        filled_rect(39, 658, 174, 66, "0.83 0.85 0.84"),
-        text_command(
-            74,
-            688,
-            "photo du bien non fournie",
-            font="F3",
-            size=9,
-            color="1 1 1",
-        ),
-        text_command(225, 714, "adresse :", font="F1", size=6.8, color=muted),
-        text_command(
-            272,
-            714,
-            "24 rue des Tisseurs, 69004 Lyon",
-            font="F2",
-            size=6.8,
-            color=text,
-        ),
-        text_command(225, 701, "type de bien :", font="F1", size=6.8, color=muted),
-        text_command(285, 701, "appartement", font="F2", size=6.8, color=text),
-        text_command(225, 688, "année de construction :", font="F1", size=6.8, color=muted),
-        text_command(325, 688, "1898", font="F2", size=6.8, color=text),
-        text_command(225, 675, "surface habitable :", font="F1", size=6.8, color=muted),
-        text_command(310, 675, "64,80 m²", font="F2", size=6.8, color=text),
-        text_command(225, 662, "lot principal :", font="F1", size=6.8, color=muted),
-        text_command(288, 662, "n° 18", font="F2", size=6.8, color=text),
-        filled_rect(27, 307, 541, 333, "1 1 1"),
-        filled_rect(31, 613, 533, 22, green),
-        text_command(
-            37,
-            620,
-            "Performance énergétique et climatique",
-            font="F2",
-            size=10.5,
-            color="1 1 1",
-        ),
-        text_command(
-            141,
-            591,
-            "logement extrêmement performant",
-            font="F1",
-            size=5.3,
-            color=dark_green,
-        ),
-    ]
-
-    chart_x = 146.0
-    chart_y = 553.0
-    for index, (grade, color) in enumerate(DPE_ENERGY_SCALE):
-        row_y = chart_y - index * 27
-        width = 45 + index * 13
-        if grade == "E":
-            commands.append(stroked_rect(chart_x - 4, row_y - 4, width + 8, 26, color=text, line_width=1.5))
-        commands.append(filled_arrow(chart_x, row_y, width, 18, color))
-        commands.append(
-            text_command(chart_x + 7, row_y + 4, grade, font="F2", size=13, color="1 1 1")
-        )
-
-    commands.extend(
-        [
-            text_command(56, 485, "consommation", font="F1", size=5.3, color=muted),
-            text_command(59, 476, "énergie primaire", font="F1", size=5.3, color=muted),
-            stroked_rect(54, 441, 47, 33, color="0.20 0.20 0.20", line_width=1),
-            text_command(61, 453, "302", font="F2", size=16, color=text),
-            text_command(59, 444, "kWh/m²/an", font="F1", size=5.2, color=text),
-            text_command(105, 485, "émissions", font="F1", size=5.3, color=muted),
-            stroked_rect(104, 441, 39, 33, color="0.20 0.20 0.20", line_width=1),
-            text_command(113, 453, "9", font="F2", size=16, color=text),
-            text_command(108, 444, "kg CO2/m²/an", font="F1", size=4.6, color=text),
-            text_command(145, 359, "logement extrêmement consommateur d'énergie", font="F1", size=5.1, color="0.72 0.05 0.05"),
-            stroked_rect(363, 397, 155, 181, color=DPE_COLORS["light_blue"], line_width=1.3),
-            text_command(374, 561, "dont émissions de gaz", font="F2", size=7.2, color=text),
-            text_command(374, 550, "à effet de serre", font="F2", size=7.2, color=text),
-            text_command(374, 530, "peu d'émissions de CO2", font="F1", size=5.2, color="0.26 0.63 0.82"),
-        ]
-    )
-    ghg_x = 377.0
-    ghg_y = 508.0
-    for index, ((grade, _), color) in enumerate(zip(DPE_ENERGY_SCALE, DPE_GHG_COLORS)):
-        row_y = ghg_y - index * 17
-        width = 29 + index * 8
-        commands.append(filled_arrow(ghg_x, row_y, width, 11, color))
-        commands.append(
-            text_command(ghg_x + 4, row_y + 2, grade, font="F2", size=7, color="1 1 1")
-        )
-        if grade == "B":
-            commands.append(text_command(ghg_x + width + 7, row_y + 2, "9 kg CO2/m²/an", font="F2", size=6.2, color=text))
-    commands.extend(
-        [
-            text_command(374, 407, "émissions de CO2 très importantes", font="F1", size=5.0, color="0.16 0.11 0.28"),
-            filled_rect(44, 319, 219, 38, green),
-            text_command(52, 343, "La classe énergétique dépend de la consommation", font="F2", size=5.7, color="1 1 1"),
-            text_command(52, 333, "et des émissions. La plus défavorable est retenue.", font="F1", size=5.7, color="1 1 1"),
-            text_command(52, 323, "Ici, le logement simulé est classé E.", font="F1", size=5.7, color="1 1 1"),
-            filled_rect(365, 319, 165, 38, green),
-            text_command(373, 341, "Ce logement émet 583 kg de CO2 par an", font="F2", size=5.7, color="1 1 1"),
-            text_command(373, 330, "selon le calcul conventionnel fictif.", font="F1", size=5.7, color="1 1 1"),
-            filled_rect(27, 176, 541, 121, "1 1 1"),
-            filled_rect(31, 270, 533, 22, pink),
-            text_command(37, 277, "Estimation des coûts annuels d'énergie du logement", font="F2", size=10.5, color="1 1 1"),
-            text_command(39, 253, "Usages conventionnels : chauffage, eau chaude, éclairage et auxiliaires.", font="F1", size=6.0, color=muted),
-            text_command(215, 218, "entre", font="F1", size=7, color=text),
-            text_command(252, 212, "1 880 €", font="F2", size=17, color=text),
-            text_command(327, 218, "et", font="F1", size=7, color=text),
-            text_command(351, 212, "2 650 €", font="F2", size=17, color=text),
-            text_command(426, 218, "par an", font="F1", size=7, color=text),
-            "0.75 0.75 0.75 RG 0.8 w 170 198 m 454 198 l S",
-            text_command(221, 184, "Prix de l'énergie retenus pour cette simulation", font="F1", size=5.5, color=muted),
-            filled_rect(27, 66, 541, 100, "1 1 1"),
-            text_command(39, 150, "Informations du diagnostiqueur simulé", font="F2", size=7.2, color=text),
-            text_command(39, 134, "DIAGNOSTICS DÉMO RHÔNE", font="F2", size=7.2, color=text),
-            text_command(39, 120, "24 rue Exemple, 69000 Lyon", font="F1", size=6.5, color=text),
-            text_command(39, 106, "Opérateur : Morgan Vidal (identité fictive)", font="F1", size=6.5, color=text),
-            text_command(252, 134, "tél. : non attribué", font="F1", size=6.5, color=muted),
-            text_command(252, 120, "certification : DEMO-CERT-001", font="F1", size=6.5, color=muted),
-            text_command(252, 106, "assurance : référence fictive", font="F1", size=6.5, color=muted),
-            stroked_rect(458, 94, 85, 48, color="0.72 0.75 0.73", line_width=1),
-            text_command(473, 113, "AUCUN LOGO", font="F2", size=8, color=muted),
-            text_command(481, 101, "NI SIGNATURE", font="F2", size=7, color=muted),
-            text_command(39, 78, "Rapport généré pour tester Acquora. Aucun diagnostic, visite ou certification réels.", font="F3", size=5.8, color=muted),
-            filled_rect(27, 34, 541, 22, pink),
-            text_command(93, 42, DEMO_NOTICE, font="F2", size=7.3, color="1 1 1"),
-            text_command(548, 24, f"{page_number}/{total}", font="F1", size=6, color=muted),
-        ]
-    )
-
-    stream = "\n".join(commands).encode("latin-1")
-    return zlib.compress(stream, level=9)
-
-
-def render_dpe_detail_page(
-    document: DemoDocument, elements: list[Element], page_number: int, total: int
-) -> bytes:
-    """Render subsequent DPE pages in the same green and pink visual system."""
-
-    green = DPE_COLORS["green"]
-    dark_green = DPE_COLORS["dark_green"]
-    pink = DPE_COLORS["pink"]
-    text = DPE_COLORS["text"]
-    muted = DPE_COLORS["muted"]
-    commands = [
-        filled_rect(0, 0, 595, 842, "1 1 1"),
-        filled_rect(14, 20, 567, 808, DPE_COLORS["mint"]),
-        filled_rect(332, 808, 239, 24, pink),
-        text_command(343, 816, "EXEMPLE DE DPE • DONNÉES ENTIÈREMENT FICTIVES", font="F2", size=7.5, color="1 1 1"),
-        filled_rect(27, 754, 541, 48, "1 1 1"),
-        text_command(39, 771, "DPE", font="F2", size=24, color=green),
-        text_command(100, 781, "diagnostic de performance énergétique", font="F2", size=10.5, color=text),
-        text_command(100, 766, "24 rue des Tisseurs, 69004 Lyon • DEMO-DPE-LYON-001", font="F1", size=6.3, color=dark_green),
-        text_command(535, 766, f"{page_number}/{total}", font="F2", size=7, color=dark_green),
-        filled_rect(27, 54, 541, 690, "1 1 1"),
-        filled_rect(27, 34, 541, 16, pink),
-        text_command(133, 39, "DOCUMENT SIMULÉ • SANS VALEUR CONTRACTUELLE", font="F2", size=6.8, color="1 1 1"),
-    ]
-    y = 712.0
-    first_heading = True
-    row_index = 0
-
-    for kind, value in elements:
-        if kind == "space":
-            y -= 10
-            continue
-        if kind == "h1":
-            if first_heading:
-                commands.append(filled_rect(31, y - 5, 533, 25, green))
-                commands.append(text_command(38, y + 3, value, font="F2", size=11.2, color="1 1 1"))
-                y -= 39
-                first_heading = False
-            else:
-                y -= 5
-                commands.append(text_command(39, y, value, font="F2", size=15, color=text))
-                y -= 25
-        elif kind == "lead":
-            y = append_wrapped_text(commands, 39, y, value, width=82, font="F3", size=9, color=muted, leading=13)
-            y -= 7
-        elif kind == "h2":
-            y -= 4
-            commands.append(filled_rect(39, y - 4, 513, 20, "0.91 0.96 0.93"))
-            commands.append(text_command(45, y + 2, value, font="F2", size=9.4, color=dark_green))
-            y -= 29
-        elif kind == "body":
-            y = append_wrapped_text(commands, 45, y, value, width=91, font="F1", size=8.7, color=text, leading=13)
-            y -= 7
-        elif kind == "bullet":
-            lines = wrap_text(value, 84)
-            commands.append(filled_rect(46, y + 2, 5, 5, green))
-            for line in lines:
-                commands.append(text_command(59, y, line, font="F1", size=8.7, color=text))
-                y -= 13
-            y -= 5
-        elif kind == "kv":
-            label, _, item_value = value.partition("|")
-            label_lines = wrap_text(label, 31)
-            value_lines = wrap_text(item_value, 51)
-            row_lines = max(len(label_lines), len(value_lines))
-            row_height = 13 * row_lines + 10
-            if row_index % 2 == 0:
-                commands.append(filled_rect(39, y - row_height + 8, 513, row_height, "0.95 0.97 0.96"))
-            for index, line in enumerate(label_lines):
-                commands.append(text_command(47, y - index * 13, line, font="F2", size=8.2, color=dark_green))
-            for index, line in enumerate(value_lines):
-                commands.append(text_command(239, y - index * 13, line, font="F1", size=8.5, color=text))
-            y -= row_height
-            row_index += 1
-        elif kind == "callout":
-            lines = wrap_text(value, 78)
-            height = 14 * len(lines) + 18
-            commands.append(filled_rect(39, y - height + 8, 513, height, green))
-            for index, line in enumerate(lines):
-                commands.append(text_command(51, y - index * 14, line, font="F2", size=8.8, color="1 1 1"))
-            y -= height + 7
-        elif kind == "small":
-            y -= 2
-            y = append_wrapped_text(commands, 45, y, value, width=102, font="F3", size=7.1, color=muted, leading=10)
-            y -= 3
-
-        if y < 68:
-            raise ValueError(f"DPE page overflow in {document.filename}, page {page_number}")
-
-    stream = "\n".join(commands).encode("latin-1")
-    return zlib.compress(stream, level=9)
-
-
 def render_page(
     document: DemoDocument, elements: list[Element], page_number: int, total: int
 ) -> bytes:
-    if document.logical_id == "dpe":
-        if page_number == 1:
-            return render_dpe_cover_page(document, page_number, total)
-        return render_dpe_detail_page(document, elements, page_number, total)
-
     is_ag = document.logical_id.startswith("ag_")
     is_ag_cover = is_ag and page_number == 1
     year = (document.document_date or "0000")[:4]
@@ -2944,6 +2418,9 @@ def render_page(
 
 
 def build_pdf(document: DemoDocument) -> bytes:
+    if document.logical_id == "dpe":
+        return build_dpe_pdf()
+
     objects: list[bytes] = []
 
     def add_object(value: bytes) -> int:
@@ -3076,9 +2553,10 @@ def build_manifest(generated: list[dict[str, object]]) -> dict[str, object]:
             "use": "Densité, hiérarchie typographique, tableaux, formulation des votes et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise.",
         },
         "generation": {
-            "command": "python3 scripts/generate_demo_dossier.py",
+            "command": "uv run scripts/generate_demo_dossier.py",
             "notice": DEMO_NOTICE,
-            "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, standard visual hierarchy for DPE, built-in fonts, Flate-compressed streams",
+            "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, populated official September 2025 apartment DPE template, compressed streams",
+            "dpe_template_url": TEMPLATE_URL,
         },
     }
 

@@ -193,9 +193,9 @@
       "covered_period_start": null,
       "covered_period_end": null,
       "purpose": "Performance énergétique, émissions, coûts et recommandations.",
-      "page_count": 9,
-      "size_bytes": 13100,
-      "sha256": "fe7885f1c6e664077eca263d21c8aa85e982d7d567971b2d7e803f0bdab57205"
+      "page_count": 8,
+      "size_bytes": 265226,
+      "sha256": "14edbb17e0093f88d743266e515adf2babd31a0ef8d06a8f049fd8e206d99e1a"
     },
     {
       "logical_id": "diagnostics",
@@ -299,8 +299,9 @@
     "use": "Densité, hiérarchie typographique, tableaux, formulation des votes et découpage des sections uniquement. Aucune donnée personnelle ou valeur du bien de référence n'est reprise."
   },
   "generation": {
-    "command": "python3 scripts/generate_demo_dossier.py",
+    "command": "uv run scripts/generate_demo_dossier.py",
     "notice": "DOCUMENT SYNTHÉTIQUE DE DÉMONSTRATION • SANS VALEUR CONTRACTUELLE",
-    "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, standard visual hierarchy for DPE, built-in fonts, Flate-compressed streams"
+    "pdf_profile": "searchable text, compact legacy office layout for non-DPE files, populated official September 2025 apartment DPE template, compressed streams",
+    "dpe_template_url": "https://rt-re-batiment.developpement-durable.gouv.fr/IMG/pdf/02_dpe_existant_appartement_01.09_2025.pdf"
   }
 }
