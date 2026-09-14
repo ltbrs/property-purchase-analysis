@@ -1,15 +1,19 @@
 from datetime import UTC, date, datetime, timedelta
-from typing import Annotated
-from uuid import UUID
+from secrets import compare_digest
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import CurrentUserId
 from app.core.config import get_settings
 from app.core.database import DatabaseSession
-from app.documents.classification.models import DocumentClassificationRead
+from app.documents.classification.models import (
+    DocumentClassificationRead,
+    DocumentClassificationRecord,
+    DocumentType,
+)
 from app.documents.classification.service import (
     DocumentClassificationFailed,
     DocumentClassificationService,
@@ -26,11 +30,18 @@ from app.documents.models import (
     DocumentRead,
     DocumentRecord,
     DocumentStatus,
+    DocumentUploadComplete,
+    DocumentUploadUrlCreate,
+    DocumentUploadUrlRead,
     DocumentViewUrlRead,
 )
 from app.documents.parsers import PdfParserDependency
 from app.documents.repository import DocumentRepository
-from app.documents.validation import InvalidDocument, validate_pdf
+from app.documents.validation import (
+    InvalidDocument,
+    validate_pdf_bytes,
+    validate_pdf_metadata,
+)
 from app.jobs.document_processing import DocumentProcessingService
 from app.llm import StructuredOutputClientDependency
 from app.property.models import PropertyType
@@ -51,6 +62,7 @@ from app.property.normalization.structured_service import (
     StructuredExtractionFailed,
     StructuredExtractionService,
     UnsupportedStructuredDocument,
+    structured_extraction_type,
 )
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
@@ -69,6 +81,44 @@ class CaseFindingsRefreshRead(BaseModel):
 
 class FindingReviewUpdate(BaseModel):
     review_status: FindingReviewStatus
+
+
+def _ordered_document_types(
+    classifications: list[DocumentClassificationRecord],
+) -> list[str]:
+    return list(dict.fromkeys(classification.document_type for classification in classifications))
+
+
+def _primary_document_type(document_types: list[str]) -> str | None:
+    return next(
+        (
+            document_type
+            for document_type in document_types
+            if document_type != DocumentType.UNKNOWN.value
+        ),
+        document_types[0] if document_types else None,
+    )
+
+
+def _validate_upload_storage_key(analysis_case_id: UUID, storage_key: str) -> None:
+    parts = storage_key.split("/")
+    if (
+        len(parts) != 4
+        or parts[:3] != ["analysis-cases", str(analysis_case_id), "documents"]
+        or not parts[3].endswith(".pdf")
+    ):
+        raise InvalidDocument("La référence de téléversement est invalide.")
+    try:
+        UUID(parts[3][:-4])
+    except ValueError as error:
+        raise InvalidDocument("La référence de téléversement est invalide.") from error
+
+
+async def _delete_unpersisted_upload(storage: ObjectStorage, storage_key: str) -> None:
+    try:
+        await run_in_threadpool(storage.delete_pdf, storage.bucket, storage_key)
+    except ObjectStorageError:
+        pass
 
 
 def _load_normalized_case_data(
@@ -217,27 +267,30 @@ def list_documents(
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
-    classifications = {
-        classification.document_id: classification.document_type
-        for classification in repository.list_case_classifications(
-            analysis_case_id, current_user_id
+    classifications_by_document: dict[UUID, list[DocumentClassificationRecord]] = {}
+    for classification in repository.list_case_classifications(analysis_case_id, current_user_id):
+        classifications_by_document.setdefault(classification.document_id, []).append(
+            classification
         )
-    }
     ademe_verification_statuses = {
         extraction.document_id: NormalizedDpeFacts.model_validate(
             extraction.normalized_facts
         ).ademe_verification.status.value
         for extraction in repository.list_case_dpe_extractions(analysis_case_id, current_user_id)
     }
-    return [
-        DocumentRead.model_validate(document).model_copy(
-            update={
-                "document_type": classifications.get(document.id),
-                "ademe_verification_status": ademe_verification_statuses.get(document.id),
-            }
+    documents: list[DocumentRead] = []
+    for document in repository.list_documents(analysis_case_id, current_user_id):
+        document_types = _ordered_document_types(classifications_by_document.get(document.id, []))
+        documents.append(
+            DocumentRead.model_validate(document).model_copy(
+                update={
+                    "document_type": _primary_document_type(document_types),
+                    "document_types": document_types,
+                    "ademe_verification_status": ademe_verification_statuses.get(document.id),
+                }
+            )
         )
-        for document in repository.list_documents(analysis_case_id, current_user_id)
-    ]
+    return documents
 
 
 @router.get(
@@ -323,25 +376,125 @@ def get_dpe_extraction(
 
 
 @router.post(
+    "/{analysis_case_id}/documents/upload-url",
+    response_model=DocumentUploadUrlRead,
+)
+async def create_document_upload_url(
+    analysis_case_id: UUID,
+    payload: DocumentUploadUrlCreate,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+) -> DocumentUploadUrlRead:
+    repository = DocumentRepository(session)
+    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+
+    settings = get_settings()
+    try:
+        validate_pdf_metadata(
+            payload.original_filename,
+            payload.content_type,
+            payload.size_bytes,
+            settings.max_upload_size_bytes,
+        )
+    except InvalidDocument as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    storage_key = f"analysis-cases/{analysis_case_id}/documents/{uuid4()}.pdf"
+    ttl_seconds = settings.document_upload_url_ttl_seconds
+    try:
+        url = await run_in_threadpool(
+            storage.create_pdf_upload_url,
+            storage_key,
+            payload.size_bytes,
+            ttl_seconds,
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="La préparation du téléversement a échoué. Veuillez réessayer.",
+        ) from error
+
+    return DocumentUploadUrlRead(
+        url=url,
+        storage_key=storage_key,
+        headers={"Content-Type": "application/pdf"},
+        expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
+
+
+@router.post(
     "/{analysis_case_id}/documents",
     response_model=DocumentRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_document(
     analysis_case_id: UUID,
+    payload: DocumentUploadComplete,
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     storage: ObjectStorage,
     response: Response,
-    file: Annotated[UploadFile, File(description="PDF document to analyze")],
 ) -> DocumentRead:
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
 
+    settings = get_settings()
     try:
-        validated = await validate_pdf(file, get_settings().max_upload_size_bytes)
+        filename = validate_pdf_metadata(
+            payload.original_filename,
+            payload.content_type,
+            payload.size_bytes,
+            settings.max_upload_size_bytes,
+        )
+        _validate_upload_storage_key(analysis_case_id, payload.storage_key)
     except InvalidDocument as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    try:
+        metadata = await run_in_threadpool(
+            storage.get_object_metadata,
+            storage.bucket,
+            payload.storage_key,
+        )
+        if metadata.size_bytes != payload.size_bytes or metadata.content_type != "application/pdf":
+            raise InvalidDocument("Le fichier téléversé ne correspond pas au fichier attendu.")
+        pdf_bytes = await run_in_threadpool(
+            storage.download_pdf,
+            storage.bucket,
+            payload.storage_key,
+        )
+    except ObjectStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le fichier téléversé ne peut pas être vérifié. Veuillez réessayer.",
+        ) from error
+    except InvalidDocument as error:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    try:
+        validated = validate_pdf_bytes(
+            pdf_bytes,
+            filename,
+            payload.content_type,
+            settings.max_upload_size_bytes,
+        )
+        if not compare_digest(validated.sha256, payload.sha256):
+            raise InvalidDocument("L’empreinte du fichier téléversé est invalide.")
+    except InvalidDocument as error:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
@@ -349,17 +502,10 @@ async def upload_document(
 
     existing = repository.find_by_checksum(analysis_case_id, current_user_id, validated.sha256)
     if existing is not None:
+        if existing.storage_key != payload.storage_key:
+            await _delete_unpersisted_upload(storage, payload.storage_key)
         response.status_code = status.HTTP_200_OK
         return DocumentRead.model_validate(existing)
-
-    storage_key = f"analysis-cases/{analysis_case_id}/documents/{validated.sha256}.pdf"
-    try:
-        await run_in_threadpool(storage.upload_pdf, file.file, storage_key)
-    except ObjectStorageError as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Le stockage du document a échoué. Veuillez réessayer.",
-        ) from error
 
     document = DocumentRecord(
         analysis_case_id=analysis_case_id,
@@ -368,10 +514,17 @@ async def upload_document(
         size_bytes=validated.size_bytes,
         sha256=validated.sha256,
         storage_bucket=storage.bucket,
-        storage_key=storage_key,
+        storage_key=payload.storage_key,
         status=DocumentStatus.UPLOADED.value,
     )
-    persisted = repository.create_document(document, current_user_id)
+    try:
+        persisted = repository.create_document(document, current_user_id)
+    except Exception:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        raise
+    if persisted.storage_key != payload.storage_key:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        response.status_code = status.HTTP_200_OK
     return DocumentRead.model_validate(persisted)
 
 
@@ -402,9 +555,9 @@ async def process_document(
         )
 
     try:
-        classification = await DocumentProcessingService(
+        classifications = await DocumentProcessingService(
             repository, storage, parser, llm_client
-        ).process(document)
+        ).process(document, current_user_id)
     except ObjectStorageError as error:
         repository.mark_extraction_failed(
             document, "Le document n’a pas pu être relu depuis le stockage privé."
@@ -439,7 +592,8 @@ async def process_document(
     )
     return DocumentRead.model_validate(document).model_copy(
         update={
-            "document_type": classification.document_type,
+            "document_type": _primary_document_type(_ordered_document_types(classifications)),
+            "document_types": _ordered_document_types(classifications),
             "ademe_verification_status": ademe_verification_status,
         }
     )
@@ -526,7 +680,7 @@ async def extract_document(
 
 @router.post(
     "/{analysis_case_id}/documents/{document_id}/classify",
-    response_model=DocumentClassificationRead,
+    response_model=list[DocumentClassificationRead],
 )
 async def classify_document(
     analysis_case_id: UUID,
@@ -534,7 +688,7 @@ async def classify_document(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     llm_client: StructuredOutputClientDependency,
-) -> DocumentClassificationRead:
+) -> list[DocumentClassificationRead]:
     repository = DocumentRepository(session)
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
@@ -548,7 +702,7 @@ async def classify_document(
         )
     if (
         document.status == DocumentStatus.ANALYZING.value
-        and repository.get_classification(document.id) is None
+        and not repository.list_document_classifications(document.id)
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -556,15 +710,18 @@ async def classify_document(
         )
 
     try:
-        classification = await DocumentClassificationService(repository, llm_client).classify(
-            document, extraction
+        classifications = await DocumentClassificationService(repository, llm_client).classify(
+            document, extraction, current_user_id
         )
     except DocumentClassificationFailed as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(error),
         ) from error
-    return DocumentClassificationRead.model_validate(classification)
+    return [
+        DocumentClassificationRead.model_validate(classification)
+        for classification in classifications
+    ]
 
 
 @router.post(
@@ -584,8 +741,12 @@ async def extract_dpe_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     extraction = repository.get_extraction(document.id)
-    classification = repository.get_classification(document.id)
-    if extraction is None or classification is None:
+    classifications = [
+        classification
+        for classification in repository.list_document_classifications(document.id)
+        if classification.document_type == DocumentType.DPE.value
+    ]
+    if extraction is None or not classifications:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Extract and classify the document before DPE extraction",
@@ -601,7 +762,7 @@ async def extract_dpe_document(
 
     try:
         dpe_extraction = await DpeExtractionService(repository, llm_client).extract(
-            document, extraction, classification
+            document, extraction, classifications, current_user_id
         )
     except DpeClassificationRequired as error:
         raise HTTPException(
@@ -618,7 +779,7 @@ async def extract_dpe_document(
 
 @router.post(
     "/{analysis_case_id}/documents/{document_id}/extract-structured",
-    response_model=StructuredExtractionRead,
+    response_model=list[StructuredExtractionRead],
 )
 async def extract_structured_document(
     analysis_case_id: UUID,
@@ -626,27 +787,48 @@ async def extract_structured_document(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
     llm_client: StructuredOutputClientDependency,
-) -> StructuredExtractionRead:
+) -> list[StructuredExtractionRead]:
     repository = DocumentRepository(session)
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     extraction = repository.get_extraction(document.id)
-    classification = repository.get_classification(document.id)
-    if extraction is None or classification is None:
+    classifications = repository.list_document_classifications(document.id)
+    if extraction is None or not classifications:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Extract and classify the document before structured extraction",
         )
     try:
-        result = await StructuredExtractionService(repository, llm_client).extract(
-            document, extraction, classification
-        )
+        grouped_classifications: dict[
+            StructuredExtractionType, list[DocumentClassificationRecord]
+        ] = {}
+        for classification in classifications:
+            try:
+                extraction_type = structured_extraction_type(
+                    DocumentType(classification.document_type)
+                )
+            except UnsupportedStructuredDocument:
+                continue
+            grouped_classifications.setdefault(extraction_type, []).append(classification)
+        if not grouped_classifications:
+            raise UnsupportedStructuredDocument(
+                "No structured extractor is available for this document"
+            )
+        results = [
+            await StructuredExtractionService(repository, llm_client).extract(
+                document,
+                extraction,
+                grouped_segments,
+                current_user_id,
+            )
+            for grouped_segments in grouped_classifications.values()
+        ]
     except UnsupportedStructuredDocument as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except StructuredExtractionFailed as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
-    return StructuredExtractionRead.model_validate(result)
+    return [StructuredExtractionRead.model_validate(result) for result in results]
 
 
 @router.post(

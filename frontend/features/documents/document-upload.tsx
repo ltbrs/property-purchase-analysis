@@ -61,9 +61,17 @@ type UploadedDocument = {
   status: DocumentStatus;
   failure_reason: string | null;
   document_type: DocumentType | null;
+  document_types: DocumentType[];
   ademe_verification_status: AdemeVerificationStatus | null;
   created_at: string;
   updated_at: string;
+};
+
+type DocumentUploadUrl = {
+  url: string;
+  storage_key: string;
+  headers: Record<string, string>;
+  expires_at: string;
 };
 
 type AnalysisCase = {
@@ -90,6 +98,18 @@ function formatFileSize(bytes: number) {
     return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+}
+
+function classifiedTypes(document: UploadedDocument): DocumentType[] {
+  if (document.document_types.length > 0) return document.document_types;
+  return document.document_type ? [document.document_type] : [];
+}
+
+async function sha256(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 async function fetchDocuments(workspace: Workspace) {
@@ -211,7 +231,9 @@ function DocumentFile({
             <strong>{document.original_filename}</strong>
             <span>
               {showType
-                ? `${documentTypeLabels[document.document_type ?? "unknown"]} · `
+                ? `${classifiedTypes(document)
+                    .map((documentType) => documentTypeLabels[documentType])
+                    .join(" + ") || documentTypeLabels.unknown} · `
                 : ""}
               {formatFileSize(document.size_bytes)} · {dateFormatter.format(new Date(document.created_at))}
             </span>
@@ -257,7 +279,7 @@ function DocumentFile({
           >
             <Icon name="eye" /> Visualiser
           </button>
-          {document.document_type === "dpe" && document.status === "completed" ? (
+          {classifiedTypes(document).includes("dpe") && document.status === "completed" ? (
             <button
               className="dpe-data-button"
               type="button"
@@ -313,6 +335,7 @@ function ExpectedDocumentRow({
   onView: (document: UploadedDocument) => void;
 }) {
   const isPresent = documents.length > 0;
+  const hasScrollableFiles = documents.length > 3;
   const state = isPresent ? "present" : propertyType === "unknown" ? "pending" : "missing";
   const stateLabel = isPresent ? "Reçu" : propertyType === "unknown" ? "À confirmer" : "Manquant";
 
@@ -325,7 +348,11 @@ function ExpectedDocumentRow({
         <div className="coverage-copy">
           <div>
             <strong>{expectation.label}</strong>
-            {!isPresent ? (
+            {isPresent && documents.length > 1 ? (
+              <span className="coverage-badge is-present">
+                {documents.length} fichiers
+              </span>
+            ) : !isPresent ? (
               <span className={`coverage-badge is-${state}`}>{stateLabel}</span>
             ) : null}
           </div>
@@ -336,7 +363,12 @@ function ExpectedDocumentRow({
         </div>
       </div>
       {documents.length > 0 ? (
-        <div className="coverage-files">
+        <div
+          className={`coverage-files${hasScrollableFiles ? " is-scrollable" : ""}`}
+          role={hasScrollableFiles ? "region" : undefined}
+          aria-label={hasScrollableFiles ? `Fichiers pour ${expectation.label}` : undefined}
+          tabIndex={hasScrollableFiles ? 0 : undefined}
+        >
           {documents.map((document) => (
             <DocumentFile
               key={document.id}
@@ -503,13 +535,45 @@ export function DocumentUpload() {
     setIsUploading(true);
     const results = await Promise.allSettled(
       files.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
+        const checksum = await sha256(file);
+        const uploadUrlResponse = await fetch(
+          `${API_URL}/analysis-cases/${workspace.caseId}/documents/upload-url`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              original_filename: file.name,
+              content_type: file.type,
+              size_bytes: file.size,
+            }),
+          },
+        );
+        if (!uploadUrlResponse.ok) {
+          throw new Error(`${file.name} : ${await readApiError(uploadUrlResponse)}`);
+        }
+        const upload = (await uploadUrlResponse.json()) as DocumentUploadUrl;
+
+        const directUploadResponse = await fetch(upload.url, {
+          method: "PUT",
+          headers: upload.headers,
+          body: file,
+        });
+        if (!directUploadResponse.ok) {
+          throw new Error(`${file.name} : le transfert vers le stockage a échoué.`);
+        }
+
         const response = await fetch(
           `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
           {
             method: "POST",
-            body: formData,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              original_filename: file.name,
+              content_type: file.type,
+              size_bytes: file.size,
+              sha256: checksum,
+              storage_key: upload.storage_key,
+            }),
           },
         );
         if (!response.ok) {
@@ -539,9 +603,7 @@ export function DocumentUpload() {
     if (successfulDocuments.length > 0) {
       captureProductEvent("documents_uploaded", {
         document_count: successfulDocuments.length,
-        document_types: successfulDocuments.map(
-          (document) => document.document_type ?? "unknown",
-        ),
+        document_types: successfulDocuments.flatMap(classifiedTypes),
       });
     }
 
@@ -646,8 +708,9 @@ export function DocumentUpload() {
     const matchingDocuments = documents.filter(
       (document) =>
         document.status !== "failed" &&
-        document.document_type !== null &&
-        expectation.acceptedTypes.includes(document.document_type),
+        classifiedTypes(document).some((documentType) =>
+          expectation.acceptedTypes.includes(documentType),
+        ),
     );
     for (const document of matchingDocuments) matchedDocumentIds.add(document.id);
     return { expectation, documents: matchingDocuments };

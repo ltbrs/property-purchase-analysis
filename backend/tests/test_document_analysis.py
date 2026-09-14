@@ -15,6 +15,7 @@ from app.core.database import Base, get_db_session
 from app.documents.classification.models import (
     DocumentClassificationCandidate,
     DocumentClassificationRecord,
+    DocumentClassificationSegmentCandidate,
     DocumentType,
     ExtractionStrategy,
 )
@@ -49,9 +50,13 @@ class FakeStructuredOutputClient:
         system_prompt: str,
         user_content: str,
         response_model: type[OutputModel],
+        user_id: UUID,
+        document_id: UUID,
     ) -> StructuredOutputResult[OutputModel]:
         assert system_prompt
         assert '<page number="1">' in user_content
+        assert isinstance(user_id, UUID)
+        assert isinstance(document_id, UUID)
         output = self.outputs[self.calls]
         self.calls += 1
         assert isinstance(output, response_model)
@@ -121,13 +126,19 @@ def seed_extracted_dpe(session: Session, user_id: UUID) -> tuple[UUID, UUID]:
 
 def classification_candidate(confidence: float = 0.99) -> DocumentClassificationCandidate:
     return DocumentClassificationCandidate(
-        document_type=DocumentType.DPE,
-        confidence=confidence,
-        document_date=date(2024, 6, 15),
-        covered_period_start=None,
-        covered_period_end=None,
-        issuer="Cabinet Exemple",
-        extraction_strategy=ExtractionStrategy.MIXED,
+        segments=[
+            DocumentClassificationSegmentCandidate(
+                start_page=1,
+                end_page=2,
+                document_type=DocumentType.DPE,
+                confidence=confidence,
+                document_date=date(2024, 6, 15),
+                covered_period_start=None,
+                covered_period_end=None,
+                issuer="Cabinet Exemple",
+                extraction_strategy=ExtractionStrategy.MIXED,
+            )
+        ]
     )
 
 
@@ -195,9 +206,9 @@ def test_low_confidence_classification_is_persisted_as_unknown(session: Session)
         )
 
     assert response.status_code == 200
-    assert response.json()["document_type"] == "unknown"
-    assert response.json()["extraction_strategy"] == "none"
-    assert response.json()["requested_model"] == "gpt-5.6-luna"
+    assert response.json()[0]["document_type"] == "unknown"
+    assert response.json()[0]["extraction_strategy"] == "none"
+    assert response.json()[0]["requested_model"] == "gpt-5.6-luna"
     persisted = session.scalar(select(DocumentClassificationRecord))
     assert persisted is not None
     assert persisted.raw_output["document_type"] == "dpe"
@@ -260,7 +271,7 @@ def test_analysis_endpoints_are_idempotent(
         first_dpe = client.post(dpe_url, headers=auth(user_id))
         second_dpe = client.post(dpe_url, headers=auth(user_id))
 
-    assert first_classification.json()["id"] == second_classification.json()["id"]
+    assert first_classification.json()[0]["id"] == second_classification.json()[0]["id"]
     assert first_dpe.json()["id"] == second_dpe.json()["id"]
     assert llm_client.calls == 2
     assert "DPE extraction reused" in caplog.text
@@ -307,7 +318,7 @@ def test_dpe_extraction_rejects_non_dpe_classification(session: Session) -> None
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
     candidate = classification_candidate()
-    candidate.document_type = DocumentType.AG_MINUTES
+    candidate.segments[0].document_type = DocumentType.AG_MINUTES
     llm_client = FakeStructuredOutputClient([candidate])
 
     with make_client(session, llm_client) as client:

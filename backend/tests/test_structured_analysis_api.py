@@ -46,9 +46,13 @@ class FakeClient:
         system_prompt: str,
         user_content: str,
         response_model: type[OutputModel],
+        user_id: UUID,
+        document_id: UUID,
     ) -> StructuredOutputResult[OutputModel]:
         assert "vot" in system_prompt
         assert '<page number="1">' in user_content
+        assert isinstance(user_id, UUID)
+        assert isinstance(document_id, UUID)
         assert isinstance(self.output, response_model)
         self.calls += 1
         return StructuredOutputResult(
@@ -108,6 +112,8 @@ def seed_ag(session: Session, user_id: UUID) -> tuple[UUID, UUID]:
     session.add(
         DocumentClassificationRecord(
             document_id=document.id,
+            start_page=1,
+            end_page=1,
             document_type=DocumentType.AG_MINUTES.value,
             confidence=0.99,
             document_date=date(2025, 5, 12),
@@ -189,8 +195,8 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
         )
 
     assert first.status_code == 200
-    assert first.json()["normalized_facts"]["items"][0]["status"] == "voted"
-    assert first.json()["id"] == second.json()["id"]
+    assert first.json()[0]["normalized_facts"]["items"][0]["status"] == "voted"
+    assert first.json()[0]["id"] == second.json()[0]["id"]
     assert fake.calls == 1
     assert {finding["code"] for finding in refresh.json()["findings"]} >= {
         "COPRO_MAJOR_WORKS_VOTED",

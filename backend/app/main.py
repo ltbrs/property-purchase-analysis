@@ -23,13 +23,8 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=[
+            "Authorization",
             "Content-Type",
-            "X-User-Id",
-            "X-User-Name",
-            "X-User-Email",
-            "X-User-Email-Verified",
-            "X-Auth-Provider",
-            "X-Auth-Provider-Account-Id",
         ],
     )
     application.include_router(api_router, prefix=settings.api_v1_prefix)

@@ -29,17 +29,21 @@ class Settings(BaseSettings):
         ),
     )
     object_storage_endpoint: str | None = None
+    object_storage_public_endpoint: str | None = None
     object_storage_bucket: str | None = None
     object_storage_region: str = "eu-west-3"
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
     document_view_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
+    document_upload_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
     max_upload_size_bytes: int = 25 * 1024 * 1024
     openai_api_key: SecretStr | None = None
     ademe_dpe_api_url: str = "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
     ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
     contact_proxy_secret: SecretStr | None = None
     backend_proxy_secret: SecretStr | None = None
+    supabase_url: str | None = None
+    supabase_jwt_audience: str = "authenticated"
     contact_short_rate_limit: int = Field(default=5, ge=1, le=100)
     contact_daily_rate_limit: int = Field(default=20, ge=1, le=1000)
 
@@ -62,6 +66,14 @@ class Settings(BaseSettings):
     def empty_secret_is_unconfigured(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("supabase_url", mode="before")
+    @classmethod
+    def normalize_optional_url(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip().rstrip("/")
+            return value or None
         return value
 
 

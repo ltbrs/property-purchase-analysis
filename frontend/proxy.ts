@@ -1,18 +1,10 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-import { auth } from "@/auth";
-import { productRoutes } from "@/lib/routes";
+import { updateSession } from "@/lib/supabase/proxy";
 
-export const proxy = auth((request) => {
-  if (request.auth?.user?.id) return NextResponse.next();
-
-  const signInUrl = new URL(productRoutes.signIn, request.url);
-  signInUrl.searchParams.set(
-    "callbackUrl",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-  );
-  return NextResponse.redirect(signInUrl);
-});
+export async function proxy(request: NextRequest) {
+  return updateSession(request);
+}
 
 export const config = {
   matcher: ["/app/:path*"],

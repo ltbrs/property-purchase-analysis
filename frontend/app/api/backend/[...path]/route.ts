@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { auth } from "@/auth";
+import { createClient } from "@/lib/supabase/server";
 
 type BackendRouteContext = {
   params: Promise<{ path: string[] }>;
@@ -19,9 +19,11 @@ async function proxyToBackend(
   request: NextRequest,
   context: BackendRouteContext,
 ) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (claimsError || !claimsData?.claims?.sub || !accessToken) {
     return Response.json({ detail: "Authentication required" }, { status: 401 });
   }
 
@@ -52,23 +54,7 @@ async function proxyToBackend(
   if (backendProxySecret) {
     headers.set("X-Backend-Proxy-Secret", backendProxySecret);
   }
-  headers.set("X-User-Id", userId);
-  if (session.user.name) {
-    headers.set("X-User-Name", encodeURIComponent(session.user.name));
-  }
-  if (session.user.email) {
-    headers.set("X-User-Email", session.user.email);
-  }
-  headers.set("X-User-Email-Verified", String(session.user.isEmailVerified));
-  if (session.user.authProvider) {
-    headers.set("X-Auth-Provider", session.user.authProvider);
-  }
-  if (session.user.authProviderAccountId) {
-    headers.set(
-      "X-Auth-Provider-Account-Id",
-      encodeURIComponent(session.user.authProviderAccountId),
-    );
-  }
+  headers.set("Authorization", `Bearer ${accessToken}`);
 
   const options: RequestInit & { duplex?: "half" } = {
     method: request.method,

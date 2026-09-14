@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from app.core.config import get_settings
@@ -30,6 +30,7 @@ from app.property.normalization.financials import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EVAL_DOCUMENT_ID = UUID("00000000-0000-0000-0000-000000000001")
+EVAL_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 
 
 def numbered_pages(pages: list[str]) -> str:
@@ -51,16 +52,31 @@ async def run_classification(client: OpenAIStructuredOutputClient) -> int:
     for fixture in load_fixtures("classification"):
         result = await client.parse(
             system_prompt=CLASSIFICATION_SYSTEM_PROMPT,
-            user_content=numbered_pages(fixture["pages"]),
+            user_content=(
+                f'<document filename="{fixture["filename"]}">\n'
+                f"{numbered_pages(fixture['pages'])}\n"
+                "</document>"
+            ),
             response_model=DocumentClassificationCandidate,
+            user_id=EVAL_USER_ID,
+            document_id=EVAL_DOCUMENT_ID,
         )
-        actual = result.output.document_type
-        if result.output.confidence < MIN_KNOWN_TYPE_CONFIDENCE:
-            actual = DocumentType.UNKNOWN
-        expected = fixture["expected_document_type"]
-        passed = actual.value == expected
+        actual = [
+            {
+                "start_page": segment.start_page,
+                "end_page": segment.end_page,
+                "document_type": (
+                    segment.document_type.value
+                    if segment.confidence >= MIN_KNOWN_TYPE_CONFIDENCE
+                    else DocumentType.UNKNOWN.value
+                ),
+            }
+            for segment in result.output.segments
+        ]
+        expected = fixture["expected_segments"]
+        passed = actual == expected
         failures += not passed
-        outcome = "PASS" if passed else f"FAIL expected={expected} actual={actual.value}"
+        outcome = "PASS" if passed else f"FAIL expected={expected} actual={actual}"
         print(f"{fixture['id']}: {outcome}")
     return failures
 
@@ -73,6 +89,8 @@ async def run_dpe(client: OpenAIStructuredOutputClient) -> int:
             system_prompt=DPE_EXTRACTION_SYSTEM_PROMPT,
             user_content=numbered_pages(pages),
             response_model=DpeExtractionCandidate,
+            user_id=EVAL_USER_ID,
+            document_id=EVAL_DOCUMENT_ID,
         )
         facts = normalize_dpe_candidate(
             result.output,
@@ -115,12 +133,14 @@ async def run_structured(client: OpenAIStructuredOutputClient, suite: str) -> in
     failures = 0
     for fixture in load_fixtures(suite):
         pages = fixture["pages"]
-        result = await client.parse(
+        result: Any = await client.parse(
             system_prompt=prompt,
             user_content=numbered_pages(pages),
-            response_model=response_model,
+            response_model=cast(Any, response_model),
+            user_id=EVAL_USER_ID,
+            document_id=EVAL_DOCUMENT_ID,
         )
-        facts = normalize(
+        facts = cast(Any, normalize)(
             result.output,
             document_id=EVAL_DOCUMENT_ID,
             pages={index: text for index, text in enumerate(pages, start=1)},

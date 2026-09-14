@@ -1,5 +1,7 @@
 import logging
+from collections.abc import Sequence
 from time import perf_counter
+from uuid import UUID
 
 from starlette.concurrency import run_in_threadpool
 
@@ -59,7 +61,8 @@ class DpeExtractionService:
         self,
         document: DocumentRecord,
         extraction: DocumentExtractionRecord,
-        classification: DocumentClassificationRecord,
+        classifications: Sequence[DocumentClassificationRecord],
+        user_id: UUID,
     ) -> DpeExtractionRecord:
         existing = self.repository.get_dpe_extraction(document.id)
         if existing is not None:
@@ -70,17 +73,31 @@ class DpeExtractionService:
                 existing_facts.ademe_verification.status.value,
             )
             return existing
-        if classification.document_type != DocumentType.DPE.value:
+        if not classifications or any(
+            classification.document_type != DocumentType.DPE.value
+            for classification in classifications
+        ):
             raise DpeClassificationRequired("Document is not classified as a DPE")
+
+        page_numbers = {
+            page_number
+            for classification in classifications
+            for page_number in range(classification.start_page, classification.end_page + 1)
+        }
 
         self.repository.mark_analyzing(document)
         try:
             result = await self.llm_client.parse(
                 system_prompt=DPE_EXTRACTION_SYSTEM_PROMPT,
-                user_content=extraction_as_numbered_text(extraction),
+                user_content=extraction_as_numbered_text(
+                    extraction,
+                    page_numbers=page_numbers,
+                ),
                 response_model=DpeExtractionCandidate,
+                user_id=user_id,
+                document_id=document.id,
             )
-            pages = page_source_text(extraction)
+            pages = page_source_text(extraction, page_numbers=page_numbers)
             facts = normalize_dpe_candidate(
                 result.output,
                 document_id=document.id,

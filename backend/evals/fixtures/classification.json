@@ -1,23 +1,49 @@
 [
   {
     "id": "modern_dpe",
+    "filename": "DPE_D.pdf",
     "pages": [
       "DIAGNOSTIC DE PERFORMANCE ÉNERGÉTIQUE (logement)",
       "Montant estimé des dépenses annuelles d'énergie pour un usage standard"
     ],
-    "expected_document_type": "dpe"
+    "expected_segments": [
+      {"start_page": 1, "end_page": 2, "document_type": "dpe"}
+    ]
   },
   {
     "id": "copro_ag_minutes",
+    "filename": "PV AG 2025.pdf",
     "pages": [
       "PROCÈS-VERBAL DE L'ASSEMBLÉE GÉNÉRALE DU 12 MAI 2025",
       "Résolution n° 7 - Travaux de réfection de toiture"
     ],
-    "expected_document_type": "ag_minutes"
+    "expected_segments": [
+      {"start_page": 1, "end_page": 2, "document_type": "ag_minutes"}
+    ]
   },
   {
     "id": "insufficient_scan",
+    "filename": "scan.pdf",
     "pages": ["Document numérisé - contenu illisible"],
-    "expected_document_type": "unknown"
+    "expected_segments": [
+      {"start_page": 1, "end_page": 1, "document_type": "unknown"}
+    ]
+  },
+  {
+    "id": "concatenated_dpe_and_diagnostics",
+    "filename": "Diagnostics T3 22 Bd Reuilly.pdf",
+    "pages": [
+      "DOSSIER DE DIAGNOSTICS TECHNIQUES. Note de synthèse des conclusions.",
+      "CERTIFICAT DE SUPERFICIE conformément à la loi n°96-1107.",
+      "DPE diagnostic de performance énergétique (logement).",
+      "Montants et consommations annuels d’énergie. Vue d’ensemble du logement.",
+      "DIAGNOSTIC DE L’ÉTAT DE L’INSTALLATION INTÉRIEURE D’ÉLECTRICITÉ.",
+      "Explicitations détaillées relatives aux risques et anomalies identifiées."
+    ],
+    "expected_segments": [
+      {"start_page": 1, "end_page": 2, "document_type": "diagnostics"},
+      {"start_page": 3, "end_page": 4, "document_type": "dpe"},
+      {"start_page": 5, "end_page": 6, "document_type": "diagnostics"}
+    ]
   }
 ]
