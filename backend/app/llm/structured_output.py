@@ -20,6 +20,8 @@ class StructuredOutputResult[OutputModel: BaseModel]:
     response_id: str
     requested_model: str
     resolved_model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class StructuredOutputClient(Protocol):
@@ -64,11 +66,14 @@ class OpenAIStructuredOutputClient:
         )
         if response.output_parsed is None:
             raise RuntimeError("OpenAI returned no structured output")
+        usage = getattr(response, "usage", None)
         return StructuredOutputResult(
             output=response.output_parsed,
             response_id=response.id,
             requested_model=OPENAI_MODEL,
             resolved_model=response.model,
+            input_tokens=usage.input_tokens if usage is not None else 0,
+            output_tokens=usage.output_tokens if usage is not None else 0,
         )
 
 

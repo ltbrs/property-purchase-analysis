@@ -173,6 +173,8 @@ class DpeExtractionRecord(Base):
     requested_model: Mapped[str] = mapped_column(String(100), nullable=False)
     resolved_model: Mapped[str] = mapped_column(String(100), nullable=False)
     response_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
+    output_tokens: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(50), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

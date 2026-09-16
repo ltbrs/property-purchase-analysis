@@ -82,6 +82,8 @@ class DocumentClassificationService:
                 requested_model=result.requested_model,
                 resolved_model=result.resolved_model,
                 response_id=result.response_id,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
                 prompt_version=CLASSIFICATION_PROMPT_VERSION,
             )
         except Exception as error:

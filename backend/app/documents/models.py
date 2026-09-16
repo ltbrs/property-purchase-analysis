@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.billing.models import AnalysisAccessStatus
 from app.core.database import Base
 from app.property.models.analysis_case import PropertyType
 
@@ -239,5 +240,18 @@ class AnalysisCaseRead(BaseModel):
     price_eur: Decimal | None
     surface_m2: Decimal | None
     lot_count: int | None
+    analysis_access_status: AnalysisAccessStatus = AnalysisAccessStatus.NOT_ACTIVATED
+    analysis_access_activated_at: datetime | None = None
+    analysis_access_expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class AnalysisUsageRead(BaseModel):
+    page_count: int
+    ocr_page_count: int
+    storage_bytes: int
+    llm_input_tokens: int
+    llm_output_tokens: int
+    llm_request_count: int
+    reanalysis_count: int

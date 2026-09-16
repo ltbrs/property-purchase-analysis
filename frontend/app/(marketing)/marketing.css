@@ -1038,17 +1038,25 @@
   background: var(--lime);
 }
 
-.pricing-card button {
+.pricing-card .pricing-cta {
+  display: block;
   width: 100%;
   margin-top: auto;
   padding: 0.82rem 1rem;
   border: 0;
   border-radius: 0.75rem;
-  color: #718079;
-  background: #e9eeea;
+  color: white;
+  background: var(--green-800);
   font-size: 0.78rem;
   font-weight: 800;
-  cursor: not-allowed;
+  text-align: center;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.pricing-card .pricing-cta:hover {
+  background: var(--green-950);
+  transform: translateY(-1px);
 }
 
 .pricing-payment-note { margin-top: 1rem; color: var(--muted); font-size: 0.7rem; text-align: center; }

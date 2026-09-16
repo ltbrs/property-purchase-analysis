@@ -35,6 +35,7 @@ from app.property.normalization.dpe import (
     DpeNumberFactCandidate,
     DpeTextFactCandidate,
 )
+from tests.billing_fixtures import grant_analysis_access
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
 
@@ -217,6 +218,7 @@ def test_low_confidence_classification_is_persisted_as_unknown(session: Session)
 def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     llm_client = FakeStructuredOutputClient([classification_candidate(), dpe_candidate()])
 
     with make_client(session, llm_client) as client:
@@ -260,6 +262,7 @@ def test_analysis_endpoints_are_idempotent(
 ) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     llm_client = FakeStructuredOutputClient([classification_candidate(), dpe_candidate()])
 
     caplog.set_level("INFO", logger="uvicorn.error")
@@ -281,6 +284,7 @@ def test_analysis_endpoints_are_idempotent(
 def test_list_documents_exposes_verified_ademe_status(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     llm_client = FakeStructuredOutputClient([classification_candidate(), dpe_candidate()])
 
     with make_client(session, llm_client) as client:
@@ -317,6 +321,7 @@ def test_list_documents_exposes_verified_ademe_status(session: Session) -> None:
 def test_dpe_extraction_rejects_non_dpe_classification(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     candidate = classification_candidate()
     candidate.segments[0].document_type = DocumentType.AG_MINUTES
     llm_client = FakeStructuredOutputClient([candidate])

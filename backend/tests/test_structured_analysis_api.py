@@ -31,6 +31,7 @@ from app.property.normalization.ag_minutes import (
 from app.property.normalization.structured import StructuredExtractionRecord
 from app.reports.models import ReportRecord
 from app.risks.models.findings import RiskFindingRecord
+from tests.billing_fixtures import grant_analysis_access
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
 
@@ -146,6 +147,7 @@ def test_structured_extraction_and_findings_refresh_are_persisted_and_idempotent
 ) -> None:
     user_id = uuid4()
     case_id, document_id = seed_ag(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     candidate = AgMinutesExtractionCandidate(
         meeting_date="2025-05-12",
         items=[

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { BillingPanel } from "@/features/billing/billing-panel";
 import { signOutCurrentSession } from "@/features/auth/actions";
 import { productRoutes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +14,12 @@ function initials(name: string | null | undefined) {
     .join("");
 }
 
-export default async function AccountPage() {
+type AccountPageProps = {
+  searchParams: Promise<{ paiement?: string | string[] }>;
+};
+
+export default async function AccountPage({ searchParams }: AccountPageProps) {
+  const params = await searchParams;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) redirect(productRoutes.signIn);
@@ -64,6 +70,12 @@ export default async function AccountPage() {
           </button>
         </form>
       </div>
+
+      <BillingPanel
+        paymentStatus={
+          Array.isArray(params.paiement) ? params.paiement[0] : params.paiement
+        }
+      />
     </section>
   );
 }

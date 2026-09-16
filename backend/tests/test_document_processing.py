@@ -41,6 +41,7 @@ from app.property.normalization.dpe import (
 from app.property.normalization.structured import StructuredExtractionRecord
 from app.risks.models.findings import RiskFindingRecord
 from app.storage.object_storage import StoredObjectMetadata, get_object_storage
+from tests.billing_fixtures import grant_analysis_access
 from tests.pdf_fixtures import DPE_PDF
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -123,6 +124,8 @@ class FakeStructuredOutputClient:
             response_id=f"resp_process_{self.calls}",
             requested_model="gpt-5.6-luna",
             resolved_model="gpt-5.6-luna",
+            input_tokens=100,
+            output_tokens=25,
         )
 
 
@@ -291,6 +294,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
             json={"title": "Appartement test", "property_type": "house"},
         )
         case_id = created.json()["id"]
+        grant_analysis_access(session, user_id, case_id)
         uploaded = upload_document(client, storage, case_id, user_id)
         document_id = uploaded.json()["id"]
         process_url = f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/process"
@@ -318,6 +322,56 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
     }
     assert "MISSING_DPE_DOCUMENT" not in report_codes
     assert session.scalar(select(RiskFindingRecord)) is not None
+
+
+def test_process_without_credit_stops_after_free_document_identification(
+    session: Session,
+) -> None:
+    storage = MemoryObjectStorage()
+    parser = FakePdfParser()
+    llm_client = FakeStructuredOutputClient(dpe_outputs())
+    application = create_app()
+    application.dependency_overrides[get_db_session] = lambda: session
+    application.dependency_overrides[get_object_storage] = lambda: storage
+    application.dependency_overrides[get_pdf_parser] = lambda: parser
+    application.dependency_overrides[get_structured_output_client] = lambda: llm_client
+    user_id = uuid4()
+
+    with TestClient(application) as client:
+        created = client.post(
+            "/api/v1/analysis-cases",
+            headers=auth(user_id),
+            json={"title": "Appartement aperçu", "property_type": "house"},
+        )
+        case_id = created.json()["id"]
+        uploaded = upload_document(client, storage, case_id, user_id)
+        processed = client.post(
+            f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
+            headers=auth(user_id),
+        )
+        report = client.post(
+            f"/api/v1/analysis-cases/{case_id}/report/refresh",
+            headers=auth(user_id),
+        )
+        usage = client.get(
+            f"/api/v1/analysis-cases/{case_id}/usage",
+            headers=auth(user_id),
+        )
+
+    assert processed.status_code == 200
+    assert processed.json()["status"] == "extracted"
+    assert processed.json()["document_type"] == "dpe"
+    assert llm_client.calls == 1
+    assert report.status_code == 402
+    assert usage.json() == {
+        "page_count": 1,
+        "ocr_page_count": 0,
+        "storage_bytes": len(DPE_PDF),
+        "llm_input_tokens": 100,
+        "llm_output_tokens": 25,
+        "llm_request_count": 1,
+        "reanalysis_count": 0,
+    }
 
 
 def test_process_enforces_document_ownership(session: Session) -> None:
@@ -386,6 +440,7 @@ def test_process_extracts_each_type_from_its_pages_in_a_composite_pdf(
             json={"title": "Appartement test", "property_type": "house"},
         )
         case_id = created.json()["id"]
+        grant_analysis_access(session, user_id, case_id)
         uploaded = upload_document(client, storage, case_id, user_id)
         processed = client.post(
             f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",

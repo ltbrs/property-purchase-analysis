@@ -106,7 +106,9 @@ https://PROJECT_REF.supabase.co/auth/v1/callback
 ```
 
 Set the Supabase Auth Site URL to `https://acquora.fr`. Allow
-`https://acquora.fr/auth/callback` and the required local or preview callbacks.
+`https://acquora.fr/auth/callback` and `http://localhost:3000/**`. The local
+wildcard is required because Auth callback URLs include a `next` query parameter.
+Add any required preview callbacks separately.
 Enable confirmed e-mail addresses, custom SMTP, security notifications, bot
 protection, and an asymmetric ES256 signing key. The frontend uses PKCE callback
 routes and cookie-backed sessions through `@supabase/ssr`.
@@ -252,6 +254,10 @@ OBJECT_STORAGE_ACCESS_KEY=SERVER_SIDE_S3_ACCESS_KEY
 OBJECT_STORAGE_SECRET_KEY=SERVER_SIDE_S3_SECRET_KEY
 DOCUMENT_UPLOAD_URL_TTL_SECONDS=300
 OPENAI_API_KEY=SERVER_SIDE_OPENAI_KEY
+STRIPE_SECRET_KEY=sk_live_SERVER_SIDE_STRIPE_KEY
+STRIPE_WEBHOOK_SECRET=whsec_STRIPE_ENDPOINT_SECRET
+STRIPE_SINGLE_ANALYSIS_PRICE_ID=price_SINGLE_ANALYSIS
+STRIPE_SEARCH_PACK_PRICE_ID=price_SEARCH_PACK
 BACKEND_PROXY_SECRET=SAME_VALUE_AS_VERCEL
 CONTACT_PROXY_SECRET=SAME_VALUE_AS_VERCEL
 SUPABASE_URL=https://PROJECT_REF.supabase.co
@@ -262,7 +268,9 @@ The backend rejects authenticated requests when the backend boundary secret is
 or Supabase configuration is missing in production. Every analysis request
 requires both the private proxy secret and a Supabase access token verified
 through the project JWKS endpoint. The contact endpoint independently requires
-its contact proxy secret. Only `/api/v1/health` is intentionally public.
+its contact proxy secret. The health endpoint and the signed Stripe webhook
+endpoint are the only intentionally public routes. Stripe verifies the raw
+webhook body before any purchase or credit is changed.
 
 ### Large upload boundary
 

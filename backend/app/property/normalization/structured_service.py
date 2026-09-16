@@ -118,6 +118,8 @@ class StructuredExtractionService:
                     requested_model=ag_result.requested_model,
                     resolved_model=ag_result.resolved_model,
                     response_id=ag_result.response_id,
+                    input_tokens=ag_result.input_tokens,
+                    output_tokens=ag_result.output_tokens,
                     prompt_version=AG_EXTRACTION_PROMPT_VERSION,
                 )
             elif extraction_type == StructuredExtractionType.FINANCIALS:
@@ -138,6 +140,8 @@ class StructuredExtractionService:
                     requested_model=financial_result.requested_model,
                     resolved_model=financial_result.resolved_model,
                     response_id=financial_result.response_id,
+                    input_tokens=financial_result.input_tokens,
+                    output_tokens=financial_result.output_tokens,
                     prompt_version=FINANCIAL_EXTRACTION_PROMPT_VERSION,
                 )
             else:
@@ -158,6 +162,8 @@ class StructuredExtractionService:
                     requested_model=diagnostic_result.requested_model,
                     resolved_model=diagnostic_result.resolved_model,
                     response_id=diagnostic_result.response_id,
+                    input_tokens=diagnostic_result.input_tokens,
+                    output_tokens=diagnostic_result.output_tokens,
                     prompt_version=DIAGNOSTIC_EXTRACTION_PROMPT_VERSION,
                 )
         except Exception as error:

@@ -68,6 +68,10 @@ The initial scaffold recognizes these variables:
 | `DOCUMENT_VIEW_URL_TTL_SECONDS` | Lifetime of private PDF viewing links (5 minutes by default) |
 | `MAX_UPLOAD_SIZE_BYTES` | Maximum PDF size (25 MiB by default) |
 | `OPENAI_API_KEY` | Server-side OpenAI API key used for structured extraction |
+| `STRIPE_SECRET_KEY` | Server-side Stripe secret key, use `sk_test_…` outside production |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for the Stripe webhook endpoint |
+| `STRIPE_SINGLE_ANALYSIS_PRICE_ID` | Stripe Price ID for one analysis at 19 € TTC |
+| `STRIPE_SEARCH_PACK_PRICE_ID` | Stripe Price ID for three analyses at 39 € TTC |
 
 The frontend-specific file recognizes:
 
@@ -89,7 +93,7 @@ provider page. It has this form:
 https://PROJECT_REF.supabase.co/auth/v1/callback
 ```
 
-Configure `http://localhost:3000/auth/callback` and
+Configure `http://localhost:3000/**` and
 `https://acquora.fr/auth/callback` in the Supabase Auth redirect allow list.
 Production password authentication also requires custom SMTP and confirmed-email
 templates in Supabase Auth. Acquora uses Resend only as the SMTP delivery service
@@ -101,6 +105,21 @@ cannot be selected by a request or changed through environment configuration.
 
 Never commit a populated `.env` file. Replace the example object-storage secret
 outside local development.
+
+### Stripe test-mode setup
+
+Create two one-time EUR prices in Stripe test mode: 19 € for `single_analysis`
+and 39 € for `search_pack`. Put their `price_…` identifiers and the test secret
+key in the root `.env`. Forward signed events to the local backend:
+
+```bash
+stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded \
+  --forward-to localhost:8000/api/v1/billing/stripe/webhook
+```
+
+Copy the `whsec_…` value printed by Stripe CLI into `STRIPE_WEBHOOK_SECRET`.
+Checkout fulfillment is webhook-only, so returning to the success page never
+creates credits by itself.
 
 See [docs/deployment.md](docs/deployment.md) for the Vercel, Supabase, OVH DNS,
 and FastAPI production setup.
