@@ -128,6 +128,8 @@ class DocumentClassificationRecord(Base):
     requested_model: Mapped[str] = mapped_column(String(100), nullable=False)
     resolved_model: Mapped[str] = mapped_column(String(100), nullable=False)
     response_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
+    output_tokens: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(50), nullable=False)
     raw_output: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

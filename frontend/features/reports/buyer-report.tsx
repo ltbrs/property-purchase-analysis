@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
+import {
+  BillingPanel,
+  type BillingSummary,
+} from "@/features/billing/billing-panel";
 import {
   PdfViewer,
   type PdfDocumentSelection,
@@ -15,6 +19,7 @@ import {
   getWorkspace,
   readApiError,
   resetWorkspace,
+  type AnalysisCase,
   type Workspace,
 } from "@/lib/workspace";
 
@@ -23,6 +28,7 @@ type FindingStatus = "confirmed" | "likely" | "possible" | "missing_information"
 type AnalysisType = "risk" | "verification" | "reassuring" | "missing_information";
 type ReviewStatus = "open" | "not_problematic";
 type Expectation = "definitely_expected" | "usually_useful" | "context_dependent";
+type AnalysisAccessStatus = AnalysisCase["analysis_access_status"];
 
 type ReportSource = {
   document_id: string;
@@ -124,20 +130,47 @@ const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
   minute: "2-digit",
 });
 
-async function requestReport(workspace: Workspace) {
+async function generateReport(workspace: Workspace) {
   return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/report/refresh`, {
     method: "POST",
   });
 }
 
-async function fetchReport(workspace: Workspace): Promise<BuyerReportData | null> {
-  const response = await requestReport(workspace);
-  if (response.status === 404) {
-    resetWorkspace(workspace.caseId);
-    return null;
-  }
+async function refreshReport(workspace: Workspace): Promise<BuyerReportData> {
+  const response = await generateReport(workspace);
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as BuyerReportData;
+}
+
+async function fetchExistingReport(workspace: Workspace): Promise<BuyerReportData | null> {
+  const response = await fetch(
+    `${API_URL}/analysis-cases/${workspace.caseId}/report`,
+    { cache: "no-store" },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as BuyerReportData;
+}
+
+async function processCaseDocuments(workspace: Workspace) {
+  const response = await fetch(
+    `${API_URL}/analysis-cases/${workspace.caseId}/documents`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) throw new Error(await readApiError(response));
+  const documents = (await response.json()) as Array<{ id: string; status: string }>;
+  const results = await Promise.all(
+    documents
+      .filter(({ status: documentStatus }) => documentStatus !== "completed")
+      .map(async ({ id }) => {
+        const processing = await fetch(
+          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${id}/process`,
+          { method: "POST" },
+        );
+        if (!processing.ok) throw new Error(await readApiError(processing));
+      }),
+  );
+  return results;
 }
 
 async function updateFindingReview(
@@ -158,9 +191,14 @@ async function updateFindingReview(
   if (!response.ok) throw new Error(await readApiError(response));
 }
 
-const pendingReportLoads = new Map<string, Promise<BuyerReportData | null>>();
+type AnalysisLoad = {
+  accessStatus: AnalysisAccessStatus;
+  report: BuyerReportData | null;
+};
 
-function loadReport(): Promise<BuyerReportData | null> {
+const pendingReportLoads = new Map<string, Promise<AnalysisLoad | null>>();
+
+function loadReport(): Promise<AnalysisLoad | null> {
   const workspace = getWorkspace();
   if (!workspace) return Promise.resolve(null);
 
@@ -168,10 +206,32 @@ function loadReport(): Promise<BuyerReportData | null> {
   const pendingLoad = pendingReportLoads.get(requestKey);
   if (pendingLoad) return pendingLoad;
 
-  const load = fetchReport(workspace).finally(() => {
-    if (pendingReportLoads.get(requestKey) === load) {
-      pendingReportLoads.delete(requestKey);
+  const load = (async () => {
+    const caseResponse = await fetch(`${API_URL}/analysis-cases/${workspace.caseId}`, {
+      cache: "no-store",
+    });
+    if (caseResponse.status === 404) {
+      resetWorkspace(workspace.caseId);
+      return null;
     }
+    if (!caseResponse.ok) throw new Error(await readApiError(caseResponse));
+    const analysisCase = (await caseResponse.json()) as AnalysisCase;
+    if (analysisCase.analysis_access_status === "not_activated") {
+      return { accessStatus: analysisCase.analysis_access_status, report: null };
+    }
+    if (analysisCase.analysis_access_status === "expired") {
+      return {
+        accessStatus: analysisCase.analysis_access_status,
+        report: await fetchExistingReport(workspace),
+      };
+    }
+    await processCaseDocuments(workspace);
+    return {
+      accessStatus: analysisCase.analysis_access_status,
+      report: await refreshReport(workspace),
+    };
+  })().finally(() => {
+    if (pendingReportLoads.get(requestKey) === load) pendingReportLoads.delete(requestKey);
   });
   pendingReportLoads.set(requestKey, load);
   return load;
@@ -434,15 +494,21 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatingFindingKey, setUpdatingFindingKey] = useState<string | null>(null);
+  const [accessStatus, setAccessStatus] = useState<AnalysisAccessStatus | null>(null);
+  const [availableAnalyses, setAvailableAnalyses] = useState(0);
+  const handleBillingSummary = useCallback((summary: BillingSummary) => {
+    setAvailableAnalyses(summary.available_analyses);
+  }, []);
 
   async function refresh() {
     setIsLoading(true);
     setError(null);
     try {
-      const loadedReport = await loadReport();
-      setNeedsWorkspace(loadedReport === null);
-      setReport(loadedReport);
-      if (loadedReport !== null) {
+      const loaded = await loadReport();
+      setNeedsWorkspace(loaded === null);
+      setAccessStatus(loaded?.accessStatus ?? null);
+      setReport(loaded?.report ?? null);
+      if (loaded?.report) {
         captureProductEvent("analysis_report_refreshed", { report_variant: variant });
       }
     } catch (refreshError) {
@@ -455,10 +521,11 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   useEffect(() => {
     let cancelled = false;
     void loadReport()
-      .then((loadedReport) => {
+      .then((loaded) => {
         if (!cancelled) {
-          setNeedsWorkspace(loadedReport === null);
-          setReport(loadedReport);
+          setNeedsWorkspace(loaded === null);
+          setAccessStatus(loaded?.accessStatus ?? null);
+          setReport(loaded?.report ?? null);
         }
       })
       .catch((loadError: unknown) => {
@@ -473,6 +540,37 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       cancelled = true;
     };
   }, []);
+
+  async function activateAnalysis() {
+    const workspace = getWorkspace();
+    if (!workspace) {
+      setNeedsWorkspace(true);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const activation = await fetch(
+        `${API_URL}/billing/analysis-cases/${workspace.caseId}/activate`,
+        { method: "POST" },
+      );
+      if (!activation.ok) throw new Error(await readApiError(activation));
+      await processCaseDocuments(workspace);
+      const loadedReport = await refreshReport(workspace);
+      setAccessStatus("active");
+      setReport(loadedReport);
+      setAvailableAnalyses((current) => Math.max(0, current - 1));
+      captureProductEvent("analysis_case_activated", {});
+    } catch (activationError) {
+      setError(
+        activationError instanceof Error
+          ? activationError.message
+          : "L’analyse complète n’a pas pu être lancée.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (selectedFinding === null || viewingSource !== null) return;
@@ -497,7 +595,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         finding.finding_key,
         checked ? "not_problematic" : "open",
       );
-      const updatedReport = await fetchReport(workspace);
+      const updatedReport = await fetchExistingReport(workspace);
       setReport(updatedReport);
       captureProductEvent("report_finding_review_updated", {
         analysis_type: finding.analysis_type,
@@ -541,13 +639,43 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     );
   }
 
-  if (error && report === null) {
+  if (error && report === null && accessStatus === null) {
     return (
       <div className="report-state report-error" role="alert">
         <span className="state-icon"><Icon name="alert" /></span>
         <strong>Rapport indisponible</strong>
         <span>{error}</span>
         <button type="button" onClick={() => void refresh()}>Réessayer</button>
+      </div>
+    );
+  }
+
+  if (report === null && accessStatus !== null) {
+    return (
+      <div className="analysis-paywall">
+        <div className="analysis-paywall-copy">
+          <span className="state-icon"><Icon name="shield" /></span>
+          <p className="eyebrow">Analyse complète</p>
+          <h1>
+            {accessStatus === "expired"
+              ? "La période de mise à jour est terminée"
+              : "Débloquez l’analyse complète de ce bien"}
+          </h1>
+          <p>
+            Risques, coûts futurs, incohérences et informations manquantes restent reliés
+            aux documents et aux pages qui les justifient.
+          </p>
+          {availableAnalyses > 0 ? (
+            <button type="button" disabled={isLoading} onClick={() => void activateAnalysis()}>
+              {isLoading ? "Analyse en cours…" : "Utiliser une analyse disponible"}
+            </button>
+          ) : null}
+          {error ? <p className="billing-error" role="alert">{error}</p> : null}
+        </div>
+        <BillingPanel
+          compact
+          onSummaryChange={handleBillingSummary}
+        />
       </div>
     );
   }
@@ -603,9 +731,15 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <span className="attention-count">
             <i /> {report.summary.high_or_critical_count} risque{report.summary.high_or_critical_count === 1 ? "" : "s"} important{report.summary.high_or_critical_count === 1 ? "" : "s"}
           </span>
-          <button className="refresh-icon-button" type="button" disabled={isLoading} aria-label="Actualiser l’analyse" title="Actualiser l’analyse" onClick={() => void refresh()}>
-            <Icon name="refresh" />
-          </button>
+          {accessStatus === "active" ? (
+            <button className="refresh-icon-button" type="button" disabled={isLoading} aria-label="Actualiser l’analyse" title="Actualiser l’analyse" onClick={() => void refresh()}>
+              <Icon name="refresh" />
+            </button>
+          ) : (
+            <button className="analysis-renew-button" type="button" onClick={() => setReport(null)}>
+              Mettre à jour
+            </button>
+          )}
         </div>
       </header>
 

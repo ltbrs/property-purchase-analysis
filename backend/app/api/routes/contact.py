@@ -60,7 +60,7 @@ def _daily_rate_limit() -> str:
 
 def rate_limit_exceeded_handler(request: Request, _: Exception) -> Response:
     response = JSONResponse(
-        {"detail": "Too many contact requests"},
+        {"detail": "Too many requests"},
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         headers={"Cache-Control": "no-store"},
     )

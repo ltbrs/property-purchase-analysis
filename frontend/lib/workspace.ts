@@ -15,6 +15,9 @@ export type AnalysisCase = {
   price_eur: string | null;
   surface_m2: string | null;
   lot_count: number | null;
+  analysis_access_status: "not_activated" | "active" | "expired";
+  analysis_access_activated_at: string | null;
+  analysis_access_expires_at: string | null;
   created_at: string;
   updated_at: string;
 };

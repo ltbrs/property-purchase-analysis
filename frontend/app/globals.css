@@ -573,6 +573,176 @@ svg {
   background: #dfe5df;
 }
 
+.billing-panel {
+  margin-top: 1.25rem;
+  padding: 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.billing-panel-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.billing-panel-heading h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+}
+
+.billing-panel-heading > strong {
+  display: grid;
+  min-width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 0.85rem;
+  color: var(--green-950);
+  background: var(--lime);
+  font-size: 1.15rem;
+}
+
+.billing-notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0 0;
+  padding: 0.75rem;
+  border-radius: 0.7rem;
+  color: var(--muted);
+  background: #eef2ef;
+  font-size: 0.72rem;
+}
+
+.billing-notice.is-success {
+  color: var(--green-700);
+  background: #edf5f0;
+}
+
+.billing-notice svg {
+  width: 1rem;
+  flex: 0 0 auto;
+}
+
+.billing-offers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.billing-offers article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: #fafbf9;
+}
+
+.billing-offers article > div {
+  display: grid;
+}
+
+.billing-offers article strong,
+.billing-offers article span {
+  font-size: 0.72rem;
+}
+
+.billing-offers article span {
+  color: var(--muted);
+}
+
+.billing-offers article b {
+  color: var(--green-800);
+  font-size: 1rem;
+}
+
+.billing-offers article button {
+  grid-column: 1 / -1;
+  padding: 0.62rem 0.8rem;
+  border: 0;
+  border-radius: 0.65rem;
+  color: white;
+  background: var(--green-800);
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.billing-offers article button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.billing-footnote {
+  margin: 0.8rem 0 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.billing-error {
+  margin: 0.8rem 0 0;
+  color: #8b3c34;
+  font-size: 0.72rem;
+}
+
+.analysis-paywall {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.8fr) minmax(26rem, 1.2fr);
+  gap: 1rem;
+  max-width: 65rem;
+  margin: 1rem auto;
+}
+
+.analysis-paywall-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.analysis-paywall-copy h1 {
+  margin: 0.4rem 0 0;
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+
+.analysis-paywall-copy > p:not(.eyebrow, .billing-error) {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.analysis-paywall-copy > button,
+.analysis-renew-button {
+  margin-top: 1.25rem;
+  padding: 0.7rem 0.9rem;
+  border: 0;
+  border-radius: 0.7rem;
+  color: white;
+  background: var(--green-800);
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.analysis-paywall .billing-panel {
+  margin-top: 0;
+}
+
 .app-frame {
   min-height: 100vh;
 }
@@ -3248,7 +3418,18 @@ svg {
   }
 }
 
+@media (max-width: 58rem) {
+  .analysis-paywall {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 38rem) {
+  .billing-offers,
+  .analysis-paywall {
+    grid-template-columns: 1fr;
+  }
+
   .account-card {
     grid-template-columns: auto minmax(0, 1fr);
   }

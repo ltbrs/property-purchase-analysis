@@ -23,6 +23,7 @@ from app.storage.object_storage import (
     StoredObjectMetadata,
     get_object_storage,
 )
+from tests.billing_fixtures import grant_analysis_access
 
 PDF_CONTENT = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 
@@ -137,7 +138,9 @@ def upload_document(
     )
 
 
-def test_property_type_updates_the_expected_coproperty_documents(client: TestClient) -> None:
+def test_property_type_updates_the_expected_coproperty_documents(
+    client: TestClient, session: Session
+) -> None:
     user_id = uuid4()
     created = client.post(
         "/api/v1/analysis-cases",
@@ -148,6 +151,7 @@ def test_property_type_updates_the_expected_coproperty_documents(client: TestCli
         },
     )
     case_id = created.json()["id"]
+    grant_analysis_access(session, user_id, case_id)
 
     house_report = client.post(
         f"/api/v1/analysis-cases/{case_id}/report/refresh",
@@ -209,6 +213,9 @@ def test_create_case_persists_the_property_details(client: TestClient, session: 
         "price_eur": "425000.50",
         "surface_m2": "67.40",
         "lot_count": 3,
+        "analysis_access_status": "not_activated",
+        "analysis_access_activated_at": None,
+        "analysis_access_expires_at": None,
         "created_at": response.json()["created_at"],
         "updated_at": response.json()["updated_at"],
     }

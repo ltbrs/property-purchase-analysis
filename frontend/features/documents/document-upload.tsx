@@ -78,12 +78,13 @@ type AnalysisCase = {
   id: string;
   title: string;
   property_type: PropertyType;
+  analysis_access_status: "not_activated" | "active" | "expired";
 };
 
 const statusLabels: Record<DocumentStatus, string> = {
   uploaded: "Importé",
   extracting: "Extraction en cours",
-  extracted: "Extrait",
+  extracted: "Identifié",
   analyzing: "Analyse en cours",
   completed: "Analysé",
   failed: "Échec",
@@ -389,6 +390,9 @@ function ExpectedDocumentRow({
 export function DocumentUpload() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
+  const [analysisAccessStatus, setAnalysisAccessStatus] = useState<
+    AnalysisCase["analysis_access_status"]
+  >("not_activated");
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
@@ -435,6 +439,7 @@ export function DocumentUpload() {
           setWorkspace(currentWorkspace);
           setDocuments(uploadedDocuments);
           setPropertyType(analysisCase.property_type);
+          setAnalysisAccessStatus(analysisCase.analysis_access_status);
         }
       } catch (initializationError) {
         if (!cancelled) {
@@ -741,7 +746,9 @@ export function DocumentUpload() {
           {isUploading
             ? "Import en cours…"
             : isProcessing
-              ? "Analyse en cours…"
+              ? analysisAccessStatus === "active"
+                ? "Analyse en cours…"
+                : "Identification en cours…"
               : "Choisir des fichiers"}
           <input
             ref={inputRef}

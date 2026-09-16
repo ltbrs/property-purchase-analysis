@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { Icon } from "@/components/icons";
+import { productRoutes } from "@/lib/routes";
 import { createMarketingMetadata } from "@/lib/seo";
 
 export const metadata = createMarketingMetadata({
@@ -14,36 +17,43 @@ const offers = [
     description: "Pour vérifier qu’Acquora comprend bien les premières pièces du bien.",
     price: "0 €",
     priceDetail: "sans carte bancaire",
+    href: productRoutes.cases,
+    cta: "Créer un dossier",
     features: [
-      "1 document analysé",
-      "Informations principales extraites",
-      "Nombre de points de vigilance détectés",
-      "Détails du rapport partiellement masqués",
+      "Création du bien et ajout des documents",
+      "Identification des pièces reçues",
+      "Inventaire des documents manquants",
+      "Aperçu avant de lancer l’analyse complète",
     ],
   },
   {
     name: "Analyse complète",
     description: "Pour examiner un bien avant de faire une offre ou de vous engager.",
-    price: "39 €",
+    price: "19 €",
     priceDetail: "TTC par dossier",
+    href: `${productRoutes.account}?offre=single_analysis`,
+    cta: "Choisir cette analyse",
     features: [
       "Analyse complète des documents du dossier",
       "Risques et coûts à anticiper",
       "Incohérences et informations manquantes",
       "Sources et pages associées aux constats",
       "Questions utiles à transmettre aux professionnels",
+      "Documents ajoutables pendant 30 jours",
     ],
   },
   {
     name: "Pack Recherche",
     description: "Pour comparer plusieurs biens au fil de votre recherche immobilière.",
-    price: "79 €",
+    price: "39 €",
     priceDetail: "TTC pour 3 dossiers",
+    href: `${productRoutes.account}?offre=search_pack`,
+    cta: "Choisir le pack",
     features: [
       "3 analyses complètes",
       "Les mêmes contrôles pour chaque bien",
-      "Analyses utilisables sans date limite",
-      "Économie de 38 € par rapport à trois analyses séparées",
+      "Crédits utilisables pendant 12 mois",
+      "Économie de 18 € par rapport à trois analyses séparées",
     ],
   },
 ] as const;
@@ -51,7 +61,7 @@ const offers = [
 const comparisons = [
   {
     label: "Documents analysés",
-    values: ["1 document", "Dossier complet", "3 dossiers complets"],
+    values: ["Identification", "Dossier complet", "3 dossiers complets"],
   },
   {
     label: "Constats détaillés et sourcés",
@@ -67,7 +77,7 @@ const comparisons = [
   },
   {
     label: "Durée de validité",
-    values: ["Sans objet", "Sans objet", "Sans date limite"],
+    values: ["Sans objet", "Mises à jour pendant 30 jours", "Crédits valables 12 mois"],
   },
 ] as const;
 
@@ -82,7 +92,7 @@ export default function PricingPage() {
           trois analyses pour votre recherche. Aucun abonnement.
         </p>
         <span className="pricing-launch-note">
-          <Icon name="info" /> Acquora ouvre bientôt. Les achats sont désactivés pour le moment.
+          <Icon name="info" /> Paiement unique, sans abonnement.
         </span>
       </section>
 
@@ -102,7 +112,7 @@ export default function PricingPage() {
                 <li key={feature}><Icon name="check" /> {feature}</li>
               ))}
             </ul>
-            <button type="button" disabled>Bientôt disponible</button>
+            <Link className="pricing-cta" href={offer.href}>{offer.cta}</Link>
           </article>
         ))}
       </section>

@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     backend_proxy_secret: SecretStr | None = None
     supabase_url: str | None = None
     supabase_jwt_audience: str = "authenticated"
+    stripe_secret_key: SecretStr | None = None
+    stripe_webhook_secret: SecretStr | None = None
+    stripe_single_analysis_price_id: str | None = None
+    stripe_search_pack_price_id: str | None = None
     contact_short_rate_limit: int = Field(default=5, ge=1, le=100)
     contact_daily_rate_limit: int = Field(default=20, ge=1, le=1000)
 
@@ -60,12 +64,26 @@ class Settings(BaseSettings):
         "openai_api_key",
         "contact_proxy_secret",
         "backend_proxy_secret",
+        "stripe_secret_key",
+        "stripe_webhook_secret",
         mode="before",
     )
     @classmethod
     def empty_secret_is_unconfigured(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator(
+        "stripe_single_analysis_price_id",
+        "stripe_search_pack_price_id",
+        mode="before",
+    )
+    @classmethod
+    def empty_string_is_unconfigured(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
         return value
 
     @field_validator("supabase_url", mode="before")

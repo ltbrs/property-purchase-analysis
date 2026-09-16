@@ -46,7 +46,11 @@ class DocumentProcessingService:
         self.llm_client = llm_client
 
     async def process(
-        self, document: DocumentRecord, user_id: UUID
+        self,
+        document: DocumentRecord,
+        user_id: UUID,
+        *,
+        full_analysis: bool = True,
     ) -> list[DocumentClassificationRecord]:
         extraction = self.repository.get_extraction(document.id)
         if extraction is None:
@@ -62,6 +66,9 @@ class DocumentProcessingService:
         classifications = await DocumentClassificationService(
             self.repository, self.llm_client
         ).classify(document, extraction, user_id)
+
+        if not full_analysis:
+            return classifications
 
         dpe_classifications = [
             classification

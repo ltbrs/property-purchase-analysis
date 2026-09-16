@@ -168,6 +168,22 @@ class DocumentRepository:
             .where(DocumentExtractionRecord.document_id == document_id)
         )
 
+    def list_case_extractions(
+        self, analysis_case_id: UUID, user_id: UUID
+    ) -> list[DocumentExtractionRecord]:
+        return list(
+            self.session.scalars(
+                select(DocumentExtractionRecord)
+                .join(DocumentRecord, DocumentRecord.id == DocumentExtractionRecord.document_id)
+                .join(DocumentRecord.analysis_case)
+                .options(selectinload(DocumentExtractionRecord.pages))
+                .where(
+                    DocumentRecord.analysis_case_id == analysis_case_id,
+                    AnalysisCaseRecord.user_id == user_id,
+                )
+            )
+        )
+
     def get_classification(
         self,
         document_id: UUID,
@@ -343,6 +359,8 @@ class DocumentRepository:
         resolved_model: str,
         response_id: str,
         prompt_version: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
     ) -> list[DocumentClassificationRecord]:
         classifications = [
             DocumentClassificationRecord(
@@ -359,6 +377,8 @@ class DocumentRepository:
                 requested_model=requested_model,
                 resolved_model=resolved_model,
                 response_id=response_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 prompt_version=prompt_version,
                 raw_output=candidate.model_dump(mode="json"),
             )
@@ -385,6 +405,8 @@ class DocumentRepository:
         resolved_model: str,
         response_id: str,
         prompt_version: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
     ) -> DpeExtractionRecord:
         dpe_extraction = DpeExtractionRecord(
             document_id=document.id,
@@ -392,6 +414,8 @@ class DocumentRepository:
             requested_model=requested_model,
             resolved_model=resolved_model,
             response_id=response_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             prompt_version=prompt_version,
         )
         self.session.add(dpe_extraction)
@@ -415,6 +439,8 @@ class DocumentRepository:
         resolved_model: str,
         response_id: str,
         prompt_version: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
     ) -> StructuredExtractionRecord:
         extraction = StructuredExtractionRecord(
             document_id=document.id,
@@ -423,6 +449,8 @@ class DocumentRepository:
             requested_model=requested_model,
             resolved_model=resolved_model,
             response_id=response_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             prompt_version=prompt_version,
         )
         self.session.add(extraction)
