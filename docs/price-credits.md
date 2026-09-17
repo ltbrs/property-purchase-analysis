@@ -1,3 +1,11 @@
+> Décision MVP du 17 septembre 2026 : un crédit disponible est requis pour créer
+> un dossier. Le crédit n’est consommé qu’à l’activation de ce dossier. Le
+> téléversement, l’extraction et la classification LLM exigent un accès actif.
+> Les dossiers déjà créés restent consultables sans crédit disponible. Les
+> passages ci-dessous qui proposent un parcours gratuit sont conservés comme
+> réflexion produit antérieure, mais ne décrivent plus le comportement de
+> l’application.
+
 Je pense que ton unité commerciale ne doit être **ni le PDF, ni le nombre de dossiers**, mais **l’analyse d’un bien immobilier**, avec une limite technique suffisamment généreuse pour que l’utilisateur n’ait presque jamais à y penser.
 
 Pour Acquora, j’éviterais donc un système visible du type « 100 crédits » où chaque PDF/page consomme des crédits. C’est cohérent techniquement, mais assez mauvais côté UX : l’acheteur veut savoir « combien me coûte l’analyse de cet appartement ? », pas calculer combien de crédits va coûter son règlement de copropriété de 180 pages.

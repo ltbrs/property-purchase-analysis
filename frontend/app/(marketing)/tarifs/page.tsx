@@ -7,23 +7,26 @@ import { createMarketingMetadata } from "@/lib/seo";
 export const metadata = createMarketingMetadata({
   title: "Tarifs de l’analyse documentaire immobilière",
   description:
-    "Découvrez les tarifs Acquora pour analyser les documents d’un achat immobilier : aperçu gratuit, analyse complète ou pack de trois analyses.",
+    "Découvrez les tarifs Acquora pour analyser les documents d’un achat immobilier : dossier gratuit, analyse complète ou pack de trois analyses.",
   path: "/tarifs",
 });
 
 const offers = [
   {
-    name: "Aperçu gratuit",
-    description: "Pour vérifier qu’Acquora comprend bien les premières pièces du bien.",
+    name: "Dossier gratuit",
+    description: "Pour préparer le bien et vérifier les pièces à réunir avant l’analyse.",
     price: "0 €",
     priceDetail: "sans carte bancaire",
     href: productRoutes.cases,
     cta: "Créer un dossier",
     features: [
-      "Création du bien et ajout des documents",
-      "Identification des pièces reçues",
-      "Inventaire des documents manquants",
-      "Aperçu avant de lancer l’analyse complète",
+      { label: "Biens concernés", value: "1 bien à préparer" },
+      { label: "Documents", value: "liste des pièces attendues" },
+      { label: "Risques et coûts", value: "non inclus" },
+      { label: "Incohérences et informations manquantes", value: "non incluses" },
+      { label: "Sources et pages", value: "non incluses" },
+      { label: "Questions à poser", value: "non incluses" },
+      { label: "Accès", value: "création sans carte bancaire" },
     ],
   },
   {
@@ -34,12 +37,13 @@ const offers = [
     href: `${productRoutes.account}?offre=single_analysis`,
     cta: "Choisir cette analyse",
     features: [
-      "Analyse complète des documents du dossier",
-      "Risques et coûts à anticiper",
-      "Incohérences et informations manquantes",
-      "Sources et pages associées aux constats",
-      "Questions utiles à transmettre aux professionnels",
-      "Documents ajoutables pendant 30 jours",
+      { label: "Biens concernés", value: "1 bien analysé" },
+      { label: "Documents", value: "analyse complète" },
+      { label: "Risques et coûts", value: "inclus" },
+      { label: "Incohérences et informations manquantes", value: "incluses" },
+      { label: "Sources et pages", value: "incluses" },
+      { label: "Questions à poser", value: "incluses" },
+      { label: "Accès", value: "ajout de documents pendant 30 jours" },
     ],
   },
   {
@@ -50,34 +54,14 @@ const offers = [
     href: `${productRoutes.account}?offre=search_pack`,
     cta: "Choisir le pack",
     features: [
-      "3 analyses complètes",
-      "Les mêmes contrôles pour chaque bien",
-      "Crédits utilisables pendant 12 mois",
-      "Économie de 18 € par rapport à trois analyses séparées",
+      { label: "Biens concernés", value: "3 biens analysés" },
+      { label: "Documents", value: "analyse complète pour chaque bien" },
+      { label: "Risques et coûts", value: "inclus pour chaque bien" },
+      { label: "Incohérences et informations manquantes", value: "incluses pour chaque bien" },
+      { label: "Sources et pages", value: "incluses pour chaque bien" },
+      { label: "Questions à poser", value: "incluses pour chaque bien" },
+      { label: "Accès", value: "3 crédits valables 12 mois" },
     ],
-  },
-] as const;
-
-const comparisons = [
-  {
-    label: "Documents analysés",
-    values: ["Identification", "Dossier complet", "3 dossiers complets"],
-  },
-  {
-    label: "Constats détaillés et sourcés",
-    values: ["Aperçu partiel", "Inclus", "Inclus"],
-  },
-  {
-    label: "Informations manquantes et incohérences",
-    values: ["Nombre détecté", "Détail inclus", "Détail inclus"],
-  },
-  {
-    label: "Questions à poser",
-    values: ["Non incluses", "Incluses", "Incluses"],
-  },
-  {
-    label: "Durée de validité",
-    values: ["Sans objet", "Mises à jour pendant 30 jours", "Crédits valables 12 mois"],
   },
 ] as const;
 
@@ -88,8 +72,8 @@ export default function PricingPage() {
         <p className="pricing-kicker"><span /> Tarifs</p>
         <h1 id="pricing-title">Un prix simple pour une décision importante.</h1>
         <p>
-          Commencez par un aperçu, analysez un bien en profondeur ou gardez
-          trois analyses pour votre recherche. Aucun abonnement.
+          Préparez gratuitement votre dossier, analysez un bien en profondeur ou
+          gardez trois analyses pour votre recherche. Aucun abonnement.
         </p>
         <span className="pricing-launch-note">
           <Icon name="info" /> Paiement unique, sans abonnement.
@@ -109,7 +93,10 @@ export default function PricingPage() {
             </div>
             <ul>
               {offer.features.map((feature) => (
-                <li key={feature}><Icon name="check" /> {feature}</li>
+                <li key={feature.label}>
+                  <Icon name="check" />
+                  <span>{feature.label} : <strong>{feature.value}</strong></span>
+                </li>
               ))}
             </ul>
             <Link className="pricing-cta" href={offer.href}>{offer.cta}</Link>
@@ -120,33 +107,6 @@ export default function PricingPage() {
       <p className="pricing-payment-note">
         Paiement unique, sans abonnement. Les prix affichés sont toutes taxes comprises.
       </p>
-
-      <section className="pricing-comparison" aria-labelledby="comparison-title">
-        <div className="pricing-section-heading">
-          <p className="pricing-section-label">Comparer les offres</p>
-          <h2 id="comparison-title">Choisissez selon l’avancement de votre recherche.</h2>
-        </div>
-        <div className="pricing-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Fonctionnalité</th>
-                {offers.map((offer) => <th scope="col" key={offer.name}>{offer.name}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {comparisons.map((row) => (
-                <tr key={row.label}>
-                  <th scope="row">{row.label}</th>
-                  {row.values.map((value, index) => (
-                    <td key={`${row.label}-${offers[index].name}`}>{value}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       {/*
       <section className="pricing-reassurance" aria-labelledby="reassurance-title">

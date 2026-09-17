@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AdemeMark } from "@/components/ademe-mark";
 import { Icon } from "@/components/icons";
+import {
+  BillingPanel,
+  type BillingSummary,
+} from "@/features/billing/billing-panel";
 import {
   documentTypeLabels,
   expectedDocumentsFor,
@@ -398,6 +402,7 @@ export function DocumentUpload() {
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
@@ -406,7 +411,11 @@ export function DocumentUpload() {
   const [viewingExtraction, setViewingExtraction] =
     useState<RawExtractionSelection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [availableAnalyses, setAvailableAnalyses] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const handleBillingSummary = useCallback((summary: BillingSummary) => {
+    setAvailableAnalyses(summary.available_analyses);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -522,7 +531,11 @@ export function DocumentUpload() {
   }
 
   async function uploadFiles(files: File[]) {
-    if (!workspace || files.length === 0) return;
+    if (
+      !workspace ||
+      analysisAccessStatus !== "active" ||
+      files.length === 0
+    ) return;
 
     setError(null);
     const invalidFile = files.find(
@@ -707,6 +720,34 @@ export function DocumentUpload() {
     }
   }
 
+  async function activateAnalysis() {
+    if (!workspace || isActivating) return;
+
+    setIsActivating(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_URL}/billing/analysis-cases/${workspace.caseId}/activate`,
+        { method: "POST" },
+      );
+      if (!response.ok) throw new Error(await readApiError(response));
+      const access = (await response.json()) as {
+        status: AnalysisCase["analysis_access_status"];
+      };
+      setAnalysisAccessStatus(access.status);
+      setAvailableAnalyses((current) => Math.max(0, current - 1));
+      captureProductEvent("analysis_case_activated", { activation_source: "documents" });
+    } catch (activationError) {
+      setError(
+        activationError instanceof Error
+          ? activationError.message
+          : "L’analyse de ce dossier n’a pas pu être activée.",
+      );
+    } finally {
+      setIsActivating(false);
+    }
+  }
+
   const expectedDocuments = expectedDocumentsFor(propertyType);
   const matchedDocumentIds = new Set<string>();
   const coverage = expectedDocuments.map((expectation) => {
@@ -733,38 +774,64 @@ export function DocumentUpload() {
         onChange={(value) => void updatePropertyType(value)}
       />
 
-      <div className="upload-card">
-        <div className="upload-card-copy">
-          <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
-          <div>
-            <h2>Ajouter des documents</h2>
-            <p>PDF uniquement, 25 Mo maximum par fichier.</p>
+      {analysisAccessStatus === "active" ? (
+        <div className="upload-card">
+          <div className="upload-card-copy">
+            <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
+            <div>
+              <h2>Ajouter des documents</h2>
+              <p>PDF uniquement, 25 Mo maximum par fichier.</p>
+            </div>
           </div>
-        </div>
-        <label className={`file-button${isUploading || isProcessing || isInitializing ? " is-disabled" : ""}`}>
-          <Icon name="upload" />
-          {isUploading
-            ? "Import en cours…"
-            : isProcessing
-              ? analysisAccessStatus === "active"
+          <label className={`file-button${isUploading || isProcessing || isInitializing ? " is-disabled" : ""}`}>
+            <Icon name="upload" />
+            {isUploading
+              ? "Import en cours…"
+              : isProcessing
                 ? "Analyse en cours…"
-                : "Identification en cours…"
-              : "Choisir des fichiers"}
-          <input
-            ref={inputRef}
-            type="file"
-            name="property-documents"
-            aria-label="Choisir des documents PDF"
-            accept="application/pdf,.pdf"
-            multiple
-            disabled={!workspace || isUploading || isProcessing || isInitializing}
-            onChange={(event) =>
-              void uploadFiles(Array.from(event.currentTarget.files ?? []))
-            }
-          />
-        </label>
-        <p className="privacy-note"><Icon name="shield" /> Stockage privé</p>
-      </div>
+                : "Choisir des fichiers"}
+            <input
+              ref={inputRef}
+              type="file"
+              name="property-documents"
+              aria-label="Choisir des documents PDF"
+              accept="application/pdf,.pdf"
+              multiple
+              disabled={!workspace || isUploading || isProcessing || isInitializing}
+              onChange={(event) =>
+                void uploadFiles(Array.from(event.currentTarget.files ?? []))
+              }
+            />
+          </label>
+          <p className="privacy-note"><Icon name="shield" /> Stockage privé</p>
+        </div>
+      ) : (
+        <div className="analysis-paywall document-upload-paywall">
+          <div className="analysis-paywall-copy">
+            <span className="state-icon"><Icon name="shield" /></span>
+            <p className="eyebrow">Documents protégés</p>
+            <h1>
+              {analysisAccessStatus === "expired"
+                ? "Réactivez ce dossier pour ajouter des documents"
+                : "Activez l’analyse avant d’ajouter vos documents"}
+            </h1>
+            <p>
+              Le téléversement, l’extraction et la classification LLM sont réservés aux
+              dossiers disposant d’un accès actif pendant 30 jours.
+            </p>
+            {availableAnalyses > 0 ? (
+              <button
+                type="button"
+                disabled={isActivating}
+                onClick={() => void activateAnalysis()}
+              >
+                {isActivating ? "Activation…" : "Utiliser une analyse disponible"}
+              </button>
+            ) : null}
+          </div>
+          <BillingPanel compact onSummaryChange={handleBillingSummary} />
+        </div>
+      )}
 
       {error ? (
         <div className="upload-error" role="alert">

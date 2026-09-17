@@ -21,7 +21,9 @@ from app.billing.stripe_gateway import (
 )
 from app.core.config import get_settings
 from app.core.database import Base, get_db_session
+from app.documents.repository import DocumentRepository
 from app.main import create_app
+from tests.billing_fixtures import grant_analysis_credit
 
 
 class FakeStripeGateway:
@@ -182,22 +184,82 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
 
 def test_activation_requires_an_available_credit(
     billing_client: tuple[TestClient, FakeStripeGateway],
+    session: Session,
 ) -> None:
     client, _gateway = billing_client
     user_id = uuid4()
-    created_case = client.post(
+    rejected_creation = client.post(
         "/api/v1/analysis-cases",
         headers=auth(user_id),
         json={"title": "Maison test"},
     )
+    analysis_case = DocumentRepository(session).create_analysis_case(user_id, "Maison test")
 
     response = client.post(
+        f"/api/v1/billing/analysis-cases/{analysis_case.id}/activate",
+        headers=auth(user_id),
+    )
+
+    assert rejected_creation.status_code == 402
+    assert response.status_code == 402
+    assert "Aucune analyse disponible" in response.json()["detail"]
+
+
+def test_manual_credit_can_activate_a_case_without_a_fake_stripe_purchase(
+    billing_client: tuple[TestClient, FakeStripeGateway],
+    session: Session,
+) -> None:
+    client, _gateway = billing_client
+    user_id = uuid4()
+    grant_analysis_credit(session, user_id)
+    created_case = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Dossier bêta"},
+    )
+
+    summary = client.get("/api/v1/billing/summary", headers=auth(user_id))
+    activation = client.post(
         f"/api/v1/billing/analysis-cases/{created_case.json()['id']}/activate",
         headers=auth(user_id),
     )
 
-    assert response.status_code == 402
-    assert "Aucune analyse disponible" in response.json()["detail"]
+    assert summary.status_code == 200
+    assert summary.json()["available_analyses"] == 1
+    assert activation.status_code == 200
+    assert activation.json()["status"] == "active"
+    assert session.scalar(select(func.count()).select_from(StripePurchaseRecord)) == 0
+
+
+def test_existing_cases_remain_readable_without_an_available_credit(
+    billing_client: tuple[TestClient, FakeStripeGateway],
+    session: Session,
+) -> None:
+    client, _gateway = billing_client
+    user_id = uuid4()
+    grant_analysis_credit(session, user_id)
+    created = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Dossier existant"},
+    )
+    activation = client.post(
+        f"/api/v1/billing/analysis-cases/{created.json()['id']}/activate",
+        headers=auth(user_id),
+    )
+
+    summary = client.get("/api/v1/billing/summary", headers=auth(user_id))
+    listed = client.get("/api/v1/analysis-cases", headers=auth(user_id))
+    opened = client.get(
+        f"/api/v1/analysis-cases/{created.json()['id']}",
+        headers=auth(user_id),
+    )
+
+    assert activation.status_code == 200
+    assert summary.json()["available_analyses"] == 0
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [created.json()["id"]]
+    assert opened.status_code == 200
 
 
 def test_webhook_rejects_an_invalid_signature(

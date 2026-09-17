@@ -41,7 +41,7 @@ from app.property.normalization.dpe import (
 from app.property.normalization.structured import StructuredExtractionRecord
 from app.risks.models.findings import RiskFindingRecord
 from app.storage.object_storage import StoredObjectMetadata, get_object_storage
-from tests.billing_fixtures import grant_analysis_access
+from tests.billing_fixtures import grant_analysis_access, grant_analysis_credit
 from tests.pdf_fixtures import DPE_PDF
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -259,6 +259,8 @@ def upload_document(
         headers=auth(user_id),
         json=metadata,
     )
+    if not upload_url.is_success:
+        return upload_url
     storage_key = upload_url.json()["storage_key"]
     storage.upload_pdf(BytesIO(DPE_PDF), storage_key)
     response = client.post(
@@ -288,6 +290,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
     user_id = uuid4()
 
     with TestClient(application) as client:
+        grant_analysis_credit(session, user_id)
         created = client.post(
             "/api/v1/analysis-cases",
             headers=auth(user_id),
@@ -324,7 +327,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
     assert session.scalar(select(RiskFindingRecord)) is not None
 
 
-def test_process_without_credit_stops_after_free_document_identification(
+def test_process_without_access_blocks_upload_and_never_calls_the_llm(
     session: Session,
 ) -> None:
     storage = MemoryObjectStorage()
@@ -338,6 +341,7 @@ def test_process_without_credit_stops_after_free_document_identification(
     user_id = uuid4()
 
     with TestClient(application) as client:
+        grant_analysis_credit(session, user_id)
         created = client.post(
             "/api/v1/analysis-cases",
             headers=auth(user_id),
@@ -345,10 +349,6 @@ def test_process_without_credit_stops_after_free_document_identification(
         )
         case_id = created.json()["id"]
         uploaded = upload_document(client, storage, case_id, user_id)
-        processed = client.post(
-            f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
-            headers=auth(user_id),
-        )
         report = client.post(
             f"/api/v1/analysis-cases/{case_id}/report/refresh",
             headers=auth(user_id),
@@ -358,18 +358,19 @@ def test_process_without_credit_stops_after_free_document_identification(
             headers=auth(user_id),
         )
 
-    assert processed.status_code == 200
-    assert processed.json()["status"] == "extracted"
-    assert processed.json()["document_type"] == "dpe"
-    assert llm_client.calls == 1
+    assert uploaded.status_code == 402
+    assert "Activez l’analyse complète" in uploaded.json()["detail"]
+    assert storage.objects == {}
+    assert parser.parse_count == 0
+    assert llm_client.calls == 0
     assert report.status_code == 402
     assert usage.json() == {
-        "page_count": 1,
+        "page_count": 0,
         "ocr_page_count": 0,
-        "storage_bytes": len(DPE_PDF),
-        "llm_input_tokens": 100,
-        "llm_output_tokens": 25,
-        "llm_request_count": 1,
+        "storage_bytes": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "llm_request_count": 0,
         "reanalysis_count": 0,
     }
 
@@ -386,12 +387,14 @@ def test_process_enforces_document_ownership(session: Session) -> None:
     owner_id = uuid4()
 
     with TestClient(application) as client:
+        grant_analysis_credit(session, owner_id)
         created = client.post(
             "/api/v1/analysis-cases",
             headers=auth(owner_id),
             json={"title": "Appartement test"},
         )
         case_id = created.json()["id"]
+        grant_analysis_access(session, owner_id, case_id)
         uploaded = upload_document(client, storage, case_id, owner_id)
         response = client.post(
             f"/api/v1/analysis-cases/{case_id}/documents/{uploaded.json()['id']}/process",
@@ -434,6 +437,7 @@ def test_process_extracts_each_type_from_its_pages_in_a_composite_pdf(
     user_id = uuid4()
 
     with TestClient(application) as client:
+        grant_analysis_credit(session, user_id)
         created = client.post(
             "/api/v1/analysis-cases",
             headers=auth(user_id),

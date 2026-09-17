@@ -87,6 +87,21 @@ class BillingRepository:
             next_credit_expiration=next_expiration,
         )
 
+    def has_available_credit(self, user_id: UUID, now: datetime) -> bool:
+        credit_id = self.session.scalar(
+            select(AnalysisCreditRecord.id)
+            .where(
+                AnalysisCreditRecord.user_id == user_id,
+                AnalysisCreditRecord.consumed_at.is_(None),
+                or_(
+                    AnalysisCreditRecord.expires_at.is_(None),
+                    AnalysisCreditRecord.expires_at > now,
+                ),
+            )
+            .limit(1)
+        )
+        return credit_id is not None
+
     def get_case_access(
         self, analysis_case_id: UUID, user_id: UUID, now: datetime
     ) -> AnalysisAccessRead:

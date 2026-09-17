@@ -251,6 +251,13 @@ def create_analysis_case(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
+    if not BillingRepository(session).has_available_credit(
+        current_user_id, datetime.now(UTC)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Aucune analyse disponible. Choisissez une offre pour créer un dossier.",
+        )
     analysis_case = DocumentRepository(session).create_analysis_case(
         current_user_id,
         payload.title.strip(),
@@ -453,6 +460,9 @@ async def create_document_upload_url(
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    _require_active_analysis(
+        BillingRepository(session), analysis_case_id, current_user_id
+    )
 
     settings = get_settings()
     try:
@@ -522,6 +532,14 @@ async def upload_document(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
         ) from error
+
+    try:
+        _require_active_analysis(
+            BillingRepository(session), analysis_case_id, current_user_id
+        )
+    except HTTPException:
+        await _delete_unpersisted_upload(storage, payload.storage_key)
+        raise
 
     try:
         metadata = await run_in_threadpool(
@@ -609,6 +627,9 @@ async def process_document(
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_active_analysis(
+        BillingRepository(session), analysis_case_id, current_user_id
+    )
     if document.status in {
         DocumentStatus.EXTRACTING.value,
         DocumentStatus.ANALYZING.value,
@@ -618,16 +639,13 @@ async def process_document(
             detail="Document processing is already in progress",
         )
 
-    access = BillingRepository(session).get_case_access(
-        analysis_case_id, current_user_id, datetime.now(UTC)
-    )
     try:
         classifications = await DocumentProcessingService(
             repository, storage, parser, llm_client
         ).process(
             document,
             current_user_id,
-            full_analysis=access.status == AnalysisAccessStatus.ACTIVE,
+            full_analysis=True,
         )
     except ObjectStorageError as error:
         repository.mark_extraction_failed(
@@ -714,6 +732,9 @@ async def extract_document(
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_active_analysis(
+        BillingRepository(session), analysis_case_id, current_user_id
+    )
 
     existing = repository.get_extraction(document.id)
     if existing is not None:
@@ -764,6 +785,9 @@ async def classify_document(
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_active_analysis(
+        BillingRepository(session), analysis_case_id, current_user_id
+    )
 
     extraction = repository.get_extraction(document.id)
     if extraction is None:

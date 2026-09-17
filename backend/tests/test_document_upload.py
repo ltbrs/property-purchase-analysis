@@ -23,7 +23,7 @@ from app.storage.object_storage import (
     StoredObjectMetadata,
     get_object_storage,
 )
-from tests.billing_fixtures import grant_analysis_access
+from tests.billing_fixtures import grant_analysis_access, grant_analysis_credit
 
 PDF_CONTENT = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 
@@ -93,6 +93,8 @@ def auth(user_id: UUID) -> dict[str, str]:
 
 
 def create_case(client: TestClient, user_id: UUID) -> UUID:
+    session = cast(FastAPI, client.app).dependency_overrides[get_db_session]()
+    grant_analysis_credit(session, user_id)
     response = client.post(
         "/api/v1/analysis-cases",
         headers=auth(user_id),
@@ -142,6 +144,7 @@ def test_property_type_updates_the_expected_coproperty_documents(
     client: TestClient, session: Session
 ) -> None:
     user_id = uuid4()
+    grant_analysis_credit(session, user_id)
     created = client.post(
         "/api/v1/analysis-cases",
         headers=auth(user_id),
@@ -192,6 +195,7 @@ def test_property_type_updates_the_expected_coproperty_documents(
 
 def test_create_case_persists_the_property_details(client: TestClient, session: Session) -> None:
     user_id = uuid4()
+    grant_analysis_credit(session, user_id)
 
     response = client.post(
         "/api/v1/analysis-cases",
@@ -254,7 +258,9 @@ def test_create_case_rejects_invalid_optional_property_details(
     assert response.status_code == 422
 
 
-def test_list_cases_only_returns_the_current_users_cases(client: TestClient) -> None:
+def test_list_cases_only_returns_the_current_users_cases(
+    client: TestClient, session: Session
+) -> None:
     user_id = uuid4()
     other_user_id = uuid4()
     first_case_id = create_case(client, user_id)
@@ -263,6 +269,7 @@ def test_list_cases_only_returns_the_current_users_cases(client: TestClient) -> 
         headers=auth(user_id),
         json={"title": "Maison de campagne", "property_type": "house"},
     )
+    grant_analysis_credit(session, other_user_id)
     client.post(
         "/api/v1/analysis-cases",
         headers=auth(other_user_id),
@@ -301,6 +308,29 @@ def test_upload_requires_an_authenticated_identity(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_upload_requires_active_analysis_access(
+    client: TestClient,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    analysis_case_id = create_case(client, user_id)
+
+    response = client.post(
+        f"/api/v1/analysis-cases/{analysis_case_id}/documents/upload-url",
+        headers=auth(user_id),
+        json={
+            "original_filename": "dpe.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": len(PDF_CONTENT),
+        },
+    )
+
+    assert response.status_code == 402
+    assert "Activez l’analyse complète" in response.json()["detail"]
+    assert storage.upload_url_requests == []
+    assert storage.objects == {}
+
+
 def test_a_user_cannot_upload_or_list_another_users_documents(
     client: TestClient, storage: MemoryObjectStorage
 ) -> None:
@@ -334,6 +364,7 @@ def test_a_user_cannot_upload_or_list_another_users_documents(
 )
 def test_upload_rejects_invalid_files(
     client: TestClient,
+    session: Session,
     storage: MemoryObjectStorage,
     filename: str,
     content: bytes,
@@ -342,6 +373,7 @@ def test_upload_rejects_invalid_files(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
 
     response = upload_document(
         client,
@@ -364,6 +396,7 @@ def test_upload_persists_private_metadata_and_exposes_status(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
 
     response = upload_document(
         client,
@@ -404,6 +437,7 @@ def test_upload_completion_rejects_a_tampered_checksum_and_removes_the_object(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
     metadata = {
         "original_filename": "dpe.pdf",
         "content_type": "application/pdf",
@@ -440,6 +474,7 @@ def test_upload_completion_cannot_attach_another_cases_storage_key(
     user_id = uuid4()
     first_case_id = create_case(client, user_id)
     second_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, first_case_id)
     metadata = {
         "original_filename": "dpe.pdf",
         "content_type": "application/pdf",
@@ -475,6 +510,7 @@ def test_upload_is_idempotent_for_the_same_file(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
 
     first = upload_document(client, storage, analysis_case_id, user_id)
     second = upload_document(client, storage, analysis_case_id, user_id)
@@ -493,6 +529,7 @@ def test_document_view_url_is_short_lived_and_requires_ownership(
 ) -> None:
     owner_id = uuid4()
     analysis_case_id = create_case(client, owner_id)
+    grant_analysis_access(session, owner_id, analysis_case_id)
     uploaded = upload_document(client, storage, analysis_case_id, owner_id)
     document_id = uploaded.json()["id"]
 
@@ -516,6 +553,7 @@ def test_document_view_url_is_short_lived_and_requires_ownership(
 
 def test_document_view_url_reports_storage_failure(
     client: TestClient,
+    session: Session,
     storage: MemoryObjectStorage,
 ) -> None:
     class FailingViewUrlStorage(MemoryObjectStorage):
@@ -526,6 +564,7 @@ def test_document_view_url_reports_storage_failure(
     cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
     uploaded = upload_document(client, failing_storage, analysis_case_id, user_id)
 
     response = client.get(
@@ -551,6 +590,7 @@ def test_storage_failure_does_not_persist_metadata(
     cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
 
     response = client.post(
         f"/api/v1/analysis-cases/{analysis_case_id}/documents/upload-url",
@@ -573,6 +613,7 @@ def test_delete_removes_document_metadata_and_private_file(
 ) -> None:
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
     uploaded = upload_document(client, storage, analysis_case_id, user_id)
     document_id = uploaded.json()["id"]
 
@@ -594,6 +635,7 @@ def test_a_user_cannot_delete_another_users_document(
 ) -> None:
     owner_id = uuid4()
     analysis_case_id = create_case(client, owner_id)
+    grant_analysis_access(session, owner_id, analysis_case_id)
     uploaded = upload_document(client, storage, analysis_case_id, owner_id)
 
     response = client.delete(
@@ -620,6 +662,7 @@ def test_storage_delete_failure_keeps_document_metadata(
     cast(FastAPI, client.app).dependency_overrides[get_object_storage] = lambda: failing_storage
     user_id = uuid4()
     analysis_case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, analysis_case_id)
     uploaded = upload_document(client, failing_storage, analysis_case_id, user_id)
 
     response = client.delete(

@@ -6,10 +6,27 @@ from sqlalchemy.orm import Session
 from app.billing.models import (
     AnalysisAccessRecord,
     AnalysisCreditRecord,
+    AnalysisCreditSource,
     BillingOfferCode,
     StripePurchaseRecord,
     StripePurchaseStatus,
 )
+from app.property.models import UserRecord
+
+
+def grant_analysis_credit(session: Session, user_id: UUID) -> None:
+    if session.get(UserRecord, user_id) is None:
+        session.add(UserRecord(id=user_id))
+        session.flush()
+    session.add(
+        AnalysisCreditRecord(
+            user_id=user_id,
+            purchase_id=None,
+            source=AnalysisCreditSource.MANUAL_GRANT.value,
+            grant_note="Automated test credit",
+        )
+    )
+    session.commit()
 
 
 def grant_analysis_access(session: Session, user_id: UUID, case_id: UUID | str) -> None:

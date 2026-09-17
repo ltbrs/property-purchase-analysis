@@ -245,7 +245,7 @@ const questions = [
   {
     title: "Combien coûte l’analyse des documents ?",
     answer:
-      "Les tarifs annoncés sont un aperçu d’un document à 0 €, une analyse complète à 39 € TTC par dossier et un pack de trois dossiers à 79 € TTC, sans abonnement. Les achats sont actuellement désactivés. L’exemple de rapport sur cette page est consultable sans compte.",
+      "La création du dossier est gratuite. L’envoi et l’analyse des documents coûtent 19 € TTC pour un bien, ou 39 € TTC pour un pack de trois biens, sans abonnement. L’exemple de rapport sur cette page reste consultable sans compte.",
   },
 ];
 
