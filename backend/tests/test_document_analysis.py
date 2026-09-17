@@ -198,6 +198,7 @@ def auth(user_id: UUID) -> dict[str, str]:
 def test_low_confidence_classification_is_persisted_as_unknown(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
+    grant_analysis_access(session, user_id, case_id)
     llm_client = FakeStructuredOutputClient([classification_candidate(confidence=0.42)])
 
     with make_client(session, llm_client) as client:
@@ -213,6 +214,24 @@ def test_low_confidence_classification_is_persisted_as_unknown(session: Session)
     persisted = session.scalar(select(DocumentClassificationRecord))
     assert persisted is not None
     assert persisted.raw_output["document_type"] == "dpe"
+
+
+def test_classification_requires_active_access_before_calling_the_model(
+    session: Session,
+) -> None:
+    user_id = uuid4()
+    case_id, document_id = seed_extracted_dpe(session, user_id)
+    llm_client = FakeStructuredOutputClient([classification_candidate()])
+
+    with make_client(session, llm_client) as client:
+        response = client.post(
+            f"/api/v1/analysis-cases/{case_id}/documents/{document_id}/classify",
+            headers=auth(user_id),
+        )
+
+    assert response.status_code == 402
+    assert llm_client.calls == 0
+    assert session.scalar(select(DocumentClassificationRecord)) is None
 
 
 def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Session) -> None:

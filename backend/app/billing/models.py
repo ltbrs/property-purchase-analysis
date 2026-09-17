@@ -38,6 +38,11 @@ class AnalysisAccessStatus(StrEnum):
     EXPIRED = "expired"
 
 
+class AnalysisCreditSource(StrEnum):
+    STRIPE_PURCHASE = "stripe_purchase"
+    MANUAL_GRANT = "manual_grant"
+
+
 class StripePurchaseRecord(Base):
     __tablename__ = "stripe_purchases"
     __table_args__ = (
@@ -84,6 +89,13 @@ class StripePurchaseRecord(Base):
 class AnalysisCreditRecord(Base):
     __tablename__ = "analysis_credits"
     __table_args__ = (
+        CheckConstraint(
+            "(source = 'stripe_purchase' AND purchase_id IS NOT NULL "
+            "AND grant_note IS NULL) OR "
+            "(source = 'manual_grant' AND purchase_id IS NULL "
+            "AND length(trim(grant_note)) > 0)",
+            name="ck_analysis_credits_source",
+        ),
         Index(
             "ix_analysis_credits_available",
             "user_id",
@@ -100,11 +112,17 @@ class AnalysisCreditRecord(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    purchase_id: Mapped[UUID] = mapped_column(
+    purchase_id: Mapped[UUID | None] = mapped_column(
         Uuid,
         ForeignKey("stripe_purchases.id", ondelete="CASCADE"),
+    )
+    source: Mapped[str] = mapped_column(
+        String(30),
+        default=AnalysisCreditSource.STRIPE_PURCHASE.value,
+        server_default=AnalysisCreditSource.STRIPE_PURCHASE.value,
         nullable=False,
     )
+    grant_note: Mapped[str | None] = mapped_column(String(500))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consumed_by_case_id: Mapped[UUID | None] = mapped_column(
         Uuid,

@@ -121,6 +121,45 @@ Copy the `whsec_…` value printed by Stripe CLI into `STRIPE_WEBHOOK_SECRET`.
 Checkout fulfillment is webhook-only, so returning to the success page never
 creates credits by itself.
 
+### Manual beta credits
+
+For a private beta, grant a real manual credit instead of creating a fake Stripe
+purchase. First identify the application user after they have signed in at least
+once:
+
+```sql
+select id, email
+from users
+where lower(email) = lower('friend@example.com');
+```
+
+Then insert one traceable credit with the returned user ID and a meaningful
+reason. This example leaves 12 months to activate it:
+
+```sql
+insert into analysis_credits (
+  id,
+  user_id,
+  purchase_id,
+  source,
+  grant_note,
+  expires_at
+)
+values (
+  gen_random_uuid(),
+  'USER_UUID_HERE',
+  null,
+  'manual_grant',
+  'Private beta invitation, granted by OWNER_NAME on YYYY-MM-DD',
+  now() + interval '12 months'
+);
+```
+
+The user then opens the Documents page and selects **Utiliser une analyse
+disponible**. The 30-day access window starts at that moment. Billing tables are
+server-only, with RLS enabled and no grants for `anon` or `authenticated`, so
+run this operation only through a trusted database administration session.
+
 See [docs/deployment.md](docs/deployment.md) for the Vercel, Supabase, OVH DNS,
 and FastAPI production setup.
 

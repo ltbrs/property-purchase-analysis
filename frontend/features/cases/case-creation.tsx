@@ -1,9 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/icons";
+import {
+  BillingPanel,
+  fetchBillingSummary,
+} from "@/features/billing/billing-panel";
 import type { PropertyType } from "@/features/documents/document-catalog";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
@@ -46,8 +50,29 @@ function optionalValue(formData: FormData, name: string) {
 export function CaseCreation({ onCreated }: CaseCreationProps) {
   const router = useRouter();
   const [propertyType, setPropertyType] = useState<Exclude<PropertyType, "unknown"> | null>(null);
+  const [availableAnalyses, setAvailableAnalyses] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchBillingSummary()
+      .then((summary) => {
+        if (!cancelled) setAvailableAnalyses(summary.available_analyses);
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Impossible de vérifier vos analyses disponibles.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,6 +116,35 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
       );
       setIsSubmitting(false);
     }
+  }
+
+  if (availableAnalyses === null) {
+    return (
+      <section className="case-creation" aria-live="polite">
+        <div className="document-empty">Vérification de vos analyses disponibles…</div>
+        {error ? <p className="creation-error" role="alert">{error}</p> : null}
+      </section>
+    );
+  }
+
+  if (availableAnalyses === 0) {
+    return (
+      <div className="analysis-paywall">
+        <div className="analysis-paywall-copy">
+          <span className="state-icon"><Icon name="folder" /></span>
+          <p className="eyebrow">Nouveau dossier</p>
+          <h1>Choisissez une analyse pour ajouter un bien</h1>
+          <p>
+            Vos dossiers existants restent accessibles. Une analyse disponible est
+            nécessaire uniquement pour créer un nouveau dossier et y ajouter des documents.
+          </p>
+        </div>
+        <BillingPanel
+          compact
+          onSummaryChange={(summary) => setAvailableAnalyses(summary.available_analyses)}
+        />
+      </div>
+    );
   }
 
   return (
