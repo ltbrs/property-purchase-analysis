@@ -62,7 +62,7 @@ class OpenAIStructuredOutputClient:
                 "user_id": str(user_id),
                 "document_id": str(document_id),
             },
-            store=True,
+            store=False,
         )
         if response.output_parsed is None:
             raise RuntimeError("OpenAI returned no structured output")

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BrandLink } from "@/components/design-system/brand-link";
@@ -21,6 +22,7 @@ type SignInPageProps = {
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const params = await searchParams;
   const callbackUrl = safeRedirectPath(params.callbackUrl);
+  const googleClientId = process.env.AUTH_GOOGLE_ID?.trim();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   if (data?.claims?.sub) redirect(callbackUrl);
@@ -43,11 +45,17 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           </p>
         </div>
 
-        <AuthForm callbackUrl={callbackUrl} routeError={routeError} />
+        <AuthForm
+          callbackUrl={callbackUrl}
+          googleClientId={googleClientId}
+          routeError={routeError}
+        />
 
         <p className="auth-privacy">
           Google et notre service d’e-mail servent uniquement à sécuriser votre
-          connexion. Vos documents immobiliers ne leur sont jamais transmis.
+          connexion. Vos documents immobiliers ne leur sont jamais transmis. Consultez
+          notre <Link href={marketingRoutes.privacy}>politique de confidentialité</Link>
+          {" "}et nos <Link href={marketingRoutes.terms}>conditions générales</Link>.
         </p>
       </section>
     </main>

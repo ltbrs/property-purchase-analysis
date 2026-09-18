@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
+import { marketingRoutes } from "@/lib/routes";
 import { API_URL, readApiError } from "@/lib/workspace";
 
 type OfferCode = "single_analysis" | "search_pack";
@@ -147,7 +149,11 @@ export function BillingPanel({
           </article>
         ))}
       </div>
-      <p className="billing-footnote">Paiement unique et sécurisé par Stripe, sans abonnement.</p>
+      <p className="billing-footnote">
+        Paiement unique et sécurisé par Stripe, sans abonnement. En choisissant une
+        offre, vous acceptez les <Link href={marketingRoutes.terms}>conditions générales</Link>
+        {" "}et reconnaissez avoir consulté la <Link href={marketingRoutes.privacy}>politique de confidentialité</Link>.
+      </p>
       {error ? <p className="billing-error" role="alert">{error}</p> : null}
     </section>
   );

@@ -49,6 +49,7 @@ def test_parse_attaches_user_and_document_metadata(monkeypatch: Any) -> None:
 
     assert result.output == ExampleOutput(value="ok")
     assert fake_openai.responses.request is not None
+    assert fake_openai.responses.request["store"] is False
     assert fake_openai.responses.request["metadata"] == {
         "user_id": str(user_id),
         "document_id": str(document_id),
