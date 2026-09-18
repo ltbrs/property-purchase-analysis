@@ -82,7 +82,7 @@ type AnalysisCase = {
   id: string;
   title: string;
   property_type: PropertyType;
-  analysis_access_status: "not_activated" | "active" | "expired";
+  analysis_access_status: "not_activated" | "preview" | "active" | "expired";
 };
 
 const statusLabels: Record<DocumentStatus, string> = {
@@ -531,9 +531,12 @@ export function DocumentUpload() {
   }
 
   async function uploadFiles(files: File[]) {
+    const canUpload = analysisAccessStatus === "active"
+      || analysisAccessStatus === "expired"
+      || (analysisAccessStatus === "preview" && documents.length === 0);
     if (
       !workspace ||
-      analysisAccessStatus !== "active" ||
+      !canUpload ||
       files.length === 0
     ) return;
 
@@ -547,6 +550,10 @@ export function DocumentUpload() {
           ? `« ${invalidFile.name} » n’est pas un fichier PDF.`
           : `« ${invalidFile.name} » dépasse la limite de 25 Mo.`,
       );
+      return;
+    }
+    if (analysisAccessStatus === "preview" && files.length > 1) {
+      setError("L’aperçu gratuit est limité à un seul fichier.");
       return;
     }
 
@@ -765,6 +772,9 @@ export function DocumentUpload() {
   const missingCount = propertyType === "unknown"
     ? 0
     : coverage.filter(({ documents: matchingDocuments }) => matchingDocuments.length === 0).length;
+  const canUpload = analysisAccessStatus === "active"
+    || analysisAccessStatus === "expired"
+    || (analysisAccessStatus === "preview" && documents.length === 0);
 
   return (
     <div className="document-workspace">
@@ -774,13 +784,17 @@ export function DocumentUpload() {
         onChange={(value) => void updatePropertyType(value)}
       />
 
-      {analysisAccessStatus === "active" ? (
+      {canUpload ? (
         <div className="upload-card">
           <div className="upload-card-copy">
             <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
             <div>
               <h2>Ajouter des documents</h2>
-              <p>PDF uniquement, 25 Mo maximum par fichier.</p>
+              <p>
+                {analysisAccessStatus === "preview"
+                  ? "Aperçu gratuit, un seul PDF de 25 Mo maximum."
+                  : "PDF uniquement, 25 Mo maximum par fichier."}
+              </p>
             </div>
           </div>
           <label className={`file-button${isUploading || isProcessing || isInitializing ? " is-disabled" : ""}`}>
@@ -796,7 +810,7 @@ export function DocumentUpload() {
               name="property-documents"
               aria-label="Choisir des documents PDF"
               accept="application/pdf,.pdf"
-              multiple
+              multiple={analysisAccessStatus !== "preview"}
               disabled={!workspace || isUploading || isProcessing || isInitializing}
               onChange={(event) =>
                 void uploadFiles(Array.from(event.currentTarget.files ?? []))
@@ -811,13 +825,14 @@ export function DocumentUpload() {
             <span className="state-icon"><Icon name="shield" /></span>
             <p className="eyebrow">Documents protégés</p>
             <h1>
-              {analysisAccessStatus === "expired"
-                ? "Réactivez ce dossier pour ajouter des documents"
+              {analysisAccessStatus === "preview"
+                ? "Votre document d’aperçu a été analysé"
                 : "Activez l’analyse avant d’ajouter vos documents"}
             </h1>
             <p>
-              Le téléversement, l’extraction et la classification LLM sont réservés aux
-              dossiers disposant d’un accès actif pendant 30 jours.
+              {analysisAccessStatus === "preview"
+                ? "Débloquez ce dossier pour ajouter d’autres pièces et consulter les constats détaillés."
+                : "Utilisez une analyse disponible pour ajouter des documents à ce dossier."}
             </p>
             {availableAnalyses > 0 ? (
               <button

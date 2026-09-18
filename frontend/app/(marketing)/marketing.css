@@ -908,7 +908,6 @@
 .pricing-hero,
 .pricing-offers,
 .pricing-payment-note,
-.pricing-comparison,
 .pricing-reassurance,
 .pricing-faq {
   width: min(100% - 3rem, var(--content-width));
@@ -1062,7 +1061,7 @@
 }
 
 .pricing-payment-note { margin-top: 1rem; color: var(--muted); font-size: 0.7rem; text-align: center; }
-.pricing-comparison, .pricing-faq { padding: clamp(5rem, 8vw, 8rem) 0; }
+.pricing-faq { padding: clamp(5rem, 8vw, 8rem) 0; }
 .pricing-section-heading { max-width: 50rem; }
 .pricing-section-heading h2,
 .pricing-reassurance h2 {
@@ -1072,27 +1071,6 @@
   letter-spacing: -0.055em;
   line-height: 1;
 }
-
-.pricing-table-wrap {
-  margin-top: 2.5rem;
-  overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.76);
-}
-.pricing-table-wrap table { width: 100%; min-width: 47rem; border-collapse: collapse; }
-.pricing-table-wrap th,
-.pricing-table-wrap td {
-  padding: 1rem 1.2rem;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.75rem;
-  text-align: left;
-}
-.pricing-table-wrap thead th { color: var(--green-950); background: #edf2ee; font-weight: 850; }
-.pricing-table-wrap tbody th { width: 29%; color: var(--ink); font-weight: 800; }
-.pricing-table-wrap td { color: var(--muted); }
-.pricing-table-wrap tbody tr:last-child th,
-.pricing-table-wrap tbody tr:last-child td { border-bottom: 0; }
 
 .pricing-reassurance {
   display: grid;
@@ -3304,7 +3282,6 @@
   .pricing-hero,
   .pricing-offers,
   .pricing-payment-note,
-  .pricing-comparison,
   .pricing-reassurance,
   .pricing-faq {
     width: min(100% - 2rem, var(--content-width));

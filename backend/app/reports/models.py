@@ -83,6 +83,15 @@ class BuyerReport(BaseModel):
     disclaimer: str
 
 
+class BuyerReportPreview(BaseModel):
+    analysis_case_id: UUID
+    generated_at: datetime
+    risk_count: int = Field(ge=0)
+    verification_count: int = Field(ge=0)
+    missing_information_count: int = Field(ge=0)
+    reassuring_count: int = Field(ge=0)
+
+
 class ReportRecord(Base):
     __tablename__ = "reports"
 

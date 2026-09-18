@@ -9,11 +9,13 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +29,12 @@ class PropertyType(StrEnum):
     UNKNOWN = "unknown"
     APARTMENT_COPROPERTY = "apartment_coproperty"
     HOUSE = "house"
+
+
+class AnalysisCaseAccessMode(StrEnum):
+    STANDARD = "standard"
+    FREE_PREVIEW = "free_preview"
+    GRANDFATHERED = "grandfathered"
 
 
 class UserRecord(Base):
@@ -78,6 +86,17 @@ class AnalysisCaseRecord(Base):
             "lot_count IS NULL OR lot_count > 0",
             name="ck_analysis_cases_lot_count_positive",
         ),
+        CheckConstraint(
+            "access_mode IN ('standard', 'free_preview', 'grandfathered')",
+            name="ck_analysis_cases_access_mode",
+        ),
+        Index(
+            "uq_analysis_cases_one_free_preview_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("access_mode = 'free_preview'"),
+            sqlite_where=text("access_mode = 'free_preview'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -94,6 +113,12 @@ class AnalysisCaseRecord(Base):
     price_eur: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     surface_m2: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     lot_count: Mapped[int | None] = mapped_column(Integer)
+    access_mode: Mapped[str] = mapped_column(
+        String(30),
+        default=AnalysisCaseAccessMode.STANDARD.value,
+        server_default=AnalysisCaseAccessMode.STANDARD.value,
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

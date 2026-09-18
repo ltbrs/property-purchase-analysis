@@ -51,6 +51,7 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
   const router = useRouter();
   const [propertyType, setPropertyType] = useState<Exclude<PropertyType, "unknown"> | null>(null);
   const [availableAnalyses, setAvailableAnalyses] = useState<number | null>(null);
+  const [canCreateFreePreview, setCanCreateFreePreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +59,10 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
     let cancelled = false;
     void fetchBillingSummary()
       .then((summary) => {
-        if (!cancelled) setAvailableAnalyses(summary.available_analyses);
+        if (!cancelled) {
+          setAvailableAnalyses(summary.available_analyses);
+          setCanCreateFreePreview(summary.can_create_free_preview);
+        }
       })
       .catch((loadError: unknown) => {
         if (!cancelled) {
@@ -127,7 +131,7 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
     );
   }
 
-  if (availableAnalyses === 0) {
+  if (availableAnalyses === 0 && !canCreateFreePreview) {
     return (
       <div className="analysis-paywall">
         <div className="analysis-paywall-copy">
@@ -141,7 +145,10 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
         </div>
         <BillingPanel
           compact
-          onSummaryChange={(summary) => setAvailableAnalyses(summary.available_analyses)}
+          onSummaryChange={(summary) => {
+            setAvailableAnalyses(summary.available_analyses);
+            setCanCreateFreePreview(summary.can_create_free_preview);
+          }}
         />
       </div>
     );
@@ -153,8 +160,9 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
         <p className="eyebrow">Nouveau dossier</p>
         <h1 id="case-creation-title">Commençons par le bien</h1>
         <p>
-          Ces quelques informations permettent d’adapter les documents attendus et de
-          contextualiser l’analyse.
+          {availableAnalyses === 0
+            ? "Créez votre dossier d’essai et analysez gratuitement un premier document. Les constats détaillés resteront masqués jusqu’au déblocage."
+            : "Ces quelques informations permettent d’adapter les documents attendus et de contextualiser l’analyse."}
         </p>
         <div className="creation-trust-note">
           <Icon name="shield" />

@@ -77,6 +77,15 @@ type BuyerReportData = {
   disclaimer: string;
 };
 
+type BuyerReportPreviewData = {
+  analysis_case_id: string;
+  generated_at: string;
+  risk_count: number;
+  verification_count: number;
+  missing_information_count: number;
+  reassuring_count: number;
+};
+
 type BuyerReportProps = {
   variant?: "overview" | "details";
 };
@@ -142,6 +151,15 @@ async function refreshReport(workspace: Workspace): Promise<BuyerReportData> {
   return (await response.json()) as BuyerReportData;
 }
 
+async function refreshReportPreview(workspace: Workspace): Promise<BuyerReportPreviewData> {
+  const response = await fetch(
+    `${API_URL}/analysis-cases/${workspace.caseId}/report/preview`,
+    { method: "POST" },
+  );
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as BuyerReportPreviewData;
+}
+
 async function fetchExistingReport(workspace: Workspace): Promise<BuyerReportData | null> {
   const response = await fetch(
     `${API_URL}/analysis-cases/${workspace.caseId}/report`,
@@ -159,7 +177,7 @@ async function processCaseDocuments(workspace: Workspace) {
   );
   if (!response.ok) throw new Error(await readApiError(response));
   const documents = (await response.json()) as Array<{ id: string; status: string }>;
-  const results = await Promise.all(
+  await Promise.all(
     documents
       .filter(({ status: documentStatus }) => documentStatus !== "completed")
       .map(async ({ id }) => {
@@ -170,7 +188,7 @@ async function processCaseDocuments(workspace: Workspace) {
         if (!processing.ok) throw new Error(await readApiError(processing));
       }),
   );
-  return results;
+  return documents.length;
 }
 
 async function updateFindingReview(
@@ -194,6 +212,7 @@ async function updateFindingReview(
 type AnalysisLoad = {
   accessStatus: AnalysisAccessStatus;
   report: BuyerReportData | null;
+  preview: BuyerReportPreviewData | null;
 };
 
 const pendingReportLoads = new Map<string, Promise<AnalysisLoad | null>>();
@@ -217,18 +236,28 @@ function loadReport(): Promise<AnalysisLoad | null> {
     if (!caseResponse.ok) throw new Error(await readApiError(caseResponse));
     const analysisCase = (await caseResponse.json()) as AnalysisCase;
     if (analysisCase.analysis_access_status === "not_activated") {
-      return { accessStatus: analysisCase.analysis_access_status, report: null };
+      return { accessStatus: analysisCase.analysis_access_status, report: null, preview: null };
+    }
+    if (analysisCase.analysis_access_status === "preview") {
+      const documentCount = await processCaseDocuments(workspace);
+      return {
+        accessStatus: analysisCase.analysis_access_status,
+        report: null,
+        preview: documentCount > 0 ? await refreshReportPreview(workspace) : null,
+      };
     }
     if (analysisCase.analysis_access_status === "expired") {
       return {
         accessStatus: analysisCase.analysis_access_status,
         report: await fetchExistingReport(workspace),
+        preview: null,
       };
     }
     await processCaseDocuments(workspace);
     return {
       accessStatus: analysisCase.analysis_access_status,
       report: await refreshReport(workspace),
+      preview: null,
     };
   })().finally(() => {
     if (pendingReportLoads.get(requestKey) === load) pendingReportLoads.delete(requestKey);
@@ -488,6 +517,7 @@ function DetailDrawer({
 
 export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [report, setReport] = useState<BuyerReportData | null>(null);
+  const [preview, setPreview] = useState<BuyerReportPreviewData | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<ReportFinding | null>(null);
   const [viewingSource, setViewingSource] = useState<PdfDocumentSelection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -508,6 +538,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       setNeedsWorkspace(loaded === null);
       setAccessStatus(loaded?.accessStatus ?? null);
       setReport(loaded?.report ?? null);
+      setPreview(loaded?.preview ?? null);
       if (loaded?.report) {
         captureProductEvent("analysis_report_refreshed", { report_variant: variant });
       }
@@ -526,6 +557,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           setNeedsWorkspace(loaded === null);
           setAccessStatus(loaded?.accessStatus ?? null);
           setReport(loaded?.report ?? null);
+          setPreview(loaded?.preview ?? null);
         }
       })
       .catch((loadError: unknown) => {
@@ -559,6 +591,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       const loadedReport = await refreshReport(workspace);
       setAccessStatus("active");
       setReport(loadedReport);
+      setPreview(null);
       setAvailableAnalyses((current) => Math.max(0, current - 1));
       captureProductEvent("analysis_case_activated", {});
     } catch (activationError) {
@@ -618,7 +651,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     }
   }
 
-  if (isLoading && report === null) {
+  if (isLoading && report === null && preview === null) {
     return (
       <div className="report-state">
         <span className="state-icon is-loading"><Icon name="refresh" /></span>
@@ -646,6 +679,64 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         <strong>Rapport indisponible</strong>
         <span>{error}</span>
         <button type="button" onClick={() => void refresh()}>Réessayer</button>
+      </div>
+    );
+  }
+
+  if (accessStatus === "preview" && preview === null) {
+    return (
+      <div className="report-state">
+        <span className="state-icon"><Icon name="upload" /></span>
+        <strong>Ajoutez votre document d’essai</strong>
+        <span>Votre premier PDF sera analysé gratuitement. Les catégories de constats seront comptées, puis les détails resteront masqués jusqu’au déblocage.</span>
+        <Link href={productRoutes.documents}>Ajouter un document</Link>
+      </div>
+    );
+  }
+
+  if (accessStatus === "preview" && preview !== null) {
+    const previewMetrics = [
+      { value: preview.risk_count, label: "risques détectés" },
+      { value: preview.verification_count, label: "points à vérifier" },
+      { value: preview.reassuring_count, label: "points rassurants" },
+      { value: preview.missing_information_count, label: "éléments manquants" },
+    ];
+    return (
+      <div className="analysis-preview">
+        <section className="analysis-preview-summary">
+          <p className="eyebrow">Aperçu gratuit</p>
+          <h1>Votre document a bien été analysé</h1>
+          <p>Voici le nombre de constats trouvés. Leur contenu et leurs sources sont masqués jusqu’au déblocage du dossier.</p>
+          <div className="analysis-preview-metrics">
+            {previewMetrics.map((metric) => (
+              <div key={metric.label}>
+                <strong>{metric.value}</strong>
+                <span>{metric.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <div className="analysis-preview-locked" aria-hidden="true">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="analysis-preview-finding">
+              <span />
+              <div><strong>Constat issu de votre document</strong><p>Le détail, l’explication et la source seront affichés ici.</p></div>
+            </div>
+          ))}
+        </div>
+        <div className="analysis-preview-paywall">
+          <div>
+            <h2>Consultez les constats et leurs sources</h2>
+            <p>Débloquez ce dossier pour voir les risques, les éléments manquants et les pages justificatives, puis ajouter toutes les pièces utiles.</p>
+            {availableAnalyses > 0 ? (
+              <button type="button" disabled={isLoading} onClick={() => void activateAnalysis()}>
+                {isLoading ? "Analyse en cours…" : "Utiliser une analyse disponible"}
+              </button>
+            ) : null}
+          </div>
+          <BillingPanel compact onSummaryChange={handleBillingSummary} />
+        </div>
+        {error ? <p className="billing-error" role="alert">{error}</p> : null}
       </div>
     );
   }

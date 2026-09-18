@@ -34,6 +34,7 @@ class StripePurchaseStatus(StrEnum):
 
 class AnalysisAccessStatus(StrEnum):
     NOT_ACTIVATED = "not_activated"
+    PREVIEW = "preview"
     ACTIVE = "active"
     EXPIRED = "expired"
 
@@ -185,6 +186,7 @@ class AnalysisAccessRead(BaseModel):
 class BillingSummaryRead(BaseModel):
     available_analyses: int
     next_credit_expiration: datetime | None = None
+    can_create_free_preview: bool = False
 
 
 class StripeWebhookAccepted(BaseModel):

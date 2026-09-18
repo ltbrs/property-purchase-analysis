@@ -19,7 +19,12 @@ from app.documents.models import (
     DocumentStatus,
 )
 from app.documents.parsers.base import ParsedPdf
-from app.property.models import AnalysisCaseRecord, PropertyType, UserRecord
+from app.property.models import (
+    AnalysisCaseAccessMode,
+    AnalysisCaseRecord,
+    PropertyType,
+    UserRecord,
+)
 from app.property.normalization.dpe import (
     DpeExtractionRecord,
     NormalizedDpeFacts,
@@ -54,6 +59,7 @@ class DocumentRepository:
         price_eur: Decimal | None = None,
         surface_m2: Decimal | None = None,
         lot_count: int | None = None,
+        access_mode: AnalysisCaseAccessMode = AnalysisCaseAccessMode.STANDARD,
     ) -> AnalysisCaseRecord:
         self.ensure_user(user_id)
         analysis_case = AnalysisCaseRecord(
@@ -63,6 +69,7 @@ class DocumentRepository:
             price_eur=price_eur,
             surface_m2=surface_m2,
             lot_count=lot_count,
+            access_mode=access_mode.value,
         )
         self.session.add(analysis_case)
         self.session.commit()

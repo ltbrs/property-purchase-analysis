@@ -47,7 +47,7 @@ from app.documents.validation import (
 )
 from app.jobs.document_processing import DocumentProcessingService
 from app.llm import StructuredOutputClientDependency
-from app.property.models import PropertyType
+from app.property.models import AnalysisCaseAccessMode, PropertyType
 from app.property.normalization.ag_minutes import NormalizedAgMinutes
 from app.property.normalization.diagnostics import NormalizedDiagnostics
 from app.property.normalization.dpe import DpeExtractionRead, NormalizedDpeFacts
@@ -69,6 +69,7 @@ from app.property.normalization.structured_service import (
 )
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
+from app.reports.models import BuyerReportPreview
 from app.risks.engine import evaluate_case_risks
 from app.risks.models import FindingReviewStatus, FindingStatus, RiskFindingRead
 from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
@@ -118,10 +119,43 @@ def _require_unlocked_analysis(
     user_id: UUID,
 ) -> None:
     access = repository.get_case_access(analysis_case_id, user_id, datetime.now(UTC))
-    if access.status == AnalysisAccessStatus.NOT_ACTIVATED:
+    if access.status not in {AnalysisAccessStatus.ACTIVE, AnalysisAccessStatus.EXPIRED}:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Activez l’analyse complète de ce bien pour continuer.",
+        )
+
+
+def _require_editable_analysis(
+    repository: BillingRepository,
+    analysis_case_id: UUID,
+    user_id: UUID,
+) -> AnalysisAccessStatus:
+    access = repository.get_case_access(analysis_case_id, user_id, datetime.now(UTC))
+    if access.status not in {
+        AnalysisAccessStatus.ACTIVE,
+        AnalysisAccessStatus.EXPIRED,
+        AnalysisAccessStatus.PREVIEW,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Activez l’analyse complète de ce bien pour continuer.",
+        )
+    return access.status
+
+
+def _require_preview_document_slot(
+    repository: DocumentRepository,
+    analysis_case_id: UUID,
+    user_id: UUID,
+) -> None:
+    if repository.list_documents(analysis_case_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=(
+                "L’aperçu gratuit est limité à un fichier. "
+                "Débloquez l’analyse complète pour en ajouter d’autres."
+            ),
         )
 
 
@@ -251,9 +285,10 @@ def create_analysis_case(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
-    if not BillingRepository(session).has_available_credit(
-        current_user_id, datetime.now(UTC)
-    ):
+    billing_repository = BillingRepository(session)
+    has_credit = billing_repository.has_available_credit(current_user_id, datetime.now(UTC))
+    can_create_preview = billing_repository.can_create_free_preview(current_user_id)
+    if not has_credit and not can_create_preview:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Aucune analyse disponible. Choisissez une offre pour créer un dossier.",
@@ -265,10 +300,21 @@ def create_analysis_case(
         price_eur=payload.price_eur,
         surface_m2=payload.surface_m2,
         lot_count=payload.lot_count,
+        access_mode=(
+            AnalysisCaseAccessMode.STANDARD
+            if has_credit
+            else AnalysisCaseAccessMode.FREE_PREVIEW
+        ),
     )
     return _case_read(
         analysis_case,
-        AnalysisAccessRead(status=AnalysisAccessStatus.NOT_ACTIVATED),
+        AnalysisAccessRead(
+            status=(
+                AnalysisAccessStatus.NOT_ACTIVATED
+                if has_credit
+                else AnalysisAccessStatus.PREVIEW
+            )
+        ),
     )
 
 
@@ -284,7 +330,15 @@ def list_analysis_cases(
             item,
             accesses.get(
                 item.id,
-                AnalysisAccessRead(status=AnalysisAccessStatus.NOT_ACTIVATED),
+                AnalysisAccessRead(
+                    status=(
+                        AnalysisAccessStatus.PREVIEW
+                        if item.access_mode == AnalysisCaseAccessMode.FREE_PREVIEW.value
+                        else AnalysisAccessStatus.ACTIVE
+                        if item.access_mode == AnalysisCaseAccessMode.GRANDFATHERED.value
+                        else AnalysisAccessStatus.NOT_ACTIVATED
+                    )
+                ),
             ),
         )
         for item in analysis_cases
@@ -411,6 +465,9 @@ def get_document_extraction(
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_unlocked_analysis(
+        BillingRepository(session), analysis_case_id, current_user_id
+    )
     extraction = repository.get_extraction(document.id)
     if extraction is None:
         raise HTTPException(
@@ -460,9 +517,11 @@ async def create_document_upload_url(
     repository = DocumentRepository(session)
     if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
-    _require_active_analysis(
+    access_status = _require_editable_analysis(
         BillingRepository(session), analysis_case_id, current_user_id
     )
+    if access_status == AnalysisAccessStatus.PREVIEW:
+        _require_preview_document_slot(repository, analysis_case_id, current_user_id)
 
     settings = get_settings()
     try:
@@ -534,9 +593,11 @@ async def upload_document(
         ) from error
 
     try:
-        _require_active_analysis(
+        access_status = _require_editable_analysis(
             BillingRepository(session), analysis_case_id, current_user_id
         )
+        if access_status == AnalysisAccessStatus.PREVIEW:
+            _require_preview_document_slot(repository, analysis_case_id, current_user_id)
     except HTTPException:
         await _delete_unpersisted_upload(storage, payload.storage_key)
         raise
@@ -627,7 +688,7 @@ async def process_document(
     document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    _require_active_analysis(
+    _require_editable_analysis(
         BillingRepository(session), analysis_case_id, current_user_id
     )
     if document.status in {
@@ -1045,6 +1106,54 @@ def refresh_case_report(
     )
     BillingRepository(session).record_report_refresh(analysis_case_id, current_user_id)
     return report
+
+
+@router.post("/{analysis_case_id}/report/preview", response_model=BuyerReportPreview)
+def refresh_case_report_preview(
+    analysis_case_id: UUID,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> BuyerReportPreview:
+    repository = DocumentRepository(session)
+    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
+    if analysis_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    access = BillingRepository(session).get_case_access(
+        analysis_case_id, current_user_id, datetime.now(UTC)
+    )
+    if access.status != AnalysisAccessStatus.PREVIEW:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucun aperçu gratuit n’est disponible pour ce dossier.",
+        )
+    _, _, dpe_documents, diagnostics = _refresh_case_findings(
+        repository, analysis_case_id, current_user_id
+    )
+    documents = repository.list_documents(analysis_case_id, current_user_id)
+    report = build_buyer_report(
+        analysis_case_id=analysis_case_id,
+        title=analysis_case.title,
+        findings=[
+            record.to_finding()
+            for record in repository.list_case_findings(analysis_case_id, current_user_id)
+        ],
+        document_names={document.id: document.original_filename for document in documents},
+        dpe_documents=dpe_documents,
+        diagnostics=diagnostics,
+    )
+    repository.save_case_report(
+        analysis_case_id=analysis_case_id,
+        user_id=current_user_id,
+        report=report,
+    )
+    return BuyerReportPreview(
+        analysis_case_id=analysis_case_id,
+        generated_at=report.generated_at,
+        risk_count=report.summary.risk_count,
+        verification_count=report.summary.verification_count,
+        missing_information_count=report.summary.missing_information_count,
+        reassuring_count=report.summary.reassuring_count,
+    )
 
 
 @router.get("/{analysis_case_id}/report", response_model=BuyerReport)

@@ -16,15 +16,9 @@ from app.billing.models import (
     StripePurchaseStatus,
     StripeWebhookEventRecord,
 )
-from app.property.models import AnalysisCaseRecord
+from app.property.models import AnalysisCaseAccessMode, AnalysisCaseRecord
 
 ANALYSIS_ACCESS_DAYS = 30
-
-
-def _is_after(value: datetime, reference: datetime) -> bool:
-    if value.tzinfo is None and reference.tzinfo is not None:
-        reference = reference.replace(tzinfo=None)
-    return value > reference
 
 
 class NoAnalysisCredit(RuntimeError):
@@ -85,7 +79,21 @@ class BillingRepository:
         return BillingSummaryRead(
             available_analyses=int(available or 0),
             next_credit_expiration=next_expiration,
+            can_create_free_preview=self.can_create_free_preview(user_id),
         )
+
+    def can_create_free_preview(self, user_id: UUID) -> bool:
+        credit_id = self.session.scalar(
+            select(AnalysisCreditRecord.id)
+            .where(AnalysisCreditRecord.user_id == user_id)
+            .limit(1)
+        )
+        case_id = self.session.scalar(
+            select(AnalysisCaseRecord.id)
+            .where(AnalysisCaseRecord.user_id == user_id)
+            .limit(1)
+        )
+        return credit_id is None and case_id is None
 
     def has_available_credit(self, user_id: UUID, now: datetime) -> bool:
         credit_id = self.session.scalar(
@@ -105,6 +113,14 @@ class BillingRepository:
     def get_case_access(
         self, analysis_case_id: UUID, user_id: UUID, now: datetime
     ) -> AnalysisAccessRead:
+        analysis_case = self.session.scalar(
+            select(AnalysisCaseRecord).where(
+                AnalysisCaseRecord.id == analysis_case_id,
+                AnalysisCaseRecord.user_id == user_id,
+            )
+        )
+        if analysis_case is None:
+            return AnalysisAccessRead(status=AnalysisAccessStatus.NOT_ACTIVATED)
         access = self.session.scalar(
             select(AnalysisAccessRecord)
             .join(
@@ -116,7 +132,7 @@ class BillingRepository:
                 AnalysisCaseRecord.user_id == user_id,
             )
         )
-        return self._access_read(access, now)
+        return self._access_read(access, now, analysis_case.access_mode)
 
     def list_case_accesses(
         self, user_id: UUID, now: datetime
@@ -133,17 +149,18 @@ class BillingRepository:
 
     @staticmethod
     def _access_read(
-        access: AnalysisAccessRecord | None, now: datetime
+        access: AnalysisAccessRecord | None,
+        now: datetime,
+        access_mode: str = AnalysisCaseAccessMode.STANDARD.value,
     ) -> AnalysisAccessRead:
         if access is None:
+            if access_mode == AnalysisCaseAccessMode.FREE_PREVIEW.value:
+                return AnalysisAccessRead(status=AnalysisAccessStatus.PREVIEW)
+            if access_mode == AnalysisCaseAccessMode.GRANDFATHERED.value:
+                return AnalysisAccessRead(status=AnalysisAccessStatus.ACTIVE)
             return AnalysisAccessRead(status=AnalysisAccessStatus.NOT_ACTIVATED)
-        status = (
-            AnalysisAccessStatus.ACTIVE
-            if _is_after(access.expires_at, now)
-            else AnalysisAccessStatus.EXPIRED
-        )
         return AnalysisAccessRead(
-            status=status,
+            status=AnalysisAccessStatus.ACTIVE,
             activated_at=access.activated_at,
             expires_at=access.expires_at,
         )
@@ -163,7 +180,7 @@ class BillingRepository:
             raise LookupError("Analysis case not found")
 
         access = self.session.get(AnalysisAccessRecord, analysis_case_id)
-        if access is not None and _is_after(access.expires_at, now):
+        if access is not None:
             return self._access_read(access, now)
 
         credit = self.session.scalar(
@@ -219,6 +236,14 @@ class BillingRepository:
             .with_for_update()
         )
         if access is None:
+            access_mode = self.session.scalar(
+                select(AnalysisCaseRecord.access_mode).where(
+                    AnalysisCaseRecord.id == analysis_case_id,
+                    AnalysisCaseRecord.user_id == user_id,
+                )
+            )
+            if access_mode == AnalysisCaseAccessMode.GRANDFATHERED.value:
+                return
             raise LookupError("Analysis access not found")
         access.report_refresh_count += 1
         self.session.commit()
