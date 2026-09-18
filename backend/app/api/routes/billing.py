@@ -18,6 +18,7 @@ from app.billing.models import (
 )
 from app.billing.repository import (
     BillingRepository,
+    DemoCaseReadOnly,
     InvalidStripePayment,
     NoAnalysisCredit,
 )
@@ -122,6 +123,11 @@ def activate_analysis_case(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Analysis case not found",
+        ) from error
+    except DemoCaseReadOnly as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce dossier de démonstration est en lecture seule.",
         ) from error
     except NoAnalysisCredit as error:
         raise HTTPException(

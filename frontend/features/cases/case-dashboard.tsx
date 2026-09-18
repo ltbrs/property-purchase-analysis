@@ -44,7 +44,9 @@ export function CaseDashboard() {
         if (!cancelled) {
           setAnalysisCases(cases);
           setActiveCaseId(getWorkspace()?.caseId ?? null);
-          setShowCreation((current) => current || cases.length === 0);
+          setShowCreation(
+            (current) => current || cases.every(({ case_kind }) => case_kind === "demo"),
+          );
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -85,8 +87,12 @@ export function CaseDashboard() {
 
   function selectCase(analysisCase: AnalysisCase) {
     captureProductEvent("analysis_case_selected", {
+      case_kind: analysisCase.case_kind,
       property_type: analysisCase.property_type,
     });
+    if (analysisCase.case_kind === "demo") {
+      captureProductEvent("demo_case_opened", { source: "case_dashboard" });
+    }
     saveWorkspace(analysisCase.id);
     setActiveCaseId(analysisCase.id);
     router.push(productRoutes.caseOverview);
@@ -133,12 +139,20 @@ export function CaseDashboard() {
                 <button
                   key={analysisCase.id}
                   type="button"
-                  className={`case-card${isActive ? " is-active" : ""}`}
+                  className={`case-card${isActive ? " is-active" : ""}${analysisCase.case_kind === "demo" ? " is-demo" : ""}`}
                   onClick={() => selectCase(analysisCase)}
                 >
                   <span className="case-card-icon"><Icon name={analysisCase.property_type === "house" ? "home" : "building"} /></span>
                   <span className="case-card-main">
-                    <span className="case-card-status">{isActive ? "Dossier sélectionné" : propertyTypeLabels[analysisCase.property_type]}</span>
+                    <span className="case-card-status">
+                      {analysisCase.case_kind === "demo" ? (
+                        <><i>Démo</i> Données fictives, lecture seule</>
+                      ) : isActive ? (
+                        "Dossier sélectionné"
+                      ) : (
+                        propertyTypeLabels[analysisCase.property_type]
+                      )}
+                    </span>
                     <strong>{analysisCase.title}</strong>
                     <span className="case-card-details">
                       {analysisCase.price_eur ? currencyFormatter.format(Number(analysisCase.price_eur)) : "Prix non renseigné"}
@@ -162,7 +176,7 @@ export function CaseDashboard() {
 
       {showCreation ? (
         <div ref={creationRef} id="nouveau-dossier" className="case-creation-container">
-          {analysisCases.length > 0 ? (
+          {analysisCases.some(({ case_kind }) => case_kind === "user") ? (
             <div className="creation-container-heading">
               <div>
                 <p className="section-kicker">Ajouter un bien</p>

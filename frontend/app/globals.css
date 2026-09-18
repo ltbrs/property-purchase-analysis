@@ -589,6 +589,93 @@ svg {
   background: #dfe5df;
 }
 
+.account-preference-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+  padding: 1.2rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--demo-surface);
+}
+
+.account-preference-card > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.account-preference-card strong {
+  font-size: 0.82rem;
+}
+
+.account-preference-card span,
+.preference-error {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.preference-switch {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.15rem 0.55rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.preference-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preference-switch > span {
+  position: relative;
+  width: 2.45rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: #cbd2d7;
+  transition: background 160ms ease;
+}
+
+.preference-switch > span::after {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transition: transform 160ms ease;
+}
+
+.preference-switch input:checked + span {
+  background: var(--green-700);
+}
+
+.preference-switch input:checked + span::after {
+  transform: translateX(1.1rem);
+}
+
+.preference-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(49, 94, 82, 0.18);
+}
+
+.preference-switch small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.62rem;
+  text-align: center;
+}
+
+.preference-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--red);
+}
+
 .billing-panel {
   margin-top: 1.25rem;
   padding: 1.4rem;
@@ -1015,6 +1102,25 @@ svg {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.sidebar-case-list button.is-demo {
+  background: transparent;
+}
+
+.sidebar-case-list button.is-demo:hover,
+.sidebar-case-list button.is-demo.is-selected {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-case-list button.is-demo > span {
+  color: var(--green-950);
+  background: rgba(121, 220, 193, 0.72);
+}
+
+.sidebar-case-list button.is-demo > svg {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .sidebar-case-list button > span {
   display: grid;
   width: 1.75rem;
@@ -1038,6 +1144,16 @@ svg {
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-case-list button strong small {
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.3rem;
+  border-radius: 999px;
+  color: var(--lime);
+  background: rgba(216, 255, 114, 0.14);
+  font-size: 0.5rem;
+  text-transform: uppercase;
 }
 
 .sidebar-case-list button > svg {
@@ -1208,6 +1324,12 @@ svg {
   transition: background 160ms ease, transform 160ms ease;
 }
 
+.primary-action.is-read-only {
+  color: var(--ink);
+  background: var(--demo-surface);
+  cursor: default;
+}
+
 .case-dashboard {
   display: grid;
   gap: 2rem;
@@ -1317,6 +1439,16 @@ svg {
   box-shadow: 0 0.5rem 1.5rem rgba(24, 43, 35, 0.06);
 }
 
+.case-card.is-demo,
+.case-card.is-demo.is-active {
+  background: var(--demo-surface);
+}
+
+.case-card.is-demo .case-card-icon {
+  color: #46525e;
+  background: #dde3e8;
+}
+
 .case-card-icon {
   display: grid;
   width: 2.8rem;
@@ -1341,6 +1473,52 @@ svg {
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.case-card-status i {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  color: #35404a;
+  background: #dce2e7;
+  font-size: 0.54rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.demo-read-only-banner {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  color: #35404a;
+  background: var(--demo-surface);
+}
+
+.demo-read-only-banner > svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.demo-read-only-banner > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.demo-read-only-banner strong {
+  font-size: 0.76rem;
+}
+
+.demo-read-only-banner span {
+  color: #63707c;
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
 .case-card-main strong {
@@ -3615,6 +3793,14 @@ svg {
 
   .account-card form {
     grid-column: 1 / -1;
+  }
+
+  .account-preference-card {
+    grid-template-columns: 1fr;
+  }
+
+  .preference-switch {
+    justify-self: start;
   }
 
   .sign-out-button {

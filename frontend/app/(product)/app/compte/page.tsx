@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { BillingPanel } from "@/features/billing/billing-panel";
+import { DemoPreference } from "@/features/account/demo-preference";
 import { signOutCurrentSession } from "@/features/auth/actions";
 import { productRoutes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
@@ -70,6 +71,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </button>
         </form>
       </div>
+
+      <DemoPreference />
 
       <BillingPanel
         paymentStatus={

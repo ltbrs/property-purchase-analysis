@@ -36,6 +36,7 @@ import {
   getWorkspace,
   readApiError,
   resetWorkspace,
+  type AnalysisCase,
   type Workspace,
 } from "@/lib/workspace";
 
@@ -76,13 +77,6 @@ type DocumentUploadUrl = {
   storage_key: string;
   headers: Record<string, string>;
   expires_at: string;
-};
-
-type AnalysisCase = {
-  id: string;
-  title: string;
-  property_type: PropertyType;
-  analysis_access_status: "not_activated" | "preview" | "active" | "expired";
 };
 
 const statusLabels: Record<DocumentStatus, string> = {
@@ -190,6 +184,7 @@ function PropertyTypeSelector({
 function DocumentFile({
   document,
   deletingDocumentId,
+  readOnly,
   showType,
   onDelete,
   onViewDpe,
@@ -198,6 +193,7 @@ function DocumentFile({
 }: {
   document: UploadedDocument;
   deletingDocumentId: string | null;
+  readOnly: boolean;
   showType?: boolean;
   onDelete: (document: UploadedDocument) => void;
   onViewDpe: (document: UploadedDocument) => void;
@@ -320,16 +316,18 @@ function DocumentFile({
               <Icon name="table" /> Extraction
             </button>
           ) : null}
-          <button
-            className="delete-document-button"
-            type="button"
-            disabled={deletingDocumentId !== null}
-            aria-label={`Supprimer ${document.original_filename}`}
-            title={`Supprimer ${document.original_filename}`}
-            onClick={() => onDelete(document)}
-          >
-            {deletingDocumentId === document.id ? "Suppression…" : <Icon name="trash" />}
-          </button>
+          {!readOnly ? (
+            <button
+              className="delete-document-button"
+              type="button"
+              disabled={deletingDocumentId !== null}
+              aria-label={`Supprimer ${document.original_filename}`}
+              title={`Supprimer ${document.original_filename}`}
+              onClick={() => onDelete(document)}
+            >
+              {deletingDocumentId === document.id ? "Suppression…" : <Icon name="trash" />}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -341,6 +339,7 @@ function ExpectedDocumentRow({
   documents,
   propertyType,
   deletingDocumentId,
+  readOnly,
   onDelete,
   onViewDpe,
   onViewExtraction,
@@ -350,6 +349,7 @@ function ExpectedDocumentRow({
   documents: UploadedDocument[];
   propertyType: PropertyType;
   deletingDocumentId: string | null;
+  readOnly: boolean;
   onDelete: (document: UploadedDocument) => void;
   onViewDpe: (document: UploadedDocument) => void;
   onViewExtraction: (document: UploadedDocument) => void;
@@ -395,6 +395,7 @@ function ExpectedDocumentRow({
               key={document.id}
               document={document}
               deletingDocumentId={deletingDocumentId}
+              readOnly={readOnly}
               onDelete={onDelete}
               onViewDpe={onViewDpe}
               onViewExtraction={onViewExtraction}
@@ -413,6 +414,7 @@ export function DocumentUpload() {
   const [analysisAccessStatus, setAnalysisAccessStatus] = useState<
     AnalysisCase["analysis_access_status"]
   >("not_activated");
+  const [readOnly, setReadOnly] = useState(false);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
@@ -465,6 +467,7 @@ export function DocumentUpload() {
           setDocuments(uploadedDocuments);
           setPropertyType(analysisCase.property_type);
           setAnalysisAccessStatus(analysisCase.analysis_access_status);
+          setReadOnly(analysisCase.read_only);
         }
       } catch (initializationError) {
         if (!cancelled) {
@@ -547,9 +550,9 @@ export function DocumentUpload() {
   }
 
   async function uploadFiles(files: File[]) {
-    const canUpload = analysisAccessStatus === "active"
+    const canUpload = !readOnly && (analysisAccessStatus === "active"
       || analysisAccessStatus === "expired"
-      || (analysisAccessStatus === "preview" && documents.length === 0);
+      || (analysisAccessStatus === "preview" && documents.length === 0));
     if (
       !workspace ||
       !canUpload ||
@@ -710,7 +713,7 @@ export function DocumentUpload() {
   }
 
   async function deleteDocument(document: UploadedDocument) {
-    if (!workspace || deletingDocumentId) return;
+    if (!workspace || deletingDocumentId || readOnly) return;
 
     const shouldDelete = window.confirm(
       `Supprimer définitivement « ${document.original_filename} » ?\n\nLe fichier sera supprimé et le rapport du dossier devra être recalculé.`,
@@ -744,7 +747,7 @@ export function DocumentUpload() {
   }
 
   async function activateAnalysis() {
-    if (!workspace || isActivating) return;
+    if (!workspace || isActivating || readOnly) return;
 
     setIsActivating(true);
     setError(null);
@@ -785,22 +788,35 @@ export function DocumentUpload() {
     return { expectation, documents: matchingDocuments };
   });
   const otherDocuments = documents.filter((document) => !matchedDocumentIds.has(document.id));
+  const visibleCoverage = readOnly
+    ? coverage.filter(({ documents: matchingDocuments }) => matchingDocuments.length > 0)
+    : coverage;
   const missingCount = propertyType === "unknown"
     ? 0
     : coverage.filter(({ documents: matchingDocuments }) => matchingDocuments.length === 0).length;
-  const canUpload = analysisAccessStatus === "active"
+  const canUpload = !readOnly && (analysisAccessStatus === "active"
     || analysisAccessStatus === "expired"
-    || (analysisAccessStatus === "preview" && documents.length === 0);
+    || (analysisAccessStatus === "preview" && documents.length === 0));
 
   return (
     <div className="document-workspace">
-      <PropertyTypeSelector
-        value={propertyType}
-        isSaving={isSavingPropertyType}
-        onChange={(value) => void updatePropertyType(value)}
-      />
+      {readOnly ? (
+        <div className="demo-read-only-banner">
+          <Icon name="shield" />
+          <div>
+            <strong>Dossier fictif en lecture seule</strong>
+            <span>Cette démonstration utilise une sélection réduite de documents. Vous pouvez consulter les fichiers et leurs extractions, sans les modifier.</span>
+          </div>
+        </div>
+      ) : (
+        <PropertyTypeSelector
+          value={propertyType}
+          isSaving={isSavingPropertyType}
+          onChange={(value) => void updatePropertyType(value)}
+        />
+      )}
 
-      {canUpload ? (
+      {readOnly ? null : canUpload ? (
         <div className="upload-card">
           <div className="upload-card-copy">
             <span className="upload-icon" aria-hidden="true"><Icon name="upload" /></span>
@@ -875,9 +891,13 @@ export function DocumentUpload() {
         <div className="document-list-heading">
           <div>
             <p className="section-kicker">{propertyTypeLabels[propertyType]}</p>
-            <h2 id="document-coverage-title">Documents à réunir</h2>
+            <h2 id="document-coverage-title">
+              {readOnly ? "Pièces de la démonstration" : "Documents à réunir"}
+            </h2>
             <p>
-              {propertyType === "unknown"
+              {readOnly
+                ? `${documents.length} document${documents.length === 1 ? "" : "s"} fictif${documents.length === 1 ? "" : "s"} analysé${documents.length === 1 ? "" : "s"}.`
+                : propertyType === "unknown"
                 ? "Choisissez le type de logement pour identifier précisément les pièces manquantes."
                 : missingCount === 0
                   ? "Toutes les catégories attendues sont couvertes."
@@ -899,13 +919,14 @@ export function DocumentUpload() {
           <div className="document-empty">Chargement de votre dossier…</div>
         ) : (
           <ul className="coverage-list">
-            {coverage.map(({ expectation, documents: matchingDocuments }) => (
+            {visibleCoverage.map(({ expectation, documents: matchingDocuments }) => (
               <ExpectedDocumentRow
                 key={expectation.key}
                 expectation={expectation}
                 documents={matchingDocuments}
                 propertyType={propertyType}
                 deletingDocumentId={deletingDocumentId}
+                readOnly={readOnly}
                 onDelete={(document) => void deleteDocument(document)}
                 onViewDpe={(document) => setViewingDpe({
                   documentId: document.id,
@@ -939,6 +960,7 @@ export function DocumentUpload() {
                 key={document.id}
                 document={document}
                 deletingDocumentId={deletingDocumentId}
+                readOnly={readOnly}
                 showType
                 onDelete={(item) => void deleteDocument(item)}
                 onViewDpe={(document) => setViewingDpe({

@@ -211,6 +211,7 @@ async function updateFindingReview(
 
 type AnalysisLoad = {
   accessStatus: AnalysisAccessStatus;
+  readOnly: boolean;
   report: BuyerReportData | null;
   preview: BuyerReportPreviewData | null;
 };
@@ -235,13 +236,27 @@ function loadReport(): Promise<AnalysisLoad | null> {
     }
     if (!caseResponse.ok) throw new Error(await readApiError(caseResponse));
     const analysisCase = (await caseResponse.json()) as AnalysisCase;
+    if (analysisCase.read_only) {
+      return {
+        accessStatus: analysisCase.analysis_access_status,
+        readOnly: true,
+        report: await fetchExistingReport(workspace),
+        preview: null,
+      };
+    }
     if (analysisCase.analysis_access_status === "not_activated") {
-      return { accessStatus: analysisCase.analysis_access_status, report: null, preview: null };
+      return {
+        accessStatus: analysisCase.analysis_access_status,
+        readOnly: false,
+        report: null,
+        preview: null,
+      };
     }
     if (analysisCase.analysis_access_status === "preview") {
       const documentCount = await processCaseDocuments(workspace);
       return {
         accessStatus: analysisCase.analysis_access_status,
+        readOnly: false,
         report: null,
         preview: documentCount > 0 ? await refreshReportPreview(workspace) : null,
       };
@@ -249,6 +264,7 @@ function loadReport(): Promise<AnalysisLoad | null> {
     if (analysisCase.analysis_access_status === "expired") {
       return {
         accessStatus: analysisCase.analysis_access_status,
+        readOnly: false,
         report: await fetchExistingReport(workspace),
         preview: null,
       };
@@ -256,6 +272,7 @@ function loadReport(): Promise<AnalysisLoad | null> {
     await processCaseDocuments(workspace);
     return {
       accessStatus: analysisCase.analysis_access_status,
+      readOnly: false,
       report: await refreshReport(workspace),
       preview: null,
     };
@@ -271,11 +288,13 @@ function FindingRow({
   onSelect,
   onReview,
   isUpdating,
+  readOnly,
 }: {
   finding: ReportFinding;
   onSelect: (finding: ReportFinding) => void;
   onReview: (finding: ReportFinding, checked: boolean) => void;
   isUpdating: boolean;
+  readOnly: boolean;
 }) {
   const isUserReviewed = finding.review_status === "not_problematic";
   const isReviewable = finding.analysis_type !== "missing_information"
@@ -314,7 +333,7 @@ function FindingRow({
         </span>
         <Icon className="row-chevron" name="chevron" />
       </button>
-      {isReviewable ? (
+      {isReviewable && !readOnly ? (
         <label className="finding-review-control">
           <input
             type="checkbox"
@@ -422,12 +441,14 @@ function DetailDrawer({
   onViewSource,
   onReview,
   isUpdating,
+  readOnly,
 }: {
   finding: ReportFinding;
   onClose: () => void;
   onViewSource: (source: ReportSource) => void;
   onReview: (finding: ReportFinding, checked: boolean) => void;
   isUpdating: boolean;
+  readOnly: boolean;
 }) {
   const isUserReviewed = finding.review_status === "not_problematic";
   const isReviewable = finding.analysis_type !== "missing_information"
@@ -455,7 +476,7 @@ function DetailDrawer({
         </div>
 
         <div className="detail-content">
-          {isReviewable ? (
+          {isReviewable && !readOnly ? (
             <label className="detail-review-control">
               <input
                 type="checkbox"
@@ -525,6 +546,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   const [error, setError] = useState<string | null>(null);
   const [updatingFindingKey, setUpdatingFindingKey] = useState<string | null>(null);
   const [accessStatus, setAccessStatus] = useState<AnalysisAccessStatus | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
   const [availableAnalyses, setAvailableAnalyses] = useState(0);
   const handleBillingSummary = useCallback((summary: BillingSummary) => {
     setAvailableAnalyses(summary.available_analyses);
@@ -537,6 +559,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
       const loaded = await loadReport();
       setNeedsWorkspace(loaded === null);
       setAccessStatus(loaded?.accessStatus ?? null);
+      setReadOnly(loaded?.readOnly ?? false);
       setReport(loaded?.report ?? null);
       setPreview(loaded?.preview ?? null);
       if (loaded?.report) {
@@ -556,6 +579,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         if (!cancelled) {
           setNeedsWorkspace(loaded === null);
           setAccessStatus(loaded?.accessStatus ?? null);
+          setReadOnly(loaded?.readOnly ?? false);
           setReport(loaded?.report ?? null);
           setPreview(loaded?.preview ?? null);
         }
@@ -574,6 +598,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   }, []);
 
   async function activateAnalysis() {
+    if (readOnly) return;
     const workspace = getWorkspace();
     if (!workspace) {
       setNeedsWorkspace(true);
@@ -615,6 +640,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
   }, [selectedFinding, viewingSource]);
 
   async function reviewFinding(finding: ReportFinding, checked: boolean) {
+    if (readOnly) return;
     const workspace = getWorkspace();
     if (!workspace) {
       setNeedsWorkspace(true);
@@ -813,6 +839,15 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
   return (
     <div className={`buyer-report report-${variant}`}>
+      {readOnly ? (
+        <div className="demo-read-only-banner">
+          <Icon name="shield" />
+          <div>
+            <strong>Données fictives, lecture seule</strong>
+            <span>Explorez les constats et leurs sources comme dans un dossier réel. Les validations et recalculs sont désactivés.</span>
+          </div>
+        </div>
+      ) : null}
       <header className="report-page-heading">
         <div>
           <p className="report-updated">Analyse mise à jour le {dateFormatter.format(new Date(report.generated_at))}</p>
@@ -822,7 +857,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <span className="attention-count">
             <i /> {report.summary.high_or_critical_count} risque{report.summary.high_or_critical_count === 1 ? "" : "s"} important{report.summary.high_or_critical_count === 1 ? "" : "s"}
           </span>
-          {accessStatus === "active" ? (
+          {readOnly ? null : accessStatus === "active" ? (
             <button className="refresh-icon-button" type="button" disabled={isLoading} aria-label="Actualiser l’analyse" title="Actualiser l’analyse" onClick={() => void refresh()}>
               <Icon name="refresh" />
             </button>
@@ -853,6 +888,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
                       onSelect={setSelectedFinding}
                       onReview={(item, checked) => void reviewFinding(item, checked)}
                       isUpdating={updatingFindingKey === finding.finding_key}
+                      readOnly={readOnly}
                     />
                   ))}
                 </div>
@@ -896,6 +932,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
                     onSelect={setSelectedFinding}
                     onReview={(item, checked) => void reviewFinding(item, checked)}
                     isUpdating={updatingFindingKey === finding.finding_key}
+                    readOnly={readOnly}
                   />
                 ))}
               </div>
@@ -923,6 +960,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           })}
           onReview={(finding, checked) => void reviewFinding(finding, checked)}
           isUpdating={updatingFindingKey === selectedFinding.finding_key}
+          readOnly={readOnly}
         />
       ) : null}
       {viewingSource ? (
