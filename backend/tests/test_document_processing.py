@@ -2,7 +2,7 @@ import hashlib
 from collections.abc import Generator
 from datetime import date
 from io import BytesIO
-from typing import BinaryIO, TypeVar
+from typing import BinaryIO, TypeVar, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -260,7 +260,7 @@ def upload_document(
         json=metadata,
     )
     if not upload_url.is_success:
-        return upload_url
+        return cast(Response, upload_url)
     storage_key = upload_url.json()["storage_key"]
     storage.upload_pdf(BytesIO(DPE_PDF), storage_key)
     response = client.post(
@@ -273,7 +273,7 @@ def upload_document(
         },
     )
     storage.download_count = 0
-    return response
+    return cast(Response, response)
 
 
 def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
