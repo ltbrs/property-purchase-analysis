@@ -120,6 +120,16 @@ def test_ademe_mismatch_is_exposed_and_does_not_overwrite_document_rating() -> N
     assert inconsistency.status.value == "possible"
 
 
+def test_missing_ademe_record_is_exposed_as_not_found() -> None:
+    dpe_number = DpeTextFact(value="2475E4333306Q", source=source())
+
+    resolved = resolve_dpe_facts(facts(), dpe_number=dpe_number)
+
+    assert resolved.ademe_verification.status == AdemeVerificationStatus.NOT_FOUND
+    assert resolved.ademe_verification.dpe_number == dpe_number.value
+    assert resolved.ademe_verification.data is None
+
+
 def test_rating_fallback_uses_the_worse_energy_or_ges_class() -> None:
     assert (
         calculate_dpe_rating(
