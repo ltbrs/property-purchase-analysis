@@ -1,5 +1,6 @@
 import hashlib
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from typing import BinaryIO, cast
 from uuid import UUID, uuid4
@@ -13,11 +14,18 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.billing.models import AnalysisAccessRecord
 from app.core.config import get_settings
 from app.core.database import Base, get_db_session
 from app.documents.models import DocumentRecord
+from app.documents.repository import DocumentRepository
 from app.main import create_app
-from app.property.models import AnalysisCaseRecord, AuthAccountRecord, UserRecord
+from app.property.models import (
+    AnalysisCaseAccessMode,
+    AnalysisCaseRecord,
+    AuthAccountRecord,
+    UserRecord,
+)
 from app.storage.object_storage import (
     ObjectStorageError,
     StoredObjectMetadata,
@@ -329,6 +337,102 @@ def test_upload_requires_active_analysis_access(
     assert "Activez l’analyse complète" in response.json()["detail"]
     assert storage.upload_url_requests == []
     assert storage.objects == {}
+
+
+def test_free_preview_allows_one_document_and_rejects_a_second(
+    client: TestClient,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    created = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Essai gratuit", "property_type": "house"},
+    )
+    case_id = UUID(created.json()["id"])
+
+    first = upload_document(client, storage, case_id, user_id, filename="premier.pdf")
+    second = upload_document(client, storage, case_id, user_id, filename="second.pdf")
+
+    assert created.status_code == 201
+    assert created.json()["analysis_access_status"] == "preview"
+    assert first.status_code == 201
+    assert second.status_code == 402
+    assert "limité à un fichier" in second.json()["detail"]
+
+
+def test_free_preview_exposes_counts_but_not_report_details(
+    client: TestClient,
+) -> None:
+    user_id = uuid4()
+    created = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Essai gratuit", "property_type": "house"},
+    )
+    case_id = created.json()["id"]
+
+    preview = client.post(
+        f"/api/v1/analysis-cases/{case_id}/report/preview",
+        headers=auth(user_id),
+    )
+    full_report = client.get(
+        f"/api/v1/analysis-cases/{case_id}/report",
+        headers=auth(user_id),
+    )
+
+    assert preview.status_code == 200
+    assert set(preview.json()) == {
+        "analysis_case_id",
+        "generated_at",
+        "risk_count",
+        "verification_count",
+        "missing_information_count",
+        "reassuring_count",
+    }
+    assert preview.json()["missing_information_count"] == 1
+    assert full_report.status_code == 402
+
+
+def test_consumed_credit_keeps_case_open_for_new_documents_after_access_window(
+    client: TestClient,
+    session: Session,
+    storage: MemoryObjectStorage,
+) -> None:
+    user_id = uuid4()
+    case_id = create_case(client, user_id)
+    grant_analysis_access(session, user_id, case_id)
+    access = session.get(AnalysisAccessRecord, case_id)
+    assert access is not None
+    access.activated_at = datetime.now(UTC) - timedelta(days=32)
+    access.expires_at = datetime.now(UTC) - timedelta(days=1)
+    session.commit()
+
+    response = upload_document(client, storage, case_id, user_id)
+    opened = client.get(f"/api/v1/analysis-cases/{case_id}", headers=auth(user_id))
+
+    assert response.status_code == 201
+    assert opened.json()["analysis_access_status"] == "active"
+
+
+def test_grandfathered_case_can_refresh_without_a_billing_access_record(
+    client: TestClient,
+    session: Session,
+) -> None:
+    user_id = uuid4()
+    analysis_case = DocumentRepository(session).create_analysis_case(
+        user_id,
+        "Ancien dossier analysé",
+        access_mode=AnalysisCaseAccessMode.GRANDFATHERED,
+    )
+
+    response = client.post(
+        f"/api/v1/analysis-cases/{analysis_case.id}/report/refresh",
+        headers=auth(user_id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["analysis_case_id"] == str(analysis_case.id)
 
 
 def test_a_user_cannot_upload_or_list_another_users_documents(

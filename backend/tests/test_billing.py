@@ -182,13 +182,13 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
     assert purchase is not None and purchase.status == "paid"
 
 
-def test_activation_requires_an_available_credit(
+def test_first_case_without_credit_is_a_free_preview_but_activation_requires_credit(
     billing_client: tuple[TestClient, FakeStripeGateway],
     session: Session,
 ) -> None:
     client, _gateway = billing_client
     user_id = uuid4()
-    rejected_creation = client.post(
+    preview_creation = client.post(
         "/api/v1/analysis-cases",
         headers=auth(user_id),
         json={"title": "Maison test"},
@@ -200,9 +200,41 @@ def test_activation_requires_an_available_credit(
         headers=auth(user_id),
     )
 
-    assert rejected_creation.status_code == 402
+    assert preview_creation.status_code == 201
+    assert preview_creation.json()["analysis_access_status"] == "preview"
     assert response.status_code == 402
     assert "Aucune analyse disponible" in response.json()["detail"]
+
+
+def test_free_preview_is_available_only_before_any_case_or_credit(
+    billing_client: tuple[TestClient, FakeStripeGateway],
+    session: Session,
+) -> None:
+    client, _gateway = billing_client
+    preview_user_id = uuid4()
+
+    summary = client.get("/api/v1/billing/summary", headers=auth(preview_user_id))
+    first = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(preview_user_id),
+        json={"title": "Aperçu"},
+    )
+    second = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(preview_user_id),
+        json={"title": "Second dossier"},
+    )
+
+    assert summary.json()["can_create_free_preview"] is True
+    assert first.status_code == 201
+    assert second.status_code == 402
+
+    credited_user_id = uuid4()
+    grant_analysis_credit(session, credited_user_id)
+    credited_summary = client.get(
+        "/api/v1/billing/summary", headers=auth(credited_user_id)
+    )
+    assert credited_summary.json()["can_create_free_preview"] is False
 
 
 def test_manual_credit_can_activate_a_case_without_a_fake_stripe_purchase(

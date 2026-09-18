@@ -11,6 +11,7 @@ type OfferCode = "single_analysis" | "search_pack";
 export type BillingSummary = {
   available_analyses: number;
   next_credit_expiration: string | null;
+  can_create_free_preview: boolean;
 };
 
 const offers: Array<{
