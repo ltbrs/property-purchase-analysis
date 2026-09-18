@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Annotated, Any, BinaryIO, Protocol
+from typing import Annotated, Any, BinaryIO, NoReturn, Protocol
 
 import boto3  # type: ignore[import-untyped]
 from botocore.client import Config  # type: ignore[import-untyped]
@@ -135,6 +135,37 @@ class S3ObjectStorage:
             raise ObjectStorageError("Could not delete document") from error
 
 
+class _UnavailableObjectStorage:
+    """Keep infrastructure errors lazy until a route needs storage access."""
+
+    bucket = ""
+
+    @staticmethod
+    def _raise_unavailable() -> NoReturn:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document storage is not configured",
+        )
+
+    def upload_pdf(self, file: BinaryIO, key: str) -> None:
+        self._raise_unavailable()
+
+    def create_pdf_upload_url(self, key: str, size_bytes: int, expires_in_seconds: int) -> str:
+        self._raise_unavailable()
+
+    def get_object_metadata(self, bucket: str, key: str) -> StoredObjectMetadata:
+        self._raise_unavailable()
+
+    def download_pdf(self, bucket: str, key: str) -> bytes:
+        self._raise_unavailable()
+
+    def create_pdf_view_url(self, bucket: str, key: str, expires_in_seconds: int) -> str:
+        self._raise_unavailable()
+
+    def delete_pdf(self, bucket: str, key: str) -> None:
+        self._raise_unavailable()
+
+
 @lru_cache
 def _get_s3_object_storage() -> S3ObjectStorage:
     return S3ObjectStorage(get_settings())
@@ -143,11 +174,8 @@ def _get_s3_object_storage() -> S3ObjectStorage:
 def get_object_storage() -> PrivateObjectStorage:
     try:
         return _get_s3_object_storage()
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Document storage is not configured",
-        ) from error
+    except RuntimeError:
+        return _UnavailableObjectStorage()
 
 
 ObjectStorage = Annotated[PrivateObjectStorage, Depends(get_object_storage)]
