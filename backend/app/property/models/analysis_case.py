@@ -112,8 +112,7 @@ class AnalysisCaseRecord(Base):
             name="ck_analysis_cases_kind_fields",
         ),
         CheckConstraint(
-            "template_manifest_sha256 IS NULL "
-            "OR length(template_manifest_sha256) = 64",
+            "template_manifest_sha256 IS NULL OR length(template_manifest_sha256) = 64",
             name="ck_analysis_cases_template_manifest_sha256_length",
         ),
         Index(

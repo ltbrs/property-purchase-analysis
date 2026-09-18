@@ -81,9 +81,7 @@ def test_database_allows_only_one_published_demo(session: Session) -> None:
 
 
 def test_demo_document_configuration_selects_requested_pdf_numbers() -> None:
-    manifest_path = (
-        Path(__file__).resolve().parents[2] / "docs/demo-dossier-lyon/manifest.json"
-    )
+    manifest_path = Path(__file__).resolve().parents[2] / "docs/demo-dossier-lyon/manifest.json"
     manifest = load_demo_manifest(manifest_path)
 
     selected = manifest.selected_documents(DEMO_DOCUMENT_LOGICAL_IDS)

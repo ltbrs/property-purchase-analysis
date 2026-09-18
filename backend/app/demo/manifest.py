@@ -88,9 +88,7 @@ class DemoManifest(BaseModel):
             raise ValueError("Demo document filenames must be unique")
         return self
 
-    def selected_documents(
-        self, logical_ids: tuple[str, ...]
-    ) -> list[DemoDocumentManifest]:
+    def selected_documents(self, logical_ids: tuple[str, ...]) -> list[DemoDocumentManifest]:
         documents_by_id = {document.logical_id: document for document in self.documents}
         missing = [logical_id for logical_id in logical_ids if logical_id not in documents_by_id]
         if missing:

@@ -105,8 +105,7 @@ async def seed_demo(
     selected = manifest.selected_documents(DEMO_DOCUMENT_LOGICAL_IDS)
     fingerprint = manifest.fingerprint(DEMO_DOCUMENT_LOGICAL_IDS)
     source_files = {
-        document.logical_id: _validate_source_file(manifest_path, document)
-        for document in selected
+        document.logical_id: _validate_source_file(manifest_path, document) for document in selected
     }
     settings = get_settings()
     storage = S3ObjectStorage(settings)

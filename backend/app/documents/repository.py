@@ -633,9 +633,7 @@ class DocumentRepository:
             return []
         return self._list_case_findings(analysis_case_id)
 
-    def list_case_findings_for_demo_seed(
-        self, analysis_case_id: UUID
-    ) -> list[RiskFindingRecord]:
+    def list_case_findings_for_demo_seed(self, analysis_case_id: UUID) -> list[RiskFindingRecord]:
         analysis_case = self.session.get(AnalysisCaseRecord, analysis_case_id)
         if analysis_case is None or analysis_case.case_kind != AnalysisCaseKind.DEMO.value:
             return []

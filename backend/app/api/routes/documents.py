@@ -1017,9 +1017,7 @@ def refresh_case_report(
     session: DatabaseSession,
 ) -> BuyerReport:
     repository = DocumentRepository(session)
-    analysis_case = _require_mutable_owned_case(
-        repository, analysis_case_id, current_user_id
-    )
+    analysis_case = _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
     report = CaseAnalysisService(repository).refresh_report(
         analysis_case=analysis_case,
@@ -1036,9 +1034,7 @@ def refresh_case_report_preview(
     session: DatabaseSession,
 ) -> BuyerReportPreview:
     repository = DocumentRepository(session)
-    analysis_case = _require_mutable_owned_case(
-        repository, analysis_case_id, current_user_id
-    )
+    analysis_case = _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     access = BillingRepository(session).get_case_access(
         analysis_case_id, current_user_id, datetime.now(UTC)
     )
