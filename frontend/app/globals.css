@@ -1103,7 +1103,22 @@ svg {
 }
 
 .sidebar-case-list button.is-demo {
-  background: rgba(238, 241, 245, 0.08);
+  background: transparent;
+}
+
+.sidebar-case-list button.is-demo:hover,
+.sidebar-case-list button.is-demo.is-selected {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-case-list button.is-demo > span {
+  color: var(--green-950);
+  background: rgba(121, 220, 193, 0.72);
+}
+
+.sidebar-case-list button.is-demo > svg {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .sidebar-case-list button > span {
@@ -1135,8 +1150,8 @@ svg {
   margin-left: 0.35rem;
   padding: 0.12rem 0.3rem;
   border-radius: 999px;
-  color: var(--green-950);
-  background: var(--demo-surface);
+  color: var(--lime);
+  background: rgba(216, 255, 114, 0.14);
   font-size: 0.5rem;
   text-transform: uppercase;
 }
