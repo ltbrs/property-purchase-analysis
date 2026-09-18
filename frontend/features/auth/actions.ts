@@ -35,22 +35,6 @@ function callbackPath(formData: FormData) {
   return safeRedirectPath(fieldValue(formData, "callbackUrl"));
 }
 
-export async function signInWithGoogle(formData: FormData) {
-  const supabase = await createClient();
-  const callbackUrl = callbackPath(formData);
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${getAuthOrigin()}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
-    },
-  });
-
-  if (error || !data.url) {
-    redirect(`${productRoutes.signIn}?error=oauth`);
-  }
-  redirect(data.url);
-}
-
 export async function signInWithPassword(
   _state: AuthActionState,
   formData: FormData,

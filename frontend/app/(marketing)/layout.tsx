@@ -77,6 +77,8 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
               <strong>Acquora</strong>
               <Link href={marketingRoutes.contact}>Nous contacter</Link>
               <Link href={productRoutes.home}>Mon espace personnel</Link>
+              <Link href={marketingRoutes.privacy}>Confidentialité</Link>
+              <Link href={marketingRoutes.terms}>Conditions générales</Link>
             </div>
           </nav>
 

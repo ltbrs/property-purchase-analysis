@@ -190,6 +190,10 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
           <Icon name="arrow" />
           <span>Retour sur Acquora.fr</span>
         </Link>
+        <nav className="sidebar-legal" aria-label="Informations juridiques">
+          <Link href={marketingRoutes.privacy}>Confidentialité</Link>
+          <Link href={marketingRoutes.terms}>Conditions</Link>
+        </nav>
       </aside>
 
       {isMenuOpen ? (

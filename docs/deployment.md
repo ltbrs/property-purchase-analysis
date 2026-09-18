@@ -91,6 +91,7 @@ Add these application variables in Vercel for Production and Preview:
 | `NEXT_PUBLIC_SITE_URL` | `https://acquora.fr` in Production |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-safe Supabase publishable key |
+| `AUTH_GOOGLE_ID` | Google OAuth web client ID, also configured in the Supabase Google provider |
 | `BACKEND_API_URL` | `https://acquora-api-acquora.vercel.app/api/v1`, then `https://api.acquora.fr/api/v1` after DNS validation |
 | `BACKEND_PROXY_SECRET` | A dedicated random value, identical on FastAPI |
 | `CONTACT_PROXY_SECRET` | A second random value, identical on FastAPI |
@@ -98,20 +99,25 @@ Add these application variables in Vercel for Production and Preview:
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host, such as `https://eu.i.posthog.com` |
 
 Never prefix the proxy secrets, Google client secret, SMTP secret, or a Supabase
-secret key with `NEXT_PUBLIC_`. Configure Google with the callback URL shown by
-the Supabase Google provider page:
+secret key with `NEXT_PUBLIC_`. `AUTH_GOOGLE_ID` is a public client identifier,
+but it is passed from the server to the sign-in component instead of being a
+global public environment variable.
 
-```text
-https://PROJECT_REF.supabase.co/auth/v1/callback
-```
+Add `https://acquora.fr` as an authorized JavaScript origin on the Google OAuth
+web client. Add `http://localhost:3000` for local development. Register that web
+client ID in the Supabase Google provider. Acquora does not use the Supabase
+OAuth redirect URL for Google sign-in.
 
 Set the Supabase Auth Site URL to `https://acquora.fr`. Allow
 `https://acquora.fr/auth/callback` and `http://localhost:3000/**`. The local
 wildcard is required because Auth callback URLs include a `next` query parameter.
 Add any required preview callbacks separately.
 Enable confirmed e-mail addresses, custom SMTP, security notifications, bot
-protection, and an asymmetric ES256 signing key. The frontend uses PKCE callback
-routes and cookie-backed sessions through `@supabase/ssr`.
+protection, and an asymmetric ES256 signing key. Google Identity Services returns
+an ID token directly to Acquora. The frontend passes that token and a verified
+nonce to Supabase Auth, which creates the cookie-backed session through
+`@supabase/ssr`. Callback routes remain in use for email confirmation and
+password recovery.
 
 ## Supabase Auth email through Resend
 

@@ -5,6 +5,8 @@ export const marketingRoutes = {
   blog: "/blog",
   blogCoproperty: "/blog/copropriete",
   contact: "/nous-contacter",
+  privacy: "/confidentialite",
+  terms: "/conditions-generales",
 } as const;
 
 export const productRoutes = {

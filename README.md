@@ -80,18 +80,25 @@ The frontend-specific file recognizes:
 | `NEXT_PUBLIC_SITE_URL` | Canonical application origin (`https://acquora.fr` in production) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL used by Auth |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-safe Supabase publishable key |
+| `AUTH_GOOGLE_ID` | Google OAuth web client ID used by Google Identity Services |
 | `BACKEND_API_URL` | Private API base URL used by the authenticated Next.js boundary |
 | `BACKEND_PROXY_SECRET` | Shared secret that protects the private frontend-to-backend boundary |
 | `CONTACT_PROXY_SECRET` | Shared secret for the public contact proxy and rate limiting |
 | `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | Public PostHog project token for product analytics |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host |
 
-Create a Google OAuth web client with the Supabase callback shown on the Google
-provider page. It has this form:
+Google sign-in starts directly on Acquora through Google Identity Services. Set
+`AUTH_GOOGLE_ID` to a web client ID registered in the Supabase Google provider.
+Add these authorized JavaScript origins to that client:
 
 ```text
-https://PROJECT_REF.supabase.co/auth/v1/callback
+http://localhost:3000
+https://acquora.fr
 ```
+
+Google returns an ID token directly to the browser. Supabase validates it with a
+nonce and creates the application session, so users are not redirected to a
+`supabase.co` consent screen.
 
 Configure `http://localhost:3000/**` and
 `https://acquora.fr/auth/callback` in the Supabase Auth redirect allow list.
