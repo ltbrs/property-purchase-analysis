@@ -76,9 +76,7 @@ class StripePurchaseRecord(Base):
     expected_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     credit_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
-        String(255), unique=True
-    )
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(

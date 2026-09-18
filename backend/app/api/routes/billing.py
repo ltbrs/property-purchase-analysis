@@ -81,10 +81,7 @@ async def create_checkout_session(
             customer_email=user.email if user is not None and user.email_verified else None,
             offer=offer,
             price_id=price_id,
-            success_url=(
-                f"{account_url}?paiement=succes"
-                "&session_id={CHECKOUT_SESSION_ID}"
-            ),
+            success_url=(f"{account_url}?paiement=succes&session_id={{CHECKOUT_SESSION_ID}}"),
             cancel_url=f"{account_url}?paiement=annule",
         )
     except stripe.StripeError as error:
