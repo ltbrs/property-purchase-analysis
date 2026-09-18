@@ -210,6 +210,8 @@ function DocumentFile({
   const isAdemeVerified = document.ademe_verification_status === "verified";
   const hasAdemeInconsistencies =
     document.ademe_verification_status === "verified_with_inconsistencies";
+  const wasAdemeNumberNotFound =
+    document.ademe_verification_status === "not_found";
   const analysisStatusIcon = document.status === "failed"
     ? "alert"
     : ["extracted", "completed"].includes(document.status)
@@ -224,7 +226,9 @@ function DocumentFile({
       ? ["vérifié auprès de l’ADEME"]
       : hasAdemeInconsistencies
         ? ["écarts détectés avec l’ADEME"]
-        : []),
+        : wasAdemeNumberNotFound
+          ? ["non vérifié, numéro introuvable auprès de l’ADEME"]
+          : []),
   ].join(", ");
 
   return (
@@ -256,18 +260,30 @@ function DocumentFile({
                 {statusLabels[document.status]}
               </span>
             ) : null}
-            {isAdemeVerified || hasAdemeInconsistencies ? (
+            {isAdemeVerified || hasAdemeInconsistencies || wasAdemeNumberNotFound ? (
               <span
-                className={`ademe-verification${hasAdemeInconsistencies ? " has-inconsistencies" : ""}`}
+                className={`ademe-verification${
+                  hasAdemeInconsistencies
+                    ? " has-inconsistencies"
+                    : wasAdemeNumberNotFound
+                      ? " is-not-found"
+                      : ""
+                }`}
                 title={
                   isAdemeVerified
                     ? "Le numéro DPE a été retrouvé dans le registre public de l’ADEME et les données comparables sont cohérentes."
-                    : "Le numéro DPE a été retrouvé dans le registre public de l’ADEME, avec des écarts sur certaines données."
+                    : hasAdemeInconsistencies
+                      ? "Le numéro DPE a été retrouvé dans le registre public de l’ADEME, avec des écarts sur certaines données."
+                      : "Le numéro DPE extrait n’a pas été retrouvé dans le registre public de l’ADEME."
                 }
               >
                 <AdemeMark />
                 <span aria-hidden="true"><Icon name={isAdemeVerified ? "check" : "info"} /></span>
-                {isAdemeVerified ? "Vérifié" : "Écarts détectés"}
+                {isAdemeVerified
+                  ? "Vérifié"
+                  : hasAdemeInconsistencies
+                    ? "Écarts détectés"
+                    : "Non vérifié"}
               </span>
             ) : null}
           </div>

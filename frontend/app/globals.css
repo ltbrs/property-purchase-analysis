@@ -324,31 +324,40 @@ svg {
   line-height: 1.65;
 }
 
-.google-sign-in {
+.google-sign-in-block {
+  display: grid;
+  width: 100%;
+}
+
+.google-sign-in-container {
+  grid-area: 1 / 1;
   display: flex;
   width: 100%;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 0.82rem 1rem;
+  visibility: hidden;
+}
+
+.google-sign-in-container.is-ready {
+  visibility: visible;
+}
+
+.google-sign-in-container > div,
+.google-sign-in-container iframe {
+  width: 100% !important;
+}
+
+.google-sign-in-loading {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
-  border-radius: 0.78rem;
-  color: var(--ink);
+  border-radius: 4px;
+  color: var(--muted);
   background: #fff;
   font-size: 0.84rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease;
-}
-
-.google-sign-in:hover {
-  background: #f8faf8;
-  transform: translateY(-1px);
-}
-
-.google-sign-in svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  font-weight: 700;
 }
 
 .auth-options {
@@ -2914,8 +2923,14 @@ svg {
   background: var(--amber-soft);
 }
 
-.ademe-verification.has-inconsistencies > span {
+.ademe-verification.has-inconsistencies > span,
+.ademe-verification.is-not-found > span {
   background: var(--amber);
+}
+
+.ademe-verification.is-not-found {
+  color: #664e1a;
+  background: #f7edd2;
 }
 
 .document-actions {
