@@ -16,7 +16,7 @@ from app.billing.models import (
     StripePurchaseStatus,
     StripeWebhookEventRecord,
 )
-from app.property.models import AnalysisCaseAccessMode, AnalysisCaseRecord
+from app.property.models import AnalysisCaseAccessMode, AnalysisCaseKind, AnalysisCaseRecord
 
 ANALYSIS_ACCESS_DAYS = 30
 
@@ -27,6 +27,10 @@ class NoAnalysisCredit(RuntimeError):
 
 class InvalidStripePayment(RuntimeError):
     """A signed Stripe event does not match the server-side purchase record."""
+
+
+class DemoCaseReadOnly(RuntimeError):
+    """A billing mutation targeted the shared demonstration case."""
 
 
 class BillingRepository:
@@ -112,11 +116,19 @@ class BillingRepository:
         analysis_case = self.session.scalar(
             select(AnalysisCaseRecord).where(
                 AnalysisCaseRecord.id == analysis_case_id,
-                AnalysisCaseRecord.user_id == user_id,
+                or_(
+                    AnalysisCaseRecord.user_id == user_id,
+                    (
+                        (AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value)
+                        & AnalysisCaseRecord.published_at.is_not(None)
+                    ),
+                ),
             )
         )
         if analysis_case is None:
             return AnalysisAccessRead(status=AnalysisAccessStatus.NOT_ACTIVATED)
+        if analysis_case.case_kind == AnalysisCaseKind.DEMO.value:
+            return AnalysisAccessRead(status=AnalysisAccessStatus.ACTIVE)
         access = self.session.scalar(
             select(AnalysisAccessRecord)
             .join(
@@ -164,13 +176,17 @@ class BillingRepository:
     ) -> AnalysisAccessRead:
         analysis_case = self.session.scalar(
             select(AnalysisCaseRecord)
-            .where(
-                AnalysisCaseRecord.id == analysis_case_id,
-                AnalysisCaseRecord.user_id == user_id,
-            )
+            .where(AnalysisCaseRecord.id == analysis_case_id)
             .with_for_update()
         )
         if analysis_case is None:
+            raise LookupError("Analysis case not found")
+        if (
+            analysis_case.case_kind == AnalysisCaseKind.DEMO.value
+            and analysis_case.published_at is not None
+        ):
+            raise DemoCaseReadOnly
+        if analysis_case.user_id != user_id:
             raise LookupError("Analysis case not found")
 
         access = self.session.get(AnalysisAccessRecord, analysis_case_id)

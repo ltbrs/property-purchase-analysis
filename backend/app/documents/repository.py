@@ -1,10 +1,12 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import case, delete, select
+from sqlalchemy import case, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.documents.classification.models import (
     DocumentClassificationRecord,
@@ -21,6 +23,7 @@ from app.documents.models import (
 from app.documents.parsers.base import ParsedPdf
 from app.property.models import (
     AnalysisCaseAccessMode,
+    AnalysisCaseKind,
     AnalysisCaseRecord,
     PropertyType,
     UserRecord,
@@ -50,6 +53,17 @@ class DocumentRepository:
                 # Two first requests for one upstream identity may race. The
                 # identity already exists, so only the losing transaction rolls back.
                 self.session.rollback()
+
+    @staticmethod
+    def _case_visibility(
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
+    ) -> ColumnElement[bool]:
+        demo_visibility = AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value
+        if not include_unpublished_demo:
+            demo_visibility &= AnalysisCaseRecord.published_at.is_not(None)
+        return or_(AnalysisCaseRecord.user_id == user_id, demo_visibility)
 
     def create_analysis_case(
         self,
@@ -102,8 +116,36 @@ class DocumentRepository:
             )
         )
 
-    def _lock_owned_analysis_case(
+    def get_accessible_analysis_case(
         self, analysis_case_id: UUID, user_id: UUID
+    ) -> AnalysisCaseRecord | None:
+        return self.session.scalar(
+            select(AnalysisCaseRecord).where(
+                AnalysisCaseRecord.id == analysis_case_id,
+                or_(
+                    AnalysisCaseRecord.user_id == user_id,
+                    (
+                        (AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value)
+                        & AnalysisCaseRecord.published_at.is_not(None)
+                    ),
+                ),
+            )
+        )
+
+    def get_demo_analysis_case(self, template_key: str) -> AnalysisCaseRecord | None:
+        return self.session.scalar(
+            select(AnalysisCaseRecord).where(
+                AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value,
+                AnalysisCaseRecord.template_key == template_key,
+            )
+        )
+
+    def _lock_owned_analysis_case(
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        allow_demo_seed: bool = False,
     ) -> AnalysisCaseRecord | None:
         """Serialize writes derived from one analysis case.
 
@@ -111,32 +153,54 @@ class DocumentRepository:
         Mode). Locking the parent row prevents two transactions from replacing
         the same findings or creating the same report at the same time.
         """
+        ownership = AnalysisCaseRecord.user_id == user_id
+        if allow_demo_seed:
+            ownership = or_(
+                ownership,
+                AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value,
+            )
         return self.session.scalar(
             select(AnalysisCaseRecord)
-            .where(
-                AnalysisCaseRecord.id == analysis_case_id,
-                AnalysisCaseRecord.user_id == user_id,
-            )
+            .where(AnalysisCaseRecord.id == analysis_case_id, ownership)
             .with_for_update()
         )
 
     def list_analysis_cases(self, user_id: UUID) -> list[AnalysisCaseRecord]:
+        user = self.session.get(UserRecord, user_id)
+        show_demo_case = user.show_demo_case if user is not None else True
+        visibility = [AnalysisCaseRecord.user_id == user_id]
+        if show_demo_case:
+            visibility.append(
+                (AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value)
+                & AnalysisCaseRecord.published_at.is_not(None)
+            )
         return list(
             self.session.scalars(
                 select(AnalysisCaseRecord)
-                .where(AnalysisCaseRecord.user_id == user_id)
-                .order_by(AnalysisCaseRecord.updated_at.desc())
+                .where(or_(*visibility))
+                .order_by(
+                    case((AnalysisCaseRecord.case_kind == AnalysisCaseKind.USER.value, 0), else_=1),
+                    AnalysisCaseRecord.updated_at.desc(),
+                )
             )
         )
 
-    def list_documents(self, analysis_case_id: UUID, user_id: UUID) -> list[DocumentRecord]:
+    def list_documents(
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
+    ) -> list[DocumentRecord]:
         return list(
             self.session.scalars(
                 select(DocumentRecord)
                 .join(DocumentRecord.analysis_case)
                 .where(
                     DocumentRecord.analysis_case_id == analysis_case_id,
-                    AnalysisCaseRecord.user_id == user_id,
+                    self._case_visibility(
+                        user_id, include_unpublished_demo=include_unpublished_demo
+                    ),
                 )
                 .order_by(DocumentRecord.created_at.desc())
             )
@@ -168,6 +232,25 @@ class DocumentRepository:
             )
         )
 
+    def get_accessible_document(
+        self, analysis_case_id: UUID, document_id: UUID, user_id: UUID
+    ) -> DocumentRecord | None:
+        return self.session.scalar(
+            select(DocumentRecord)
+            .join(DocumentRecord.analysis_case)
+            .where(
+                DocumentRecord.id == document_id,
+                DocumentRecord.analysis_case_id == analysis_case_id,
+                or_(
+                    AnalysisCaseRecord.user_id == user_id,
+                    (
+                        (AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value)
+                        & AnalysisCaseRecord.published_at.is_not(None)
+                    ),
+                ),
+            )
+        )
+
     def get_extraction(self, document_id: UUID) -> DocumentExtractionRecord | None:
         return self.session.scalar(
             select(DocumentExtractionRecord)
@@ -176,7 +259,11 @@ class DocumentRepository:
         )
 
     def list_case_extractions(
-        self, analysis_case_id: UUID, user_id: UUID
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
     ) -> list[DocumentExtractionRecord]:
         return list(
             self.session.scalars(
@@ -186,7 +273,9 @@ class DocumentRepository:
                 .options(selectinload(DocumentExtractionRecord.pages))
                 .where(
                     DocumentRecord.analysis_case_id == analysis_case_id,
-                    AnalysisCaseRecord.user_id == user_id,
+                    self._case_visibility(
+                        user_id, include_unpublished_demo=include_unpublished_demo
+                    ),
                 )
             )
         )
@@ -225,7 +314,11 @@ class DocumentRepository:
         )
 
     def list_case_classifications(
-        self, analysis_case_id: UUID, user_id: UUID
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
     ) -> list[DocumentClassificationRecord]:
         return list(
             self.session.scalars(
@@ -234,7 +327,9 @@ class DocumentRepository:
                 .join(DocumentRecord.analysis_case)
                 .where(
                     DocumentRecord.analysis_case_id == analysis_case_id,
-                    AnalysisCaseRecord.user_id == user_id,
+                    self._case_visibility(
+                        user_id, include_unpublished_demo=include_unpublished_demo
+                    ),
                 )
                 .order_by(
                     DocumentClassificationRecord.created_at,
@@ -259,7 +354,11 @@ class DocumentRepository:
         )
 
     def list_case_dpe_extractions(
-        self, analysis_case_id: UUID, user_id: UUID
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
     ) -> list[DpeExtractionRecord]:
         return list(
             self.session.scalars(
@@ -268,13 +367,19 @@ class DocumentRepository:
                 .join(DocumentRecord.analysis_case)
                 .where(
                     DocumentRecord.analysis_case_id == analysis_case_id,
-                    AnalysisCaseRecord.user_id == user_id,
+                    self._case_visibility(
+                        user_id, include_unpublished_demo=include_unpublished_demo
+                    ),
                 )
             )
         )
 
     def list_case_structured_extractions(
-        self, analysis_case_id: UUID, user_id: UUID
+        self,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        *,
+        include_unpublished_demo: bool = False,
     ) -> list[StructuredExtractionRecord]:
         return list(
             self.session.scalars(
@@ -283,7 +388,9 @@ class DocumentRepository:
                 .join(DocumentRecord.analysis_case)
                 .where(
                     DocumentRecord.analysis_case_id == analysis_case_id,
-                    AnalysisCaseRecord.user_id == user_id,
+                    self._case_visibility(
+                        user_id, include_unpublished_demo=include_unpublished_demo
+                    ),
                 )
                 .order_by(StructuredExtractionRecord.created_at)
             )
@@ -477,8 +584,16 @@ class DocumentRepository:
         analysis_case_id: UUID,
         user_id: UUID,
         findings: list[RiskFinding],
+        allow_demo_seed: bool = False,
     ) -> list[RiskFindingRecord]:
-        if self._lock_owned_analysis_case(analysis_case_id, user_id) is None:
+        if (
+            self._lock_owned_analysis_case(
+                analysis_case_id,
+                user_id,
+                allow_demo_seed=allow_demo_seed,
+            )
+            is None
+        ):
             raise PermissionError("Analysis case is not owned by the current user")
         existing = list(
             self.session.scalars(
@@ -514,8 +629,19 @@ class DocumentRepository:
         return records
 
     def list_case_findings(self, analysis_case_id: UUID, user_id: UUID) -> list[RiskFindingRecord]:
-        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+        if self.get_accessible_analysis_case(analysis_case_id, user_id) is None:
             return []
+        return self._list_case_findings(analysis_case_id)
+
+    def list_case_findings_for_demo_seed(
+        self, analysis_case_id: UUID
+    ) -> list[RiskFindingRecord]:
+        analysis_case = self.session.get(AnalysisCaseRecord, analysis_case_id)
+        if analysis_case is None or analysis_case.case_kind != AnalysisCaseKind.DEMO.value:
+            return []
+        return self._list_case_findings(analysis_case_id)
+
+    def _list_case_findings(self, analysis_case_id: UUID) -> list[RiskFindingRecord]:
         return list(
             self.session.scalars(
                 select(RiskFindingRecord)
@@ -537,7 +663,7 @@ class DocumentRepository:
     def get_case_finding(
         self, analysis_case_id: UUID, user_id: UUID, finding_key: str
     ) -> RiskFindingRecord | None:
-        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+        if self.get_accessible_analysis_case(analysis_case_id, user_id) is None:
             return None
         return self.session.scalar(
             select(RiskFindingRecord).where(
@@ -570,9 +696,21 @@ class DocumentRepository:
         return record
 
     def save_case_report(
-        self, *, analysis_case_id: UUID, user_id: UUID, report: BuyerReport
+        self,
+        *,
+        analysis_case_id: UUID,
+        user_id: UUID,
+        report: BuyerReport,
+        allow_demo_seed: bool = False,
     ) -> ReportRecord:
-        if self._lock_owned_analysis_case(analysis_case_id, user_id) is None:
+        if (
+            self._lock_owned_analysis_case(
+                analysis_case_id,
+                user_id,
+                allow_demo_seed=allow_demo_seed,
+            )
+            is None
+        ):
             raise PermissionError("Analysis case is not owned by the current user")
         record = self.session.scalar(
             select(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case_id)
@@ -587,11 +725,66 @@ class DocumentRepository:
         return record
 
     def get_case_report(self, analysis_case_id: UUID, user_id: UUID) -> ReportRecord | None:
-        if self.get_owned_analysis_case(analysis_case_id, user_id) is None:
+        if self.get_accessible_analysis_case(analysis_case_id, user_id) is None:
             return None
         return self.session.scalar(
             select(ReportRecord).where(ReportRecord.analysis_case_id == analysis_case_id)
         )
+
+    def create_demo_analysis_case(
+        self,
+        *,
+        title: str,
+        property_type: PropertyType,
+        price_eur: Decimal | None,
+        surface_m2: Decimal | None,
+        lot_count: int | None,
+        template_key: str,
+        template_manifest_sha256: str,
+    ) -> AnalysisCaseRecord:
+        analysis_case = AnalysisCaseRecord(
+            user_id=None,
+            title=title,
+            property_type=property_type.value,
+            price_eur=price_eur,
+            surface_m2=surface_m2,
+            lot_count=lot_count,
+            access_mode=AnalysisCaseAccessMode.GRANDFATHERED.value,
+            case_kind=AnalysisCaseKind.DEMO.value,
+            template_key=template_key,
+            template_manifest_sha256=template_manifest_sha256,
+        )
+        self.session.add(analysis_case)
+        self.session.commit()
+        self.session.refresh(analysis_case)
+        return analysis_case
+
+    def create_demo_document(self, document: DocumentRecord) -> DocumentRecord:
+        analysis_case = self.session.get(AnalysisCaseRecord, document.analysis_case_id)
+        if analysis_case is None or analysis_case.case_kind != AnalysisCaseKind.DEMO.value:
+            raise PermissionError("Demo case not found")
+        self.session.add(document)
+        self.session.commit()
+        self.session.refresh(document)
+        return document
+
+    def publish_demo_analysis_case(
+        self, analysis_case: AnalysisCaseRecord, published_at: datetime
+    ) -> None:
+        if analysis_case.case_kind != AnalysisCaseKind.DEMO.value:
+            raise PermissionError("Only demo cases can be published")
+        self.session.execute(
+            update(AnalysisCaseRecord)
+            .where(
+                AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value,
+                AnalysisCaseRecord.id != analysis_case.id,
+                AnalysisCaseRecord.published_at.is_not(None),
+            )
+            .values(published_at=None)
+        )
+        analysis_case.published_at = published_at
+        self.session.commit()
+        self.session.refresh(analysis_case)
 
     def create_document(self, document: DocumentRecord, user_id: UUID) -> DocumentRecord:
         if self.get_owned_analysis_case(document.analysis_case_id, user_id) is None:

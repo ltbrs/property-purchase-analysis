@@ -15,11 +15,17 @@ export type AnalysisCase = {
   price_eur: string | null;
   surface_m2: string | null;
   lot_count: number | null;
+  case_kind: "user" | "demo";
+  read_only: boolean;
   analysis_access_status: "not_activated" | "preview" | "active" | "expired";
   analysis_access_activated_at: string | null;
   analysis_access_expires_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type UserPreferences = {
+  show_demo_case: boolean;
 };
 
 export async function readApiError(response: Response) {
@@ -43,6 +49,22 @@ export async function fetchAnalysisCases() {
   });
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as AnalysisCase[];
+}
+
+export async function fetchUserPreferences() {
+  const response = await fetch(`${API_URL}/me/preferences`, { cache: "no-store" });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as UserPreferences;
+}
+
+export async function updateUserPreferences(preferences: UserPreferences) {
+  const response = await fetch(`${API_URL}/me/preferences`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as UserPreferences;
 }
 
 export function saveWorkspace(caseId: string): Workspace {

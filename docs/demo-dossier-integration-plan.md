@@ -1,91 +1,58 @@
 # Intégration du dossier de démonstration
 
-## Résultat attendu
+## Architecture retenue
 
-Après sa première authentification, chaque utilisateur voit un dossier « 24 rue des Tisseurs, 69004 Lyon • Démo » dans la liste de ses dossiers. Il est visuellement distinct, en lecture seule et consultable avec les mêmes écrans de synthèse, rapport, documents, sources et visionneuse PDF qu'un dossier réel.
+Le dossier Lyon est un dossier global partagé, analysé une seule fois par environnement. Il utilise les tables, les modèles Pydantic, Xberg, les extractions structurées, les règles déterministes et l'assembleur de rapport du produit.
 
-Le chemin de lecture ne doit pas diverger du produit réel. La démo utilise les mêmes tables, modèles Pydantic, règles déterministes, assembleur de rapport, contrôles d'autorisation et URLs signées. Seul le provisionnement initial est spécifique.
+Une démo publiée est visible par défaut pour tous les utilisateurs authentifiés. Elle est toujours renvoyée après les dossiers personnels, avec `case_kind = "demo"`, `read_only = true` et un accès d'analyse `active`. Elle ne crée ni accès payant ni consommation de crédit.
 
-## Modèle de données proposé
+Chaque utilisateur conserve uniquement la préférence `users.show_demo_case`. La désactivation masque la démo des listes, sans supprimer ses données et sans révoquer son accès direct.
 
-Ajouter à `analysis_cases` :
+## Documents inclus
 
-- `case_kind`, enum contrôlé `user` ou `demo`, valeur par défaut `user` ;
-- `template_key`, nullable, valeur `lyon_v1` pour la démo ;
-- une contrainte unique partielle sur `(user_id, template_key)` quand `case_kind = 'demo'`.
+La sélection est définie dans `backend/app/demo/config.py`. La version `lyon_v1` utilise actuellement :
 
-Ajouter à `documents` :
+- 02, règlement de copropriété et EDD ;
+- 03, 04 et 05, procès-verbaux d'AG 2024 à 2026 ;
+- 09, appel de fonds travaux toiture ;
+- 11, conclusions du DTG et PPPT ;
+- 12, DPE ;
+- 14, état des risques, termites et bruit ;
+- 15, taxe foncière.
 
-- `storage_ownership`, enum contrôlé `case` ou `shared_demo`, valeur par défaut `case` ;
-- supprimer l'unicité globale de `storage_key`, car plusieurs lignes appartenant à des utilisateurs différents référenceront le même objet privé de démonstration ;
-- conserver l'unicité existante `(analysis_case_id, sha256)`.
+Toute modification de cette sélection change l'empreinte calculée. Une version déjà créée avec une autre empreinte doit recevoir une nouvelle clé, par exemple `lyon_v2`.
 
-Exposer `case_kind` dans `AnalysisCaseRead`. Aucun contenu synthétique ne doit être inféré depuis une couleur ou depuis le titre.
+## Préparation et publication
 
-## Provisionnement idempotent
+Après application de la migration, préparer la démo depuis la racine du dépôt :
 
-Créer un service backend `DemoCaseProvisioner` et une commande d'administration `seed_demo_template`.
+```bash
+cd backend
+uv run python -m app.demo.seed \
+  --manifest ../docs/demo-dossier-lyon/manifest.json \
+  --template-key lyon_v1 \
+  --publish
+```
 
-La commande d'administration :
+La commande est idempotente. Elle valide le manifeste, les tailles, les empreintes et les signatures PDF, envoie les objets dans le stockage privé sous `demo-templates/lyon_v1/<sha256>.pdf`, reprend les traitements incomplets, contrôle la pagination extraite et les pages citées, génère le rapport, puis publie le dossier.
 
-1. vérifie les empreintes du `manifest.json` ;
-2. charge les 18 PDF sous `demo-templates/lyon_v1/<sha256>.pdf` dans le bucket privé ;
-3. construit une fixture canonique avec extraction des 95 pages, classification, données normalisées, constats et rapport ;
-4. valide cette fixture avec les modèles Pydantic actuels avant de la publier.
+Sans `--publish`, le dossier reste un brouillon invisible. Un échec conserve également un brouillon reprenable. Aucun seed n'est exécuté au démarrage de FastAPI.
 
-Le provisionneur utilisateur :
+## Lecture seule et sécurité
 
-1. verrouille l'utilisateur ou s'appuie sur la contrainte unique partielle ;
-2. crée le cas `demo` s'il n'existe pas ;
-3. copie les petites lignes relationnelles de la fixture canonique avec de nouveaux UUID ;
-4. remappe tous les `document_id` contenus dans les sources et citations ;
-5. référence les PDF partagés avec `storage_ownership = 'shared_demo'` ;
-6. valide puis commit toute la copie dans une seule transaction.
+Les lectures d'une démo publiée sont autorisées à tout utilisateur authentifié. Les documents restent dans le bucket privé et sont servis par les URLs signées existantes.
 
-Le provisionnement peut être déclenché lors de la première requête authentifiée qui liste les dossiers. Il doit rester idempotent et sûr en cas de deux requêtes concurrentes. Une alternative plus explicite consiste à appeler une route interne depuis le callback de première connexion, mais elle ajoute un couplage inutile entre Supabase Auth et FastAPI.
+Toutes les mutations du dossier démo renvoient `409` avec le message « Ce dossier de démonstration est en lecture seule. » Cela couvre le type de bien, l'upload, la suppression, les traitements manuels, le recalcul du rapport, la revue des constats et l'activation payante.
 
-## Pourquoi pré-calculer l'analyse
+L'interface masque ces contrôles et affiche toujours un badge ou un bandeau textuel. La carte utilise la surface neutre `--demo-surface`, sans bordure d'accent.
 
-Il ne faut pas repasser les 18 PDF dans Xberg et le LLM pour chaque nouvel inscrit. Cela augmenterait le délai de première ouverture, le coût, les risques de variation et l'exposition inutile à des prestataires tiers.
+## Déploiement
 
-La fixture canonique est toutefois produite par le pipeline normal : extraction, classification, normalisation, règles, rapprochements et rapport. Elle est ensuite figée et clonée. Une tâche CI la régénère lorsque les versions de prompts, schémas ou règles changent, puis compare les résultats au manifeste attendu. Ainsi, la démo reste représentative du workflow réel sans l'exécuter à chaque inscription.
+1. Appliquer la migration Alembic `1c439cb1ee8b`.
+2. Déployer le backend et le frontend.
+3. Exécuter la commande sans `--publish` en préproduction.
+4. Contrôler le rapport, les PDF et les citations.
+5. Relancer avec `--publish`.
+6. Répéter en production.
 
-## Lecture, sécurité et suppression
-
-- Toutes les routes continuent à appeler les méthodes `get_owned_*`. Chaque copie de démonstration appartient donc bien à son utilisateur.
-- Les PDF restent privés et sont consultés via les URLs signées existantes.
-- Les routes de mutation refusent les cas `case_kind = 'demo'` avec une réponse `409` et un message clair. Cela concerne upload, suppression, retraitement, changement de type, rafraîchissement manuel et revue des constats.
-- La suppression d'un utilisateur supprime ses lignes de démo, mais jamais les objets marqués `shared_demo`.
-- Une tâche d'administration peut retirer une version de template uniquement lorsqu'aucune ligne ne la référence plus.
-- Aucun document de démonstration n'est placé dans `frontend/public`.
-
-## Interface
-
-Dans la liste des dossiers, utiliser une surface de carte différente mais sans bordure d'accent, conformément au design system. Ajouter un badge explicite « Démo » et un texte accessible « dossier de démonstration en lecture seule ». La distinction ne doit pas reposer uniquement sur la couleur.
-
-Dans le dossier, afficher un bandeau discret rappelant que les données sont fictives. Masquer ou désactiver les actions de modification. Les écrans de rapport, documents, détails DPE, citations et PDF restent les composants existants.
-
-Ne pas sélectionner automatiquement la démo si l'utilisateur possède déjà un dossier réel actif. À la première connexion sans dossier actif, l'ouverture automatique de la démo est acceptable.
-
-## Tests indispensables
-
-- un utilisateur reçoit exactement une démo, même sous requêtes concurrentes ;
-- deux utilisateurs possèdent des cas et UUID distincts, mais peuvent référencer les mêmes objets privés ;
-- un utilisateur ne peut jamais lire la copie de l'autre ;
-- les mutations sur la démo sont refusées, celles des dossiers réels restent inchangées ;
-- la suppression d'une copie ne supprime pas un PDF partagé ;
-- chaque source du rapport pointe vers le bon document cloné et la bonne page ;
-- les 18 PDF passent la validation MIME, signature et taille ;
-- l'extraction textuelle retrouve les valeurs sentinelles du manifeste ;
-- les constats attendus restent stables lors d'une régénération de fixture ;
-- le frontend affiche le badge et le libellé accessible sur petit écran.
-
-## Déploiement conseillé
-
-1. fusionner la migration et les garde-fous backend ;
-2. envoyer la version `lyon_v1` dans le stockage privé via la commande d'administration ;
-3. vérifier la fixture et ses citations en préproduction ;
-4. déployer l'interface avec le badge et le mode lecture seule ;
-5. activer le provisionnement derrière un feature flag serveur ;
-6. observer taux d'ouverture, erreurs de provisionnement et passages de la démo vers un premier dossier réel ;
-7. généraliser après validation, puis retirer le flag si le comportement est stable.
+Pour masquer immédiatement la démo à tous les utilisateurs, remettre `published_at` à `NULL` sur sa ligne. Les données et objets peuvent rester en place pour une republication.

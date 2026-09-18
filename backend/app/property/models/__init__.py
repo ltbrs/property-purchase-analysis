@@ -2,6 +2,7 @@
 
 from app.property.models.analysis_case import (
     AnalysisCaseAccessMode,
+    AnalysisCaseKind,
     AnalysisCaseRecord,
     AuthAccountRecord,
     PropertyType,
@@ -10,6 +11,7 @@ from app.property.models.analysis_case import (
 
 __all__ = [
     "AnalysisCaseAccessMode",
+    "AnalysisCaseKind",
     "AnalysisCaseRecord",
     "AuthAccountRecord",
     "PropertyType",

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from secrets import compare_digest
 from uuid import UUID, uuid4
 
@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from app.analysis import CaseAnalysisService
 from app.billing.models import AnalysisAccessRead, AnalysisAccessStatus
 from app.billing.repository import BillingRepository
 from app.core.auth import CurrentUserId
@@ -47,8 +48,11 @@ from app.documents.validation import (
 )
 from app.jobs.document_processing import DocumentProcessingService
 from app.llm import StructuredOutputClientDependency
-from app.property.models import AnalysisCaseAccessMode, PropertyType
-from app.property.normalization.ag_minutes import NormalizedAgMinutes
+from app.property.models import (
+    AnalysisCaseAccessMode,
+    AnalysisCaseKind,
+    AnalysisCaseRecord,
+)
 from app.property.normalization.diagnostics import NormalizedDiagnostics
 from app.property.normalization.dpe import DpeExtractionRead, NormalizedDpeFacts
 from app.property.normalization.dpe_service import (
@@ -56,7 +60,6 @@ from app.property.normalization.dpe_service import (
     DpeExtractionFailed,
     DpeExtractionService,
 )
-from app.property.normalization.financials import NormalizedFinancials
 from app.property.normalization.structured import (
     StructuredExtractionRead,
     StructuredExtractionType,
@@ -68,11 +71,9 @@ from app.property.normalization.structured_service import (
     structured_extraction_type,
 )
 from app.property.reconciliation import TimelineEvent
-from app.reports import BuyerReport, build_buyer_report
+from app.reports import BuyerReport
 from app.reports.models import BuyerReportPreview
-from app.risks.engine import evaluate_case_risks
 from app.risks.models import FindingReviewStatus, FindingStatus, RiskFindingRead
-from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -88,16 +89,33 @@ class FindingReviewUpdate(BaseModel):
 
 
 def _case_read(
-    analysis_case: object,
+    analysis_case: AnalysisCaseRecord,
     access: AnalysisAccessRead,
 ) -> AnalysisCaseRead:
     return AnalysisCaseRead.model_validate(analysis_case).model_copy(
         update={
+            "read_only": analysis_case.case_kind == AnalysisCaseKind.DEMO.value,
             "analysis_access_status": access.status,
             "analysis_access_activated_at": access.activated_at,
             "analysis_access_expires_at": access.expires_at,
         }
     )
+
+
+def _require_mutable_owned_case(
+    repository: DocumentRepository,
+    analysis_case_id: UUID,
+    user_id: UUID,
+) -> AnalysisCaseRecord:
+    analysis_case = repository.get_accessible_analysis_case(analysis_case_id, user_id)
+    if analysis_case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    if analysis_case.case_kind == AnalysisCaseKind.DEMO.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce dossier de démonstration est en lecture seule.",
+        )
+    return analysis_case
 
 
 def _require_active_analysis(
@@ -197,45 +215,6 @@ async def _delete_unpersisted_upload(storage: ObjectStorage, storage_key: str) -
         pass
 
 
-def _load_normalized_case_data(
-    repository: DocumentRepository,
-    analysis_case_id: UUID,
-    user_id: UUID,
-) -> tuple[
-    list[NormalizedDpeFacts],
-    list[NormalizedAgMinutes],
-    list[NormalizedFinancials],
-    list[NormalizedDiagnostics],
-    list[AvailableDocument],
-]:
-    dpe_documents = [
-        NormalizedDpeFacts.model_validate(record.normalized_facts)
-        for record in repository.list_case_dpe_extractions(analysis_case_id, user_id)
-    ]
-    minutes: list[NormalizedAgMinutes] = []
-    financials: list[NormalizedFinancials] = []
-    diagnostics: list[NormalizedDiagnostics] = []
-    for record in repository.list_case_structured_extractions(analysis_case_id, user_id):
-        if record.extraction_type == StructuredExtractionType.AG_MINUTES.value:
-            minutes.append(NormalizedAgMinutes.model_validate(record.normalized_facts))
-        elif record.extraction_type == StructuredExtractionType.FINANCIALS.value:
-            financials.append(NormalizedFinancials.model_validate(record.normalized_facts))
-        elif record.extraction_type == StructuredExtractionType.DIAGNOSTICS.value:
-            diagnostics.append(NormalizedDiagnostics.model_validate(record.normalized_facts))
-    available_documents = [
-        AvailableDocument.model_validate(
-            {
-                "document_id": record.document_id,
-                "document_type": record.document_type,
-                "document_date": record.document_date,
-                "covered_period_end": record.covered_period_end,
-            }
-        )
-        for record in repository.list_case_classifications(analysis_case_id, user_id)
-    ]
-    return dpe_documents, minutes, financials, diagnostics, available_documents
-
-
 def _refresh_case_findings(
     repository: DocumentRepository,
     analysis_case_id: UUID,
@@ -246,36 +225,18 @@ def _refresh_case_findings(
     list[NormalizedDpeFacts],
     list[NormalizedDiagnostics],
 ]:
-    dpe_documents, minutes, financials, diagnostics, available_documents = (
-        _load_normalized_case_data(repository, analysis_case_id, user_id)
-    )
     analysis_case = repository.get_owned_analysis_case(analysis_case_id, user_id)
-    missing_document_context = MissingDocumentContext(
-        is_coproperty=(
-            None
-            if analysis_case is None or analysis_case.property_type == PropertyType.UNKNOWN.value
-            else analysis_case.property_type == PropertyType.APARTMENT_COPROPERTY.value
-        )
-    )
-    evaluation = evaluate_case_risks(
-        dpe_documents=dpe_documents,
-        minutes=minutes,
-        financials=financials,
-        diagnostics=diagnostics,
-        available_documents=available_documents,
-        missing_document_context=missing_document_context,
-        as_of=date.today(),
-    )
-    records = repository.replace_case_findings(
-        analysis_case_id=analysis_case_id,
+    if analysis_case is None:
+        raise PermissionError("Analysis case is not owned by the current user")
+    result = CaseAnalysisService(repository).refresh_findings(
+        analysis_case=analysis_case,
         user_id=user_id,
-        findings=evaluation.findings,
     )
     return (
-        [RiskFindingRead.model_validate(record) for record in records],
-        evaluation.reconciliation.timeline,
-        dpe_documents,
-        diagnostics,
+        result.findings,
+        result.timeline,
+        result.dpe_documents,
+        result.diagnostics,
     )
 
 
@@ -347,7 +308,7 @@ def get_analysis_case(
     current_user_id: CurrentUserId,
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
-    analysis_case = DocumentRepository(session).get_owned_analysis_case(
+    analysis_case = DocumentRepository(session).get_accessible_analysis_case(
         analysis_case_id, current_user_id
     )
     if analysis_case is None:
@@ -366,9 +327,7 @@ def update_analysis_case(
     session: DatabaseSession,
 ) -> AnalysisCaseRead:
     repository = DocumentRepository(session)
-    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
-    if analysis_case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    analysis_case = _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     updated = repository.update_analysis_case_property_type(analysis_case, payload.property_type)
     access = BillingRepository(session).get_case_access(
         analysis_case_id, current_user_id, datetime.now(UTC)
@@ -383,7 +342,7 @@ def list_documents(
     session: DatabaseSession,
 ) -> list[DocumentRead]:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+    if repository.get_accessible_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
     classifications_by_document: dict[UUID, list[DocumentClassificationRecord]] = {}
     for classification in repository.list_case_classifications(analysis_case_id, current_user_id):
@@ -423,7 +382,7 @@ async def create_document_view_url(
     storage: ObjectStorage,
 ) -> DocumentViewUrlRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
@@ -458,7 +417,7 @@ def get_document_extraction(
     session: DatabaseSession,
 ) -> DocumentExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_unlocked_analysis(BillingRepository(session), analysis_case_id, current_user_id)
@@ -482,7 +441,7 @@ def get_dpe_extraction(
     session: DatabaseSession,
 ) -> DpeExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_unlocked_analysis(BillingRepository(session), analysis_case_id, current_user_id)
@@ -507,8 +466,7 @@ async def create_document_upload_url(
     storage: ObjectStorage,
 ) -> DocumentUploadUrlRead:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     access_status = _require_editable_analysis(
         BillingRepository(session), analysis_case_id, current_user_id
     )
@@ -566,8 +524,7 @@ async def upload_document(
     response: Response,
 ) -> DocumentRead:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
 
     settings = get_settings()
     try:
@@ -677,9 +634,10 @@ async def process_document(
     llm_client: StructuredOutputClientDependency,
 ) -> DocumentRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_editable_analysis(BillingRepository(session), analysis_case_id, current_user_id)
     if document.status in {
         DocumentStatus.EXTRACTING.value,
@@ -751,9 +709,10 @@ async def delete_document(
     storage: ObjectStorage,
 ) -> Response:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
 
     try:
         await run_in_threadpool(storage.delete_pdf, document.storage_bucket, document.storage_key)
@@ -780,9 +739,10 @@ async def extract_document(
     parser: PdfParserDependency,
 ) -> DocumentExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
 
     existing = repository.get_extraction(document.id)
@@ -831,9 +791,10 @@ async def classify_document(
     llm_client: StructuredOutputClientDependency,
 ) -> list[DocumentClassificationRead]:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
 
     extraction = repository.get_extraction(document.id)
@@ -878,9 +839,10 @@ async def extract_dpe_document(
     llm_client: StructuredOutputClientDependency,
 ) -> DpeExtractionRead:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
 
     extraction = repository.get_extraction(document.id)
@@ -932,9 +894,10 @@ async def extract_structured_document(
     llm_client: StructuredOutputClientDependency,
 ) -> list[StructuredExtractionRead]:
     repository = DocumentRepository(session)
-    document = repository.get_owned_document(analysis_case_id, document_id, current_user_id)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
     extraction = repository.get_extraction(document.id)
     classifications = repository.list_document_classifications(document.id)
@@ -985,8 +948,7 @@ def refresh_case_findings(
     session: DatabaseSession,
 ) -> CaseFindingsRefreshRead:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
 
     findings, timeline, _, _ = _refresh_case_findings(repository, analysis_case_id, current_user_id)
@@ -1003,7 +965,7 @@ def list_case_findings(
     session: DatabaseSession,
 ) -> list[RiskFindingRead]:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+    if repository.get_accessible_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
     _require_unlocked_analysis(BillingRepository(session), analysis_case_id, current_user_id)
     return [
@@ -1024,6 +986,7 @@ def update_finding_review_status(
     session: DatabaseSession,
 ) -> RiskFindingRead:
     repository = DocumentRepository(session)
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     finding = repository.get_case_finding(analysis_case_id, current_user_id, finding_key)
     if finding is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Finding not found")
@@ -1054,29 +1017,13 @@ def refresh_case_report(
     session: DatabaseSession,
 ) -> BuyerReport:
     repository = DocumentRepository(session)
-    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
-    if analysis_case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
-    _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
-    _, _, dpe_documents, diagnostics = _refresh_case_findings(
+    analysis_case = _require_mutable_owned_case(
         repository, analysis_case_id, current_user_id
     )
-    documents = repository.list_documents(analysis_case_id, current_user_id)
-    report = build_buyer_report(
-        analysis_case_id=analysis_case_id,
-        title=analysis_case.title,
-        findings=[
-            record.to_finding()
-            for record in repository.list_case_findings(analysis_case_id, current_user_id)
-        ],
-        document_names={document.id: document.original_filename for document in documents},
-        dpe_documents=dpe_documents,
-        diagnostics=diagnostics,
-    )
-    repository.save_case_report(
-        analysis_case_id=analysis_case_id,
+    _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    report = CaseAnalysisService(repository).refresh_report(
+        analysis_case=analysis_case,
         user_id=current_user_id,
-        report=report,
     )
     BillingRepository(session).record_report_refresh(analysis_case_id, current_user_id)
     return report
@@ -1089,9 +1036,9 @@ def refresh_case_report_preview(
     session: DatabaseSession,
 ) -> BuyerReportPreview:
     repository = DocumentRepository(session)
-    analysis_case = repository.get_owned_analysis_case(analysis_case_id, current_user_id)
-    if analysis_case is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
+    analysis_case = _require_mutable_owned_case(
+        repository, analysis_case_id, current_user_id
+    )
     access = BillingRepository(session).get_case_access(
         analysis_case_id, current_user_id, datetime.now(UTC)
     )
@@ -1100,25 +1047,9 @@ def refresh_case_report_preview(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Aucun aperçu gratuit n’est disponible pour ce dossier.",
         )
-    _, _, dpe_documents, diagnostics = _refresh_case_findings(
-        repository, analysis_case_id, current_user_id
-    )
-    documents = repository.list_documents(analysis_case_id, current_user_id)
-    report = build_buyer_report(
-        analysis_case_id=analysis_case_id,
-        title=analysis_case.title,
-        findings=[
-            record.to_finding()
-            for record in repository.list_case_findings(analysis_case_id, current_user_id)
-        ],
-        document_names={document.id: document.original_filename for document in documents},
-        dpe_documents=dpe_documents,
-        diagnostics=diagnostics,
-    )
-    repository.save_case_report(
-        analysis_case_id=analysis_case_id,
+    report = CaseAnalysisService(repository).refresh_report(
+        analysis_case=analysis_case,
         user_id=current_user_id,
-        report=report,
     )
     return BuyerReportPreview(
         analysis_case_id=analysis_case_id,
@@ -1137,7 +1068,7 @@ def get_case_report(
     session: DatabaseSession,
 ) -> BuyerReport:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+    if repository.get_accessible_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
     _require_unlocked_analysis(BillingRepository(session), analysis_case_id, current_user_id)
     record = repository.get_case_report(analysis_case_id, current_user_id)
@@ -1153,7 +1084,7 @@ def get_case_usage(
     session: DatabaseSession,
 ) -> AnalysisUsageRead:
     repository = DocumentRepository(session)
-    if repository.get_owned_analysis_case(analysis_case_id, current_user_id) is None:
+    if repository.get_accessible_analysis_case(analysis_case_id, current_user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis case not found")
 
     documents = repository.list_documents(analysis_case_id, current_user_id)

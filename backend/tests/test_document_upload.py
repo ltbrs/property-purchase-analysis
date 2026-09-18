@@ -228,6 +228,8 @@ def test_create_case_persists_the_property_details(client: TestClient, session: 
         "price_eur": "425000.50",
         "surface_m2": "67.40",
         "lot_count": 3,
+        "case_kind": "user",
+        "read_only": False,
         "analysis_access_status": "not_activated",
         "analysis_access_activated_at": None,
         "analysis_access_expires_at": None,

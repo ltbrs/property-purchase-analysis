@@ -32,4 +32,6 @@ uv run scripts/test_demo_dpe.py
 
 ## Garde-fous de production
 
-Ces fichiers sont des sources de démonstration versionnées. Ils doivent être placés dans le stockage objet privé, jamais dans `frontend/public`. L'application doit provisionner un dossier de démonstration personnel et en lecture seule pour chaque utilisateur authentifié, tout en réutilisant ces objets communs sans autoriser leur suppression.
+Ces fichiers sont des sources de démonstration versionnées. Ils doivent être placés dans le stockage objet privé, jamais dans `frontend/public`. L'application publie un seul dossier de démonstration global en lecture seule, visible par les utilisateurs authentifiés sans dupliquer ses données ni autoriser leur modification.
+
+La sélection effectivement intégrée est configurée dans `backend/app/demo/config.py`. Elle peut rester plus réduite que les 18 fichiers du jeu source. La procédure d'analyse et de publication est documentée dans [le plan d'intégration](../demo-dossier-integration-plan.md).

@@ -7,6 +7,7 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { BrandLink } from "@/components/design-system/brand-link";
 import { Icon, type IconName } from "@/components/icons";
 import {
+  captureProductEvent,
   identifyProductUser,
   resetProductAnalytics,
   stopProductSessionRecording,
@@ -79,6 +80,9 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
   }, [pathname]);
 
   function selectCase(analysisCase: AnalysisCase) {
+    if (analysisCase.case_kind === "demo") {
+      captureProductEvent("demo_case_opened", { source: "sidebar" });
+    }
     saveWorkspace(analysisCase.id);
     setActiveCaseId(analysisCase.id);
     setIsMenuOpen(false);
@@ -142,12 +146,15 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
                 <button
                   key={analysisCase.id}
                   type="button"
-                  className={analysisCase.id === activeCaseId ? "is-selected" : undefined}
+                  className={`${analysisCase.id === activeCaseId ? "is-selected" : ""}${analysisCase.case_kind === "demo" ? " is-demo" : ""}`.trim() || undefined}
                   aria-pressed={analysisCase.id === activeCaseId}
                   onClick={() => selectCase(analysisCase)}
                 >
                   <span><Icon name={analysisCase.property_type === "house" ? "home" : "building"} /></span>
-                  <strong>{analysisCase.title}</strong>
+                  <strong>
+                    {analysisCase.title}
+                    {analysisCase.case_kind === "demo" ? <small>Démo</small> : null}
+                  </strong>
                   <Icon name="chevron" />
                 </button>
               ))}
@@ -217,7 +224,13 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
             <Icon name="menu" />
           </button>
           <div className="case-title">
-            <span>{isGlobalView ? "Espace immobilier" : "Dossier d’achat"}</span>
+            <span>
+              {isGlobalView
+                ? "Espace immobilier"
+                : activeCase?.case_kind === "demo"
+                  ? "Démonstration fictive"
+                  : "Dossier d’achat"}
+            </span>
             <strong>{isGlobalView ? "Tous les dossiers" : activeCase?.title ?? "Aucun dossier sélectionné"}</strong>
           </div>
           {isGlobalView ? (
@@ -225,6 +238,11 @@ export function ApplicationShell({ children, user }: ApplicationShellProps) {
               <Icon name="folder" />
               <span>Créer</span>
             </button>
+          ) : activeCase?.read_only ? (
+            <span className="primary-action is-read-only">
+              <Icon name="shield" />
+              <span>Démo en lecture seule</span>
+            </span>
           ) : activeCase ? (
             <Link className="primary-action" href={productRoutes.documents}>
               <Icon name="upload" />
