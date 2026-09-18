@@ -40,9 +40,7 @@ class FakeStripeGateway:
             url="https://checkout.stripe.test/cs_test_pack",
         )
 
-    def construct_webhook_event(
-        self, payload: bytes, signature: str
-    ) -> VerifiedStripeEvent:
+    def construct_webhook_event(self, payload: bytes, signature: str) -> VerifiedStripeEvent:
         assert payload == b"{}"
         assert signature == "valid-signature"
         if self.event is None:
@@ -117,9 +115,7 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
         json={"offer_code": "search_pack"},
     )
     assert checkout.status_code == 200
-    assert checkout.json() == {
-        "checkout_url": "https://checkout.stripe.test/cs_test_pack"
-    }
+    assert checkout.json() == {"checkout_url": "https://checkout.stripe.test/cs_test_pack"}
     assert gateway.purchase_id is not None
 
     gateway.event = VerifiedStripeEvent(
@@ -231,9 +227,7 @@ def test_free_preview_is_available_only_before_any_case_or_credit(
 
     credited_user_id = uuid4()
     grant_analysis_credit(session, credited_user_id)
-    credited_summary = client.get(
-        "/api/v1/billing/summary", headers=auth(credited_user_id)
-    )
+    credited_summary = client.get("/api/v1/billing/summary", headers=auth(credited_user_id))
     assert credited_summary.json()["can_create_free_preview"] is False
 
 

@@ -37,9 +37,7 @@ class StripeGateway(Protocol):
         cancel_url: str,
     ) -> CreatedCheckoutSession: ...
 
-    def construct_webhook_event(
-        self, payload: bytes, signature: str
-    ) -> VerifiedStripeEvent: ...
+    def construct_webhook_event(self, payload: bytes, signature: str) -> VerifiedStripeEvent: ...
 
 
 class StripeSdkGateway:
@@ -82,9 +80,7 @@ class StripeSdkGateway:
             raise RuntimeError("Stripe returned an incomplete Checkout Session")
         return CreatedCheckoutSession(id=session.id, url=session.url)
 
-    def construct_webhook_event(
-        self, payload: bytes, signature: str
-    ) -> VerifiedStripeEvent:
+    def construct_webhook_event(self, payload: bytes, signature: str) -> VerifiedStripeEvent:
         event = stripe.Webhook.construct_event(  # type: ignore[no-untyped-call]
             payload,
             signature,

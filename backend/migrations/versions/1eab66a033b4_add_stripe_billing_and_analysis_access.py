@@ -10,7 +10,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-
 revision: str = "1eab66a033b4"
 down_revision: str | Sequence[str] | None = "20260913_13"
 branch_labels: str | Sequence[str] | None = None
@@ -92,9 +91,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["purchase_id"], ["stripe_purchases.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["purchase_id"], ["stripe_purchases.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["consumed_by_case_id"], ["analysis_cases.id"], ondelete="SET NULL"
         ),
@@ -127,9 +124,7 @@ def upgrade() -> None:
             "expires_at > activated_at",
             name="ck_analysis_accesses_valid_window",
         ),
-        sa.ForeignKeyConstraint(
-            ["analysis_case_id"], ["analysis_cases.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["analysis_case_id"], ["analysis_cases.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["credit_id"], ["analysis_credits.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("analysis_case_id"),
         sa.UniqueConstraint("credit_id", name="uq_analysis_accesses_credit_id"),

@@ -84,14 +84,10 @@ class BillingRepository:
 
     def can_create_free_preview(self, user_id: UUID) -> bool:
         credit_id = self.session.scalar(
-            select(AnalysisCreditRecord.id)
-            .where(AnalysisCreditRecord.user_id == user_id)
-            .limit(1)
+            select(AnalysisCreditRecord.id).where(AnalysisCreditRecord.user_id == user_id).limit(1)
         )
         case_id = self.session.scalar(
-            select(AnalysisCaseRecord.id)
-            .where(AnalysisCaseRecord.user_id == user_id)
-            .limit(1)
+            select(AnalysisCaseRecord.id).where(AnalysisCaseRecord.user_id == user_id).limit(1)
         )
         return credit_id is None and case_id is None
 
@@ -134,9 +130,7 @@ class BillingRepository:
         )
         return self._access_read(access, now, analysis_case.access_mode)
 
-    def list_case_accesses(
-        self, user_id: UUID, now: datetime
-    ) -> dict[UUID, AnalysisAccessRead]:
+    def list_case_accesses(self, user_id: UUID, now: datetime) -> dict[UUID, AnalysisAccessRead]:
         accesses = self.session.scalars(
             select(AnalysisAccessRecord)
             .join(
