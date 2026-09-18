@@ -133,18 +133,21 @@ def upload_document(
         json=metadata,
     )
     if not upload_url.is_success:
-        return upload_url
+        return cast(Response, upload_url)
 
     storage_key = upload_url.json()["storage_key"]
     storage.upload_pdf(BytesIO(content), storage_key)
-    return client.post(
-        f"/api/v1/analysis-cases/{analysis_case_id}/documents",
-        headers=auth(user_id),
-        json={
-            **metadata,
-            "sha256": hashlib.sha256(content).hexdigest(),
-            "storage_key": storage_key,
-        },
+    return cast(
+        Response,
+        client.post(
+            f"/api/v1/analysis-cases/{analysis_case_id}/documents",
+            headers=auth(user_id),
+            json={
+                **metadata,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "storage_key": storage_key,
+            },
+        ),
     )
 
 
