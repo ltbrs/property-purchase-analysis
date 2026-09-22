@@ -16,6 +16,7 @@ export const productRoutes = {
   documents: "/app/dossiers/documents",
   analysis: "/app/analyse",
   account: "/app/compte",
+  admin: "/app/administration",
   signIn: "/connexion",
   forgotPassword: "/mot-de-passe-oublie",
   updatePassword: "/reinitialiser-mot-de-passe",

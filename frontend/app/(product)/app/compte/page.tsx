@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BillingPanel } from "@/features/billing/billing-panel";
 import { DemoPreference } from "@/features/account/demo-preference";
 import { signOutCurrentSession } from "@/features/auth/actions";
 import { productRoutes } from "@/lib/routes";
+import { isCurrentUserAdmin } from "@/lib/admin-server";
 import { createClient } from "@/lib/supabase/server";
 
 function initials(name: string | null | undefined) {
@@ -43,6 +45,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const providerDescription = providers.length
     ? providers.map((provider) => providerLabels[provider] ?? provider).join(", ")
     : "Compte Supabase";
+  const isAdmin = await isCurrentUserAdmin();
 
   return (
     <section className="account-page" aria-labelledby="account-title">
@@ -71,6 +74,12 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </button>
         </form>
       </div>
+
+      {isAdmin ? (
+        <Link className="admin-account-link" href={productRoutes.admin}>
+          Gérer les utilisateurs et les crédits
+        </Link>
+      ) : null}
 
       <DemoPreference />
 
