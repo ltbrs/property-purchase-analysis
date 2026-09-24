@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { BrandLink } from "@/components/design-system/brand-link";
 import { ButtonLink } from "@/components/design-system/button-link";
+import { Icon } from "@/components/icons";
 import { marketingRoutes, productRoutes } from "@/lib/routes";
 
 import "./marketing.css";
@@ -40,7 +41,16 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             <Link key={item.href} href={item.href}>{item.label}</Link>
           ))}
         </nav>
-        <ButtonLink href={productRoutes.home}>Mon espace personnel</ButtonLink>
+        <nav className="marketing-header-actions" aria-label="Accès aux dossiers">
+          <ButtonLink className="marketing-demo-link" href={productRoutes.demo}>
+            <Icon name="folder" />
+            Dossier démo
+            <Icon name="arrow" />
+          </ButtonLink>
+          <ButtonLink href={productRoutes.home}>
+            Mon espace personnel
+          </ButtonLink>
+        </nav>
       </header>
 
       <main className="marketing-main">{children}</main>
@@ -63,6 +73,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             <div>
               <strong>Découvrir</strong>
               <Link href={marketingRoutes.howItWorks}>Comment ça marche</Link>
+              <Link href={productRoutes.demo}>Dossier de démonstration</Link>
               <Link href={marketingRoutes.pricing}>Tarifs</Link>
             </div>
             <div>

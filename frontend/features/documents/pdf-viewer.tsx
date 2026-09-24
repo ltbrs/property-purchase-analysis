@@ -30,9 +30,11 @@ function pdfUrlAtPage(url: string, pageNumber?: number) {
 export function PdfViewer({
   document,
   onClose,
+  publicDemo = false,
 }: {
   document: PdfDocumentSelection;
   onClose: () => void;
+  publicDemo?: boolean;
 }) {
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,15 +48,17 @@ export function PdfViewer({
     closeButtonRef.current?.focus();
 
     async function loadViewUrl() {
-      const workspace = getWorkspace();
-      if (!workspace) {
+      const workspace = publicDemo ? null : getWorkspace();
+      if (!publicDemo && !workspace) {
         setError("Aucun dossier n’est actuellement sélectionné.");
         return;
       }
 
       try {
         const response = await fetch(
-          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/view-url`,
+          publicDemo
+            ? `/api/demo/documents/${document.documentId}/view-url`
+            : `${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.documentId}/view-url`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -85,7 +89,7 @@ export function PdfViewer({
       window.document.body.style.overflow = previousOverflow;
       if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, document.pageNumber, onClose]);
+  }, [document.documentId, document.pageNumber, onClose, publicDemo]);
 
   return (
     <div className="pdf-viewer-layer">

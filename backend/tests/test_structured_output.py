@@ -21,7 +21,7 @@ class FakeResponses:
         return SimpleNamespace(
             output_parsed=ExampleOutput(value="ok"),
             id="resp_test",
-            model="gpt-5.6-luna-2026-08-01",
+            model="gpt-6-luna-2026-08-01",
         )
 
 

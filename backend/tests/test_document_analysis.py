@@ -64,8 +64,8 @@ class FakeStructuredOutputClient:
         return StructuredOutputResult(
             output=output,
             response_id=f"resp_test_{self.calls}",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
         )
 
 
@@ -210,7 +210,7 @@ def test_low_confidence_classification_is_persisted_as_unknown(session: Session)
     assert response.status_code == 200
     assert response.json()[0]["document_type"] == "unknown"
     assert response.json()[0]["extraction_strategy"] == "none"
-    assert response.json()[0]["requested_model"] == "gpt-5.6-luna"
+    assert response.json()[0]["requested_model"] == "gpt-6-luna"
     persisted = session.scalar(select(DocumentClassificationRecord))
     assert persisted is not None
     assert persisted.raw_output["document_type"] == "dpe"
@@ -272,7 +272,7 @@ def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Ses
 
     record = session.scalar(select(DpeExtractionRecord))
     document = session.get(DocumentRecord, document_id)
-    assert record is not None and record.requested_model == "gpt-5.6-luna"
+    assert record is not None and record.requested_model == "gpt-6-luna"
     assert document is not None and document.status == DocumentStatus.COMPLETED.value
 
 

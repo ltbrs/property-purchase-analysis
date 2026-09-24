@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
-import { API_URL, getWorkspace, readApiError } from "@/lib/workspace";
+import { API_URL, PUBLIC_DEMO_API_URL, getWorkspace, readApiError } from "@/lib/workspace";
 
 export type RawExtractionSelection = {
   documentId: string;
@@ -36,9 +36,11 @@ type RawExtraction = {
 export function RawExtractionViewer({
   document,
   onClose,
+  publicDemo = false,
 }: {
   document: RawExtractionSelection;
   onClose: () => void;
+  publicDemo?: boolean;
 }) {
   const [extraction, setExtraction] = useState<RawExtraction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,15 +54,17 @@ export function RawExtractionViewer({
     closeButtonRef.current?.focus();
 
     async function loadExtraction() {
-      const workspace = getWorkspace();
-      if (!workspace) {
+      const workspace = publicDemo ? null : getWorkspace();
+      if (!publicDemo && !workspace) {
         setError("Aucun dossier n’est actuellement sélectionné.");
         return;
       }
 
       try {
         const response = await fetch(
-          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/extraction`,
+          publicDemo
+            ? `${PUBLIC_DEMO_API_URL}/documents/${document.documentId}/extraction`
+            : `${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.documentId}/extraction`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -90,7 +94,7 @@ export function RawExtractionViewer({
       window.document.body.style.overflow = previousOverflow;
       if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, onClose]);
+  }, [document.documentId, onClose, publicDemo]);
 
   return (
     <div className="pdf-viewer-layer">

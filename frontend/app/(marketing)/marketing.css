@@ -63,10 +63,33 @@
   background: rgba(231, 239, 234, 0.78);
 }
 
-.marketing-header > .ds-button {
+.marketing-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.marketing-header-actions .ds-button {
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   box-shadow: 0 0.35rem 1rem rgba(16, 42, 37, 0.12);
+  white-space: nowrap;
+}
+
+.marketing-header-actions .marketing-demo-link {
+  color: var(--green-950);
+  background: #e6f6bb;
+}
+
+.marketing-header-actions .marketing-demo-link:hover {
+  background: var(--lime);
+}
+
+.marketing-demo-link > svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 
 .marketing-main {
@@ -3376,7 +3399,7 @@
     display: none;
   }
 
-  .marketing-header > .ds-button {
+  .marketing-header-actions {
     margin-left: auto;
   }
 
@@ -3760,8 +3783,21 @@
     width: min(100% - 2rem, var(--content-width));
   }
 
-  .marketing-header > .ds-button {
-    padding-inline: 0.75rem;
+  .marketing-header-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .marketing-header-actions .ds-button {
+    flex: 1;
+    min-width: 0;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.72rem;
+    white-space: normal;
+  }
+
+  .marketing-demo-link > svg:last-child {
+    display: none;
   }
 
   .marketing-brand {

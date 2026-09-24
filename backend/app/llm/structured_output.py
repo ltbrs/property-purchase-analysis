@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 
-OPENAI_MODEL = "gpt-5.6-luna"
+OPENAI_MODEL = "gpt-6-luna"
 
 StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
 

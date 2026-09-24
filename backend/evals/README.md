@@ -15,5 +15,5 @@ uv run python -m evals.run_document_evals diagnostics
 ```
 
 The runner uses the same prompts, structured schemas, deterministic confidence threshold,
-normalization, and fixed `gpt-5.6-luna` adapter as production. It prints fixture identifiers and
+normalization, and fixed `gpt-6-luna` adapter as production. It prints fixture identifiers and
 field-level mismatches without logging the fixture document text.

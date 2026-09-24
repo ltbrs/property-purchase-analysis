@@ -122,8 +122,8 @@ class FakeStructuredOutputClient:
         return StructuredOutputResult(
             output=output,
             response_id=f"resp_process_{self.calls}",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
             input_tokens=100,
             output_tokens=25,
         )

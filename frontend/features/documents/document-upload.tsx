@@ -33,6 +33,7 @@ import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
+  PUBLIC_DEMO_API_URL,
   getWorkspace,
   readApiError,
   resetWorkspace,
@@ -111,12 +112,16 @@ async function sha256(file: File) {
   ).join("");
 }
 
-async function fetchDocuments(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents`);
+async function fetchDocuments(workspace: Workspace, publicDemo = false) {
+  return fetch(publicDemo
+    ? `${PUBLIC_DEMO_API_URL}/documents`
+    : `${API_URL}/analysis-cases/${workspace.caseId}/documents`);
 }
 
-async function fetchAnalysisCase(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}`);
+async function fetchAnalysisCase(workspace: Workspace, publicDemo = false) {
+  return fetch(publicDemo
+    ? `${PUBLIC_DEMO_API_URL}/case`
+    : `${API_URL}/analysis-cases/${workspace.caseId}`);
 }
 
 function PropertyTypeSelector({
@@ -408,13 +413,13 @@ function ExpectedDocumentRow({
   );
 }
 
-export function DocumentUpload() {
+export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
   const [analysisAccessStatus, setAnalysisAccessStatus] = useState<
     AnalysisCase["analysis_access_status"]
-  >("not_activated");
-  const [readOnly, setReadOnly] = useState(false);
+  >(publicDemo ? "active" : "not_activated");
+  const [readOnly, setReadOnly] = useState(publicDemo);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
@@ -440,17 +445,20 @@ export function DocumentUpload() {
 
     async function initialize() {
       try {
-        const currentWorkspace = getWorkspace();
+        const currentWorkspace = publicDemo ? { caseId: "demo" } : getWorkspace();
         if (!currentWorkspace) {
           setNeedsWorkspace(true);
           return;
         }
         const [documentsResponse, caseResponse] = await Promise.all([
-          fetchDocuments(currentWorkspace),
-          fetchAnalysisCase(currentWorkspace),
+          fetchDocuments(currentWorkspace, publicDemo),
+          fetchAnalysisCase(currentWorkspace, publicDemo),
         ]);
 
         if (documentsResponse.status === 404 || caseResponse.status === 404) {
+          if (publicDemo) {
+            throw new Error("Le dossier de démonstration est indisponible.");
+          }
           resetWorkspace(currentWorkspace.caseId);
           setNeedsWorkspace(true);
           return;
@@ -463,7 +471,7 @@ export function DocumentUpload() {
           caseResponse.json() as Promise<AnalysisCase>,
         ]);
         if (!cancelled) {
-          setWorkspace(currentWorkspace);
+          setWorkspace(publicDemo ? { caseId: analysisCase.id } : currentWorkspace);
           setDocuments(uploadedDocuments);
           setPropertyType(analysisCase.property_type);
           setAnalysisAccessStatus(analysisCase.analysis_access_status);
@@ -486,7 +494,7 @@ export function DocumentUpload() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicDemo]);
 
   if (needsWorkspace) {
     return (
@@ -505,7 +513,7 @@ export function DocumentUpload() {
     setIsRefreshing(true);
     setError(null);
     try {
-      const response = await fetchDocuments(workspace);
+      const response = await fetchDocuments(workspace, publicDemo);
       if (!response.ok) throw new Error(await readApiError(response));
       setDocuments((await response.json()) as UploadedDocument[]);
     } catch (refreshError) {
@@ -984,18 +992,21 @@ export function DocumentUpload() {
         <PdfViewer
           document={viewingDocument}
           onClose={() => setViewingDocument(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
       {viewingExtraction ? (
         <RawExtractionViewer
           document={viewingExtraction}
           onClose={() => setViewingExtraction(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
       {viewingDpe ? (
         <DpeExtractionViewer
           document={viewingDpe}
           onClose={() => setViewingDpe(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
     </div>

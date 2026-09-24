@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
-import { API_URL, getWorkspace, readApiError } from "@/lib/workspace";
+import { API_URL, PUBLIC_DEMO_API_URL, getWorkspace, readApiError } from "@/lib/workspace";
 
 export type DpeExtractionSelection = {
   documentId: string;
@@ -101,9 +101,11 @@ function FactCard({
 export function DpeExtractionViewer({
   document,
   onClose,
+  publicDemo = false,
 }: {
   document: DpeExtractionSelection;
   onClose: () => void;
+  publicDemo?: boolean;
 }) {
   const [extraction, setExtraction] = useState<DpeExtraction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,14 +119,16 @@ export function DpeExtractionViewer({
     closeButtonRef.current?.focus();
 
     async function loadDpeExtraction() {
-      const workspace = getWorkspace();
-      if (!workspace) {
+      const workspace = publicDemo ? null : getWorkspace();
+      if (!publicDemo && !workspace) {
         setError("Aucun dossier n’est actuellement sélectionné.");
         return;
       }
       try {
         const response = await fetch(
-          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/dpe-extraction`,
+          publicDemo
+            ? `${PUBLIC_DEMO_API_URL}/documents/${document.documentId}/dpe-extraction`
+            : `${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.documentId}/dpe-extraction`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -154,7 +158,7 @@ export function DpeExtractionViewer({
       window.document.body.style.overflow = previousOverflow;
       if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, onClose]);
+  }, [document.documentId, onClose, publicDemo]);
 
   const facts = extraction?.normalized_facts;
   const ademe = facts?.ademe_verification.data;

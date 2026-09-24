@@ -16,6 +16,7 @@ import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
+  PUBLIC_DEMO_API_URL,
   getWorkspace,
   readApiError,
   resetWorkspace,
@@ -88,6 +89,7 @@ type BuyerReportPreviewData = {
 
 type BuyerReportProps = {
   variant?: "overview" | "details";
+  publicDemo?: boolean;
 };
 
 const severityLabels: Record<Severity, string> = {
@@ -217,6 +219,17 @@ type AnalysisLoad = {
 };
 
 const pendingReportLoads = new Map<string, Promise<AnalysisLoad | null>>();
+
+async function loadPublicDemoReport(): Promise<AnalysisLoad> {
+  const response = await fetch(`${PUBLIC_DEMO_API_URL}/report`, { cache: "no-store" });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return {
+    accessStatus: "active",
+    readOnly: true,
+    report: (await response.json()) as BuyerReportData,
+    preview: null,
+  };
+}
 
 function loadReport(): Promise<AnalysisLoad | null> {
   const workspace = getWorkspace();
@@ -536,7 +549,7 @@ function DetailDrawer({
   );
 }
 
-export function BuyerReport({ variant = "details" }: BuyerReportProps) {
+export function BuyerReport({ variant = "details", publicDemo = false }: BuyerReportProps) {
   const [report, setReport] = useState<BuyerReportData | null>(null);
   const [preview, setPreview] = useState<BuyerReportPreviewData | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<ReportFinding | null>(null);
@@ -556,7 +569,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const loaded = await loadReport();
+      const loaded = publicDemo ? await loadPublicDemoReport() : await loadReport();
       setNeedsWorkspace(loaded === null);
       setAccessStatus(loaded?.accessStatus ?? null);
       setReadOnly(loaded?.readOnly ?? false);
@@ -574,7 +587,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
 
   useEffect(() => {
     let cancelled = false;
-    void loadReport()
+    void (publicDemo ? loadPublicDemoReport() : loadReport())
       .then((loaded) => {
         if (!cancelled) {
           setNeedsWorkspace(loaded === null);
@@ -595,7 +608,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicDemo]);
 
   async function activateAnalysis() {
     if (readOnly) return;
@@ -877,7 +890,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
             <section className="panel priority-panel">
               <div className="panel-heading">
                 <div><p className="section-kicker">À traiter en premier</p><h2>Points prioritaires</h2></div>
-                <Link className="text-link" href={productRoutes.analysis}>Tout voir <Icon name="arrow" /></Link>
+                <Link className="text-link" href={publicDemo ? productRoutes.demoAnalysis : productRoutes.analysis}>Tout voir <Icon name="arrow" /></Link>
               </div>
               {firstPriorityFindings.length > 0 ? (
                 <div className="finding-rows">
@@ -909,7 +922,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
                 <Metric value={report.summary.reassuring_count} label="rassurants" />
                 <Metric value={report.summary.missing_information_count} label="manquants" />
               </div>
-              <Link className="dossier-card-link" href={productRoutes.documents}>Voir les documents <Icon name="arrow" /></Link>
+              <Link className="dossier-card-link" href={publicDemo ? productRoutes.demoDocuments : productRoutes.documents}>Voir les documents <Icon name="arrow" /></Link>
             </section>
           </div>
         </>
@@ -944,7 +957,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
           <span className="state-icon"><Icon name="document" /></span>
           <strong>Aucun point d’analyse disponible</strong>
           <span>Consultez la page Documents pour vérifier les pièces encore attendues.</span>
-          <Link href={productRoutes.documents}>Voir les documents</Link>
+          <Link href={publicDemo ? productRoutes.demoDocuments : productRoutes.documents}>Voir les documents</Link>
         </div>
       )}
 
@@ -967,6 +980,7 @@ export function BuyerReport({ variant = "details" }: BuyerReportProps) {
         <PdfViewer
           document={viewingSource}
           onClose={() => setViewingSource(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
     </div>

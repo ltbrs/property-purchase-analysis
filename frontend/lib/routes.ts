@@ -11,6 +11,9 @@ export const marketingRoutes = {
 
 export const productRoutes = {
   home: "/app",
+  demo: "/app/demo",
+  demoAnalysis: "/app/demo/analyse",
+  demoDocuments: "/app/demo/documents",
   cases: "/app/dossiers",
   caseOverview: "/app/dossiers/vue-ensemble",
   documents: "/app/dossiers/documents",

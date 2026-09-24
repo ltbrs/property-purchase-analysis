@@ -107,7 +107,7 @@ templates in Supabase Auth. Acquora uses Resend only as the SMTP delivery servic
 for these transactional Auth messages. See the Resend setup and verification
 procedure in [docs/deployment.md](docs/deployment.md#supabase-auth-email-through-resend).
 
-The model is deliberately fixed to `gpt-5.6-luna` in the server-side adapter; it
+The model is deliberately fixed to `gpt-6-luna` in the server-side adapter; it
 cannot be selected by a request or changed through environment configuration.
 
 Never commit a populated `.env` file. Replace the example object-storage secret
