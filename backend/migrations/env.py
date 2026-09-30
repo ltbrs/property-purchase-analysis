@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import Base
 from app.documents.classification.models import DocumentClassificationRecord  # noqa: F401
 from app.documents.models import DocumentRecord  # noqa: F401
+from app.llm.rate_budget import LLMRateBudgetRecord  # noqa: F401
 from app.property.models import AnalysisCaseRecord, UserRecord  # noqa: F401
 from app.property.normalization.dpe import DpeExtractionRecord  # noqa: F401
 from app.property.normalization.structured import StructuredExtractionRecord  # noqa: F401

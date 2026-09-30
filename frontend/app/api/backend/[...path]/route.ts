@@ -13,6 +13,7 @@ const FORWARDED_RESPONSE_HEADERS = [
   "content-type",
   "etag",
   "last-modified",
+  "retry-after",
 ] as const;
 
 async function proxyToBackend(

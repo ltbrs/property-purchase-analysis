@@ -22,6 +22,8 @@ type ExtractionPage = {
   page_number: number;
   text: string;
   tables: ExtractedTable[];
+  extraction_method: string;
+  read_status: string;
 };
 
 type RawExtraction = {
@@ -112,7 +114,7 @@ export function RawExtractionViewer({
       >
         <header className="pdf-viewer-header">
           <div>
-            <p className="section-kicker">Extraction brute Xberg</p>
+            <p className="section-kicker">Texte extrait du document</p>
             <h2 id="raw-extraction-title">{document.filename}</h2>
           </div>
           <button
@@ -154,9 +156,9 @@ export function RawExtractionViewer({
                 </div>
               </div>
               <p className="raw-extraction-note">
-                Cette vue restitue le texte et les tableaux tels que Xberg les a
-                détectés. Une information visible dans le PDF peut manquer ici,
-                notamment lorsqu’elle est intégrée à un graphique ou une image.
+                Cette vue restitue le texte détecté dans le PDF, complété par une
+                transcription OpenAI des pages scannées. Les passages illisibles
+                restent signalés. Vous pouvez comparer chaque page au document original.
               </p>
               <div className="raw-extraction-pages">
                 {extraction.pages.map((page) => (
@@ -164,12 +166,18 @@ export function RawExtractionViewer({
                     <header>
                       <strong>Page {page.page_number}</strong>
                       <span>
+                        {page.extraction_method === "vision" ? "Lecture visuelle · " : "Lecture PDF · "}
                         {page.text.trim().length.toLocaleString("fr-FR")} caractères
                         {page.tables.length > 0
                           ? ` · ${page.tables.length} tableau${page.tables.length === 1 ? "" : "x"}`
                           : ""}
                       </span>
                     </header>
+                    {["partial", "unreadable", "failed", "limit_exceeded"].includes(page.read_status) ? (
+                      <p role="status">Lecture incomplète. Certains passages n’ont pas pu être transcrits.</p>
+                    ) : ["pending", "retry"].includes(page.read_status) ? (
+                      <p role="status">Lecture de cette page en attente.</p>
+                    ) : null}
                     <pre>{page.text.trim() || "Aucun texte détecté sur cette page."}</pre>
                     {page.tables.map((table, index) => (
                       <details key={`${page.page_number}-${index}`}>

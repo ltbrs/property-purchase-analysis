@@ -27,6 +27,36 @@ from app.risks.models import (
 from tests.test_risk_engine import dpe_facts
 
 
+def test_incomplete_document_keeps_page_warning_and_suppresses_reassuring_findings() -> None:
+    dpe = dpe_facts(rating="B")
+    assert dpe.dpe_rating.source is not None
+    source = dpe.dpe_rating.source
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="DPE incomplet",
+        findings=[
+            RiskFinding(
+                code="UNREAD_DOCUMENT_PAGES",
+                finding_key=f"UNREAD_DOCUMENT_PAGES:{source.document_id}",
+                category=RiskCategory.MISSING_INFORMATION,
+                severity=RiskSeverity.MEDIUM,
+                title="Pages non lues",
+                description="La page 2 reste inconnue.",
+                status=FindingStatus.MISSING_INFORMATION,
+                sources=[source.model_copy(update={"page_number": 2, "quote": None})],
+            )
+        ],
+        document_names={source.document_id: "dpe.pdf"},
+        dpe_documents=[dpe],
+        diagnostics=[],
+    )
+    assert report.summary.reassuring_count == 0
+    assert report.summary.missing_information_count == 1
+    warning = report.sections[5].findings[0]
+    assert warning.sources[0].document_name == "dpe.pdf"
+    assert warning.sources[0].page_number == 2
+
+
 def test_report_orders_sections_enriches_sources_and_keeps_uncertainty() -> None:
     document_id = uuid4()
     dpe = dpe_facts(rating="B")

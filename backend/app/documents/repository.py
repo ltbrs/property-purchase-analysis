@@ -450,6 +450,8 @@ class DocumentRepository:
                     page_number=page.page_number,
                     text=page.text,
                     tables=[table.model_dump(mode="json") for table in page.tables],
+                    extraction_method=page.extraction_method,
+                    read_status=page.read_status,
                 )
                 for page in parsed.pages
             ],

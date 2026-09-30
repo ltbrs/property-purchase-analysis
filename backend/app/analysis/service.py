@@ -14,6 +14,7 @@ from app.reports import BuyerReport, build_buyer_report
 from app.risks.engine import evaluate_case_risks
 from app.risks.models import RiskFindingRead
 from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
+from app.risks.rules.unread_pages import unread_page_findings
 
 
 @dataclass(frozen=True)
@@ -95,7 +96,14 @@ class CaseAnalysisService:
         records = self.repository.replace_case_findings(
             analysis_case_id=analysis_case.id,
             user_id=user_id,
-            findings=evaluation.findings,
+            findings=evaluation.findings
+            + unread_page_findings(
+                self.repository.list_case_extractions(
+                    analysis_case.id,
+                    user_id,
+                    include_unpublished_demo=demo_seed,
+                )
+            ),
             allow_demo_seed=demo_seed,
         )
         return CaseAnalysisResult(

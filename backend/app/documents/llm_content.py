@@ -30,6 +30,19 @@ def extraction_as_numbered_text(
         if selected_pages is not None and page.page_number not in selected_pages:
             continue
         page_content = [page.text.strip()]
+        if page.read_status in {
+            "partial",
+            "unreadable",
+            "failed",
+            "limit_exceeded",
+            "pending",
+            "retry",
+        }:
+            page_content.insert(
+                0,
+                "[Lecture incomplète : les passages manquants sont inconnus. "
+                "Ne déduire aucun constat favorable de leur absence.]",
+            )
         for table_index, table in enumerate(page.tables, start=1):
             markdown = table.get("markdown")
             if isinstance(markdown, str) and markdown.strip():

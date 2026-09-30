@@ -26,6 +26,8 @@ class ParsedPage(BaseModel):
     page_number: int = Field(gt=0)
     text: str = ""
     tables: list[ParsedTable] = Field(default_factory=list)
+    extraction_method: str = "xberg"
+    read_status: str = "read"
 
 
 class ParsedPdf(BaseModel):

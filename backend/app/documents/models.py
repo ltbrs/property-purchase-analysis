@@ -69,6 +69,14 @@ class DocumentRecord(Base):
         index=True,
     )
     failure_reason: Mapped[str | None] = mapped_column(String(500))
+    processing_stage: Mapped[str | None] = mapped_column(String(32), index=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_token: Mapped[UUID | None] = mapped_column(Uuid)
+    processing_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    processing_progress: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default="{}", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -135,8 +143,26 @@ class DocumentExtractionPageRecord(Base):
     page_number: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     tables: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+    extraction_method: Mapped[str] = mapped_column(
+        String(32), default="xberg", server_default="xberg"
+    )
+    read_status: Mapped[str] = mapped_column(String(32), default="read", server_default="read")
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    vision_metadata: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default="{}", nullable=False
+    )
 
     extraction: Mapped[DocumentExtractionRecord] = relationship(back_populates="pages")
+
+
+class ProcessingProgress(BaseModel):
+    total_pages: int = 0
+    processed_pages: int = 0
+    fallback_pages: int = 0
+    fallback_completed: int = 0
+    unread_pages: list[int] = Field(default_factory=list)
+    retry_reason: str | None = None
 
 
 class DocumentRead(BaseModel):
@@ -149,6 +175,9 @@ class DocumentRead(BaseModel):
     size_bytes: int
     status: DocumentStatus
     failure_reason: str | None
+    processing_stage: str | None = None
+    next_attempt_at: datetime | None = None
+    processing_progress: ProcessingProgress = Field(default_factory=ProcessingProgress)
     document_type: str | None = None
     document_types: list[str] = Field(default_factory=list)
     ademe_verification_status: str | None = None
@@ -196,6 +225,8 @@ class ExtractionPageRead(BaseModel):
     page_number: int
     text: str
     tables: list[ExtractedTableRead]
+    extraction_method: str = "xberg"
+    read_status: str = "read"
 
 
 class DocumentExtractionRead(BaseModel):
