@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
@@ -262,6 +263,7 @@ def test_public_document_url_is_limited_to_published_demo(
             assert (bucket, key) == ("private", "demo-templates/lyon_v1/demo.pdf")
             return "https://storage.example/signed-demo.pdf"
 
+    assert isinstance(client.app, FastAPI)
     client.app.dependency_overrides[get_object_storage] = lambda: FakeStorage()
 
     assert client.get(f"/api/v1/demo/documents/{uuid4()}/view-url").status_code == 404

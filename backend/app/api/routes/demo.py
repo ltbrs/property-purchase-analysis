@@ -68,9 +68,7 @@ def get_public_demo_report(
     request: Request, response: Response, session: DatabaseSession
 ) -> BuyerReport:
     demo = _published_demo(session)
-    record = session.scalar(
-        select(ReportRecord).where(ReportRecord.analysis_case_id == demo.id)
-    )
+    record = session.scalar(select(ReportRecord).where(ReportRecord.analysis_case_id == demo.id))
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

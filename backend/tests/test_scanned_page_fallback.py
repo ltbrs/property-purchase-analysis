@@ -3,7 +3,7 @@ import zlib
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import httpx
@@ -42,7 +42,7 @@ from app.main import create_app
 from app.reports.models import ReportRecord
 from app.risks.models.findings import RiskFindingRecord
 from app.risks.rules.unread_pages import unread_page_findings
-from app.storage.object_storage import get_object_storage
+from app.storage.object_storage import PrivateObjectStorage, get_object_storage
 from tests.billing_fixtures import grant_analysis_access
 from tests.pdf_fixtures import make_text_pdf
 
@@ -262,6 +262,7 @@ class VisionClient:
 def document_for(session: Session) -> DocumentRecord:
     repository = DocumentRepository(session)
     case = repository.create_analysis_case(uuid4(), "Test scanned PDF")
+    assert case.user_id is not None
     return repository.create_document(
         DocumentRecord(
             analysis_case_id=case.id,
@@ -335,13 +336,15 @@ def test_page_retry_preserves_other_pages_and_refreshes_analysis(
     session.rollback()
 
     resumed = worker(
-        session, runner.storage.pdf, VisionClient([transcription("Budget 48000 EUR")], pages=2)
+        session,
+        cast(Storage, runner.storage).pdf,
+        VisionClient([transcription("Budget 48000 EUR")], pages=2),
     )
     claimed = claim_document(session, resumed.settings)
     assert claimed is not None
     asyncio.run(resumed.run(claimed))
     session.refresh(healthy_page)
-    assert resumed.parser.calls == 0
+    assert cast(FakeParser, resumed.parser).calls == 0
     assert resumed.client.calls == 1
     assert healthy_page.text == healthy_text
     assert healthy_page.vision_metadata == healthy_metadata
@@ -386,7 +389,7 @@ def test_retry_without_text_does_not_confirm_a_previous_partial_transcription(
     enqueue_page_retry(session, document, 1)
     resumed = worker(
         session,
-        runner.storage.pdf,
+        cast(Storage, runner.storage).pdf,
         VisionClient(
             [PageTranscription(content_kind="no_text", text="", has_unreadable_regions=False)]
         ),
@@ -480,11 +483,19 @@ def rate_limit(headers: dict[str, str] | None = None) -> RateLimitError:
     )
 
 
+def settings_without_env(**overrides: Any) -> Settings:
+    return Settings(**{"_env_file": None, **overrides})
+
+
 def worker(
     session: Session, pdf: bytes, client: VisionClient, **settings: Any
 ) -> PersistentDocumentWorker:
     return PersistentDocumentWorker(
-        session, Storage(pdf), FakeParser(), client, Settings(_env_file=None, **settings)
+        session,
+        cast(PrivateObjectStorage, Storage(pdf)),
+        FakeParser(),
+        client,
+        settings_without_env(**settings),
     )
 
 
@@ -539,7 +550,7 @@ def test_429_checkpoints_retry_without_sleep_and_resume_does_not_reparse(session
     resumed = claim_document(session, runner.settings)
     assert resumed is not None
     asyncio.run(runner.run(resumed))
-    assert runner.parser.calls == 1
+    assert cast(FakeParser, runner.parser).calls == 1
     assert runner.client.calls == 2
     assert document.status == "completed"
 
@@ -600,7 +611,7 @@ def test_exhausted_attempts_and_partial_pages_create_missing_information(session
 def test_expired_lease_is_reclaimed_but_live_lease_is_not(session: Session) -> None:
     document = document_for(session)
     enqueue_document(session, document)
-    settings = Settings(_env_file=None)
+    settings = settings_without_env()
     claimed = claim_document(session, settings)
     assert claimed is not None
     first_token = document.lease_token
@@ -632,10 +643,10 @@ def test_resume_keeps_first_batch_and_only_transcribes_remaining_pages(session: 
     resumed = claim_document(session, second_runner.settings)
     assert resumed is not None
     asyncio.run(second_runner.run(resumed))
-    assert second_runner.parser.calls == 0
+    assert cast(FakeParser, second_runner.parser).calls == 0
     assert second_runner.client.calls == 1
     assert document.status == "completed"
-    assert document.processing_progress["fallback_completed"] == 5
+    assert document.processing_progress.get("fallback_completed") == 5
 
 
 def test_old_empty_extraction_is_inspected_when_processing_resumes(session: Session) -> None:
@@ -652,7 +663,7 @@ def test_old_empty_extraction_is_inspected_when_processing_resumes(session: Sess
     assert extraction is not None
     assert extraction.document_metadata["scan_inspection_version"] == 1
     assert extraction.pages[0].extraction_method == "vision"
-    assert runner.parser.calls == 0
+    assert cast(FakeParser, runner.parser).calls == 0
 
 
 def test_illustration_without_text_is_not_flagged_as_unread(session: Session) -> None:
@@ -697,7 +708,7 @@ def test_retry_after_and_fallback_backoff(headers: dict[str, str]) -> None:
 
 
 def test_rate_budget_is_shared_between_sessions_and_releases_concurrency(session: Session) -> None:
-    settings = Settings(_env_file=None, openai_max_concurrency=1)
+    settings = settings_without_env(openai_max_concurrency=1)
     first = LLMRateBudget(session, settings, "gpt-6-luna")
     reservation = first.reserve(100)
     with Session(session.get_bind()) as second_session:
