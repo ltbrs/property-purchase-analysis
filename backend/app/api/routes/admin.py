@@ -85,10 +85,7 @@ def _auth_users(
         # It is not exposed through the Supabase Data API.
         pattern = f"%{search}%"
         total = session.execute(
-            text(
-                "SELECT count(*) FROM auth.users "
-                "WHERE :search = '' OR email ILIKE :pattern"
-            ),
+            text("SELECT count(*) FROM auth.users WHERE :search = '' OR email ILIKE :pattern"),
             {"search": search, "pattern": pattern},
         ).scalar_one()
         rows = session.execute(
@@ -235,7 +232,9 @@ def grant_credits(
         )
     session.commit()
     available = session.scalar(
-        select(func.count()).select_from(AnalysisCreditRecord).where(
+        select(func.count())
+        .select_from(AnalysisCreditRecord)
+        .where(
             AnalysisCreditRecord.user_id == user_id,
             AnalysisCreditRecord.consumed_at.is_(None),
             or_(

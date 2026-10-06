@@ -49,11 +49,14 @@ def test_only_database_promoted_owner_can_access_admin_routes(
 
     assert client.get("/api/v1/admin/me", headers=owner_auth).status_code == 404
     assert client.get("/api/v1/admin/users", headers=friend_auth).status_code == 404
-    assert client.post(
-        f"/api/v1/admin/users/{friend_id}/credits",
-        headers=friend_auth,
-        json={"count": 1, "reason": "Friend test"},
-    ).status_code == 404
+    assert (
+        client.post(
+            f"/api/v1/admin/users/{friend_id}/credits",
+            headers=friend_auth,
+            json={"count": 1, "reason": "Friend test"},
+        ).status_code
+        == 404
+    )
 
     owner = session.get(UserRecord, owner_id)
     assert owner is not None
@@ -104,9 +107,9 @@ def test_admin_lists_users_and_grants_traceable_credits(
     assert all(c.source == "manual_grant" for c in credits)
     assert all(c.granted_by_user_id == owner_id for c in credits)
     assert all(c.grant_note == "Test avec un proche" for c in credits)
-    assert client.get("/api/v1/billing/summary", headers=friend_auth).json()[
-        "available_analyses"
-    ] == 2
+    assert (
+        client.get("/api/v1/billing/summary", headers=friend_auth).json()["available_analyses"] == 2
+    )
     updated = client.get("/api/v1/admin/users?search=friend", headers=owner_auth).json()
     assert updated["users"][0]["granted_credits"] == 2
 
@@ -116,8 +119,11 @@ def test_admin_lists_users_and_grants_traceable_credits(
         json={"count": 11, "reason": "Test avec un proche"},
     )
     assert invalid.status_code == 422
-    assert client.post(
-        f"/api/v1/admin/users/{uuid4()}/credits",
-        headers=owner_auth,
-        json={"count": 1, "reason": "Test avec un proche"},
-    ).status_code == 404
+    assert (
+        client.post(
+            f"/api/v1/admin/users/{uuid4()}/credits",
+            headers=owner_auth,
+            json={"count": 1, "reason": "Test avec un proche"},
+        ).status_code
+        == 404
+    )
