@@ -14,6 +14,7 @@ from app.billing.models import (
     BillingSummaryRead,
     CheckoutSessionCreate,
     CheckoutSessionRead,
+    CheckoutSessionStatusRead,
     StripeWebhookAccepted,
 )
 from app.billing.repository import (
@@ -100,6 +101,25 @@ async def create_checkout_session(
 
     repository.attach_checkout_session(purchase, checkout.id)
     return CheckoutSessionRead(checkout_url=checkout.url)
+
+
+@router.get("/checkout-sessions/{checkout_session_id}", response_model=CheckoutSessionStatusRead)
+def get_checkout_session_status(
+    checkout_session_id: str,
+    response: Response,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+) -> CheckoutSessionStatusRead:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return BillingRepository(session).checkout_session_status(
+            checkout_session_id, current_user_id
+        )
+    except LookupError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paiement introuvable pour ce compte.",
+        ) from error
 
 
 @router.post(

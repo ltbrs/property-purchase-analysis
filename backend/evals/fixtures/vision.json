@@ -1,0 +1,32 @@
+[
+  {
+    "id": "scanned_ag_money_date",
+    "kind": "text",
+    "lines": [
+      "PROCÈS-VERBAL DE L’ASSEMBLÉE GÉNÉRALE",
+      "Résolution n° 4, travaux de toiture",
+      "Devis approuvé : 48 000 € TTC",
+      "Assemblée tenue le 12/06/2025",
+      "Répartition selon les tantièmes généraux"
+    ],
+    "expected_snippets": ["48 000", "12/06/2025", "toiture", "tantièmes"]
+  },
+  {
+    "id": "scanned_dpe_units",
+    "kind": "text",
+    "lines": [
+      "DIAGNOSTIC DE PERFORMANCE ÉNERGÉTIQUE",
+      "Classe énergie : E",
+      "Consommation : 280 kWh/m²/an",
+      "Coût annuel estimé : 1 500 € à 2 100 €",
+      "Date du diagnostic : 15/06/2024"
+    ],
+    "expected_snippets": ["Classe énergie", "280", "1 500", "2 100", "15/06/2024"]
+  },
+  {
+    "id": "illustration_without_text",
+    "kind": "no_text",
+    "lines": [],
+    "expected_snippets": []
+  }
+]

@@ -116,6 +116,14 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
     )
     assert checkout.status_code == 200
     assert checkout.json() == {"checkout_url": "https://checkout.stripe.test/cs_test_pack"}
+    pending = client.get("/api/v1/billing/checkout-sessions/cs_test_pack", headers=auth(user_id))
+    assert pending.status_code == 200
+    assert pending.headers["Cache-Control"] == "no-store"
+    assert pending.json() == {"status": "open", "credits_granted": 0}
+    assert (
+        client.get("/api/v1/billing/summary", headers=auth(user_id)).json()["available_analyses"]
+        == 0
+    )
     assert gateway.purchase_id is not None
 
     gateway.event = VerifiedStripeEvent(
@@ -158,6 +166,8 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
 
     assert first_webhook.status_code == 200
     assert duplicate_webhook.status_code == 200
+    confirmed = client.get("/api/v1/billing/checkout-sessions/cs_test_pack", headers=auth(user_id))
+    assert confirmed.json() == {"status": "paid", "credits_granted": 3}
     assert summary.json()["available_analyses"] == 3
     assert activation.status_code == 200
     assert activation.json()["status"] == "active"
@@ -176,6 +186,68 @@ def test_paid_checkout_grants_pack_once_and_activates_one_case(
     assert access.expires_at - access.activated_at == timedelta(days=30)
     purchase = session.scalar(select(StripePurchaseRecord))
     assert purchase is not None and purchase.status == "paid"
+
+
+def test_checkout_status_is_visible_only_to_its_buyer(
+    billing_client: tuple[TestClient, FakeStripeGateway],
+) -> None:
+    client, _gateway = billing_client
+    buyer_id = uuid4()
+    client.post(
+        "/api/v1/billing/checkout-sessions",
+        headers=auth(buyer_id),
+        json={"offer_code": "search_pack"},
+    )
+
+    other_buyer = client.get(
+        "/api/v1/billing/checkout-sessions/cs_test_pack", headers=auth(uuid4())
+    )
+    missing = client.get(
+        "/api/v1/billing/checkout-sessions/cs_test_missing", headers=auth(buyer_id)
+    )
+    unauthenticated = client.get("/api/v1/billing/checkout-sessions/cs_test_pack")
+
+    assert other_buyer.status_code == 404
+    assert missing.status_code == 404
+    assert other_buyer.json() == missing.json()
+    assert unauthenticated.status_code == 401
+
+
+def test_unpaid_webhook_does_not_confirm_purchase_or_grant_credits(
+    billing_client: tuple[TestClient, FakeStripeGateway],
+) -> None:
+    client, gateway = billing_client
+    user_id = uuid4()
+    client.post(
+        "/api/v1/billing/checkout-sessions",
+        headers=auth(user_id),
+        json={"offer_code": "search_pack"},
+    )
+    gateway.event = VerifiedStripeEvent(
+        id="evt_unpaid",
+        type="checkout.session.completed",
+        data_object={
+            "id": "cs_test_pack",
+            "client_reference_id": str(gateway.purchase_id),
+            "payment_status": "unpaid",
+            "amount_total": 3900,
+            "currency": "eur",
+        },
+    )
+
+    webhook = client.post(
+        "/api/v1/billing/stripe/webhook",
+        headers={"Stripe-Signature": "valid-signature"},
+        content=b"{}",
+    )
+    checkout_status = client.get(
+        "/api/v1/billing/checkout-sessions/cs_test_pack", headers=auth(user_id)
+    )
+    summary = client.get("/api/v1/billing/summary", headers=auth(user_id))
+
+    assert webhook.status_code == 200
+    assert checkout_status.json() == {"status": "open", "credits_granted": 0}
+    assert summary.json()["available_analyses"] == 0
 
 
 def test_first_case_without_credit_is_a_free_preview_but_activation_requires_credit(

@@ -75,22 +75,23 @@ class XbergPdfParser:
 
         try:
             document = result.results[0]
-            if not document.pages:
-                raise PdfParserError("Xberg did not return page-level content")
-
             pages = [
                 ParsedPage(
                     page_number=page.page_number,
                     text=page.content,
                     tables=[self._parse_table(table) for table in page.tables],
                 )
-                for page in document.pages
+                for page in document.pages or []
             ]
             page_numbers = [page.page_number for page in pages]
             if len(page_numbers) != len(set(page_numbers)):
                 raise PdfParserError("Xberg returned duplicate page numbers")
 
             pages.sort(key=lambda page: page.page_number)
+            if not pages:
+                # A raster-only PDF may yield no page output at all. The local
+                # inspector reconciles placeholders against the PDF's real pages.
+                pages = [ParsedPage(page_number=1)]
             return ParsedPdf(pages=pages, metadata=self._parse_metadata(document.metadata))
         except PdfParserError:
             raise

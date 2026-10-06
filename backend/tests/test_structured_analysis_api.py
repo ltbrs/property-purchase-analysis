@@ -59,8 +59,8 @@ class FakeClient:
         return StructuredOutputResult(
             output=self.output,
             response_id="resp_ag",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
         )
 
 
@@ -122,8 +122,8 @@ def seed_ag(session: Session, user_id: UUID) -> tuple[UUID, UUID]:
             covered_period_end=None,
             issuer=None,
             extraction_strategy="text",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
             response_id="resp_class",
             prompt_version="test",
             raw_output={},

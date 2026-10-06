@@ -140,6 +140,14 @@ class DocumentRepository:
             )
         )
 
+    def get_published_demo_analysis_case(self) -> AnalysisCaseRecord | None:
+        return self.session.scalar(
+            select(AnalysisCaseRecord).where(
+                AnalysisCaseRecord.case_kind == AnalysisCaseKind.DEMO.value,
+                AnalysisCaseRecord.published_at.is_not(None),
+            )
+        )
+
     def _lock_owned_analysis_case(
         self,
         analysis_case_id: UUID,
@@ -442,6 +450,8 @@ class DocumentRepository:
                     page_number=page.page_number,
                     text=page.text,
                     tables=[table.model_dump(mode="json") for table in page.tables],
+                    extraction_method=page.extraction_method,
+                    read_status=page.read_status,
                 )
                 for page in parsed.pages
             ],

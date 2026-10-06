@@ -11,11 +11,15 @@ export const marketingRoutes = {
 
 export const productRoutes = {
   home: "/app",
+  demo: "/app/demo",
+  demoAnalysis: "/app/demo/analyse",
+  demoDocuments: "/app/demo/documents",
   cases: "/app/dossiers",
   caseOverview: "/app/dossiers/vue-ensemble",
   documents: "/app/dossiers/documents",
   analysis: "/app/analyse",
   account: "/app/compte",
+  admin: "/app/administration",
   signIn: "/connexion",
   forgotPassword: "/mot-de-passe-oublie",
   updatePassword: "/reinitialiser-mot-de-passe",

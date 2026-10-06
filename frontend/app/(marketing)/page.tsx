@@ -245,7 +245,7 @@ const questions = [
   {
     title: "Combien coûte l’analyse des documents ?",
     answer:
-      "La création du dossier est gratuite. L’envoi et l’analyse des documents coûtent 19 € TTC pour un bien, ou 39 € TTC pour un pack de trois biens, sans abonnement. L’exemple de rapport sur cette page reste consultable sans compte.",
+      "La création du dossier est gratuite. L’envoi et l’analyse des documents coûtent 19 € TTC pour un bien, ou 39 € TTC pour un pack de trois biens, sans abonnement. Le dossier de démonstration est consultable sans compte.",
   },
 ];
 
@@ -276,12 +276,12 @@ export default function MarketingHomePage() {
           </p>
           <div className="home-hero-actions">
             <HomeCta
-              href="#exemple-rapport"
+              href={productRoutes.demo}
               action="report_example"
               placement="hero"
               className="ds-button ds-button--primary home-primary-cta"
             >
-              Voir un exemple de rapport <Icon name="arrow" />
+              Explorer le dossier de démonstration <Icon name="arrow" />
             </HomeCta>
             <HomeCta
               href={productRoutes.home}
@@ -293,7 +293,7 @@ export default function MarketingHomePage() {
             </HomeCta>
           </div>
           <p className="home-cta-note">
-            Exemple accessible sans compte ni document à envoyer.
+            Dossier de démonstration accessible sans compte ni document à envoyer.
           </p>
           <div className="home-trust-list" aria-label="Engagements Acquora">
             {trustPoints.map((point) => (
@@ -340,9 +340,9 @@ export default function MarketingHomePage() {
                 <small>Décompte de charges · page 4</small>
               </span>
             </div>
-            <a className="home-float-link" href="#exemple-rapport">
-              Lire ces points de vigilance <Icon name="arrow" />
-            </a>
+            <Link className="home-float-link" href={productRoutes.demo}>
+              Ouvrir le dossier de démonstration <Icon name="arrow" />
+            </Link>
           </div>
         </div>
       </section>
@@ -388,8 +388,8 @@ export default function MarketingHomePage() {
           <p>
             Le rapport hiérarchise les points de vigilance, distingue les
             constats des incertitudes et renvoie aux documents et aux pages
-            disponibles. Ouvrez un point de cet exemple pour voir comment le
-            lire.
+            disponibles. Cet aperçu illustre la présentation. Explorez le dossier
+            de démonstration pour consulter le rapport complet et ses sources.
           </p>
           <ul>
             <li>
@@ -403,21 +403,21 @@ export default function MarketingHomePage() {
             </li>
           </ul>
           <HomeCta
-            href={productRoutes.home}
-            action="create_case"
+            href={productRoutes.demo}
+            action="report_example"
             placement="report"
             className="ds-button ds-button--primary home-primary-cta home-report-cta"
           >
-            Créer mon dossier <Icon name="arrow" />
+            Explorer le dossier de démonstration <Icon name="arrow" />
           </HomeCta>
           <p className="home-cta-note">
-            Un compte est nécessaire pour ajouter vos documents.
+            Accès libre, sans compte.
           </p>
         </div>
         <div className="home-report-preview">
           <div className="home-report-preview-header">
             <div>
-              <small>Exemple fictif, à titre illustratif</small>
+              <small>Aperçu illustratif, dossier fictif</small>
               <strong>Achat d’un appartement en copropriété</strong>
             </div>
           </div>

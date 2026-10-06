@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     document_upload_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
     max_upload_size_bytes: int = 25 * 1024 * 1024
     openai_api_key: SecretStr | None = None
+    processing_cron_secret: SecretStr | None = None
+    processing_batch_seconds: int = Field(default=45, ge=5, le=120)
+    processing_lease_seconds: int = Field(default=180, ge=150, le=900)
+    vision_max_pages: int = Field(default=100, ge=1, le=500)
+    vision_batch_pages: int = Field(default=4, ge=1, le=4)
+    vision_max_attempts: int = Field(default=3, ge=1, le=5)
+    openai_timeout_seconds: int = Field(default=35, ge=5, le=60)
+    openai_max_concurrency: int = Field(default=4, ge=1, le=16)
+    openai_requests_per_minute: int = Field(default=60, ge=1)
+    openai_tokens_per_minute: int = Field(default=200000, ge=24000)
     ademe_dpe_api_url: str = "https://data.ademe.fr/data-fair/api/v1/datasets/dpe03existant"
     ademe_dpe_api_timeout_seconds: float = Field(default=5, gt=0, le=30)
     contact_proxy_secret: SecretStr | None = None
@@ -62,6 +72,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "openai_api_key",
+        "processing_cron_secret",
         "contact_proxy_secret",
         "backend_proxy_secret",
         "stripe_secret_key",

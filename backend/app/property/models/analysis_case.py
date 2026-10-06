@@ -44,11 +44,20 @@ class AnalysisCaseKind(StrEnum):
 
 class UserRecord(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "NOT is_admin OR (email = 'lambertbruyas@gmail.com' AND email_verified)",
+            name="ck_users_admin_email",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str | None] = mapped_column(String(200))
     email: Mapped[str | None] = mapped_column(String(254), index=True)
     email_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    is_admin: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
     show_demo_case: Mapped[bool] = mapped_column(

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { marketingRoutes } from "@/lib/routes";
 import { API_URL, readApiError } from "@/lib/workspace";
@@ -39,6 +40,7 @@ const offers: Array<{
 type BillingPanelProps = Readonly<{
   compact?: boolean;
   paymentStatus?: string;
+  paymentSessionId?: string;
   onSummaryChange?: (summary: BillingSummary) => void;
 }>;
 
@@ -51,29 +53,58 @@ export async function fetchBillingSummary() {
 export function BillingPanel({
   compact = false,
   paymentStatus,
+  paymentSessionId,
   onSummaryChange,
 }: BillingPanelProps) {
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [loadingOffer, setLoadingOffer] = useState<OfferCode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paymentConfirmation, setPaymentConfirmation] = useState<
+    "checking" | "confirmed" | "pending"
+  >("checking");
+  const [creditsGranted, setCreditsGranted] = useState(0);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    let attempts = paymentStatus === "succes" ? 5 : 1;
+    let attempts = paymentStatus === "succes" ? 30 : 1;
 
     async function loadSummary() {
       try {
+        let purchase: { status: string; credits_granted: number } | null = null;
+        if (paymentStatus === "succes" && paymentSessionId) {
+          const response = await fetch(
+            `${API_URL}/billing/checkout-sessions/${encodeURIComponent(paymentSessionId)}`,
+            { cache: "no-store" },
+          );
+          if (!response.ok) throw new Error(await readApiError(response));
+          purchase = await response.json();
+        }
         const loaded = await fetchBillingSummary();
         if (cancelled) return;
         setSummary(loaded);
+        setError(null);
         onSummaryChange?.(loaded);
-        if (paymentStatus === "succes" && attempts > 1) {
-          attempts -= 1;
-          timeout = setTimeout(() => void loadSummary(), 1_000);
+        if (paymentStatus === "succes") {
+          if (purchase?.status === "paid") {
+            setCreditsGranted(purchase.credits_granted);
+            setPaymentConfirmation("confirmed");
+          } else if (
+            purchase &&
+            (purchase.status === "open" || purchase.status === "pending") &&
+            attempts > 1
+          ) {
+            setPaymentConfirmation("checking");
+            attempts -= 1;
+            timeout = setTimeout(() => void loadSummary(), 2_000);
+          } else {
+            setPaymentConfirmation("pending");
+          }
         }
       } catch (loadError) {
         if (!cancelled) {
+          setPaymentConfirmation("pending");
           setError(
             loadError instanceof Error
               ? loadError.message
@@ -88,7 +119,7 @@ export function BillingPanel({
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [onSummaryChange, paymentStatus]);
+  }, [onSummaryChange, paymentStatus, paymentSessionId, refreshVersion]);
 
   async function startCheckout(offerCode: OfferCode) {
     setLoadingOffer(offerCode);
@@ -113,6 +144,23 @@ export function BillingPanel({
     }
   }
 
+  if (summary === null) {
+    return (
+      <section className={`billing-panel${compact ? " is-compact" : ""}`} aria-label="Analyses disponibles">
+        {error ? (
+          <>
+            <p className="billing-error" role="alert">{error}</p>
+            <button className="billing-refresh" type="button" onClick={() => setRefreshVersion((version) => version + 1)}>
+              Réessayer
+            </button>
+          </>
+        ) : (
+          <LoadingState title="Chargement de vos analyses disponibles…" compact />
+        )}
+      </section>
+    );
+  }
+
   return (
     <section className={`billing-panel${compact ? " is-compact" : ""}`} aria-labelledby="billing-title">
       <div className="billing-panel-heading">
@@ -124,9 +172,24 @@ export function BillingPanel({
       </div>
 
       {paymentStatus === "succes" ? (
-        <p className="billing-notice is-success" role="status">
-          <Icon name="check" /> Paiement confirmé. Le crédit apparaît dès validation du webhook Stripe.
-        </p>
+        <>
+          <p
+            className={`billing-notice${paymentConfirmation === "confirmed" ? " is-success" : ""}`}
+            role="status"
+          >
+            <Icon name={paymentConfirmation === "confirmed" ? "check" : "info"} />
+            {paymentConfirmation === "confirmed"
+              ? `Paiement confirmé. ${creditsGranted} ${creditsGranted === 1 ? "crédit ajouté" : "crédits ajoutés"} à votre compte.`
+              : paymentConfirmation === "checking"
+                ? "Vérification du paiement en cours. Vos crédits seront disponibles dès confirmation."
+                : "Votre paiement n’est pas encore confirmé dans votre compte. Actualisez le solde dans quelques instants. Si le problème persiste, contactez-nous."}
+          </p>
+          {paymentConfirmation === "pending" ? (
+            <button className="billing-refresh" type="button" onClick={() => setRefreshVersion((version) => version + 1)}>
+              Actualiser le solde
+            </button>
+          ) : null}
+        </>
       ) : paymentStatus === "annule" ? (
         <p className="billing-notice"><Icon name="info" /> Paiement annulé, rien n’a été débité.</p>
       ) : null}

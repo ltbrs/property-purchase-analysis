@@ -23,6 +23,7 @@ from app.reports.models import (
     report_generated_at,
 )
 from app.risks.models import (
+    TECHNICAL_FINDING_CODES,
     FindingReviewStatus,
     FindingStatus,
     RiskCategory,
@@ -207,6 +208,14 @@ def build_buyer_report(
     grouped: dict[ReportSectionCode, list[ReportFinding]] = {
         section: [] for section in SECTION_ORDER
     }
+    incomplete_document_ids = {
+        source.document_id
+        for finding in findings
+        if finding.code == "UNREAD_DOCUMENT_PAGES"
+        for source in finding.sources
+    }
+    # Reading quality remains an internal completeness signal, not a property finding.
+    findings = [finding for finding in findings if finding.code not in TECHNICAL_FINDING_CODES]
     for finding in findings:
         analysis_type = _analysis_type_for_finding(finding)
         section = (
@@ -239,7 +248,11 @@ def build_buyer_report(
         )
     )
     grouped[ReportSectionCode.REASSURING] = _deduplicate_report_findings(
-        grouped[ReportSectionCode.REASSURING]
+        [
+            finding
+            for finding in grouped[ReportSectionCode.REASSURING]
+            if not any(source.document_id in incomplete_document_ids for source in finding.sources)
+        ]
     )
     findings_by_type = {
         analysis_type: [

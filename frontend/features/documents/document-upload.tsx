@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AdemeMark } from "@/components/ademe-mark";
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import {
   BillingPanel,
   type BillingSummary,
@@ -33,6 +34,7 @@ import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
+  PUBLIC_DEMO_API_URL,
   getWorkspace,
   readApiError,
   resetWorkspace,
@@ -65,6 +67,16 @@ type UploadedDocument = {
   size_bytes: number;
   status: DocumentStatus;
   failure_reason: string | null;
+  processing_stage: string | null;
+  next_attempt_at: string | null;
+  processing_progress: {
+    total_pages: number;
+    processed_pages: number;
+    fallback_pages: number;
+    fallback_completed: number;
+    unread_pages: number[];
+    retry_reason: string | null;
+  };
   document_type: DocumentType | null;
   document_types: DocumentType[];
   ademe_verification_status: AdemeVerificationStatus | null;
@@ -87,6 +99,20 @@ const statusLabels: Record<DocumentStatus, string> = {
   completed: "Analysé",
   failed: "Échec",
 };
+
+function processingLabel(document: UploadedDocument) {
+  if (document.processing_progress?.retry_reason === "rate_limit") return "En attente du service de lecture";
+  if (document.processing_progress?.retry_reason === "batch_deadline") return "Reprise de la lecture programmée";
+  if (document.processing_progress?.retry_reason) return "Nouvelle tentative programmée";
+  switch (document.processing_stage) {
+    case "queued": return "Lecture en préparation";
+    case "xberg": return "Lecture du PDF";
+    case "vision": return "Lecture des pages scannées";
+    case "classification": return "Identification du document";
+    case "structured": return "Analyse des informations";
+    default: return statusLabels[document.status];
+  }
+}
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
   dateStyle: "medium",
@@ -111,12 +137,16 @@ async function sha256(file: File) {
   ).join("");
 }
 
-async function fetchDocuments(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents`);
+async function fetchDocuments(workspace: Workspace, publicDemo = false) {
+  return fetch(publicDemo
+    ? `${PUBLIC_DEMO_API_URL}/documents`
+    : `${API_URL}/analysis-cases/${workspace.caseId}/documents`);
 }
 
-async function fetchAnalysisCase(workspace: Workspace) {
-  return fetch(`${API_URL}/analysis-cases/${workspace.caseId}`);
+async function fetchAnalysisCase(workspace: Workspace, publicDemo = false) {
+  return fetch(publicDemo
+    ? `${PUBLIC_DEMO_API_URL}/case`
+    : `${API_URL}/analysis-cases/${workspace.caseId}`);
 }
 
 function PropertyTypeSelector({
@@ -200,7 +230,7 @@ function DocumentFile({
   onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
-  const canViewExtraction = ["extracted", "analyzing", "completed"].includes(
+  const canViewExtraction = ["extracting", "extracted", "analyzing", "completed", "failed"].includes(
     document.status,
   );
   const isAdemeVerified = document.ademe_verification_status === "verified";
@@ -217,7 +247,7 @@ function DocumentFile({
     "reçu",
     ...(document.status === "uploaded"
       ? []
-      : [statusLabels[document.status].toLocaleLowerCase("fr-FR")]),
+      : [processingLabel(document).toLocaleLowerCase("fr-FR")]),
     ...(isAdemeVerified
       ? ["vérifié auprès de l’ADEME"]
       : hasAdemeInconsistencies
@@ -253,7 +283,7 @@ function DocumentFile({
             {document.status !== "uploaded" ? (
               <span className={`document-status-step status-${document.status}`}>
                 <Icon name={analysisStatusIcon} />
-                {statusLabels[document.status]}
+                {processingLabel(document)}
               </span>
             ) : null}
             {isAdemeVerified || hasAdemeInconsistencies || wasAdemeNumberNotFound ? (
@@ -284,8 +314,26 @@ function DocumentFile({
             ) : null}
           </div>
         </div>
-        {document.failure_reason ? (
-          <span className="document-failure">{document.failure_reason}</span>
+        {document.processing_stage && !["completed", "failed"].includes(document.processing_stage) ? (
+          <div className="document-processing-progress" role="status">
+            {document.processing_progress.total_pages > 0 ? (
+              <span>
+                {document.processing_progress.processed_pages} / {document.processing_progress.total_pages} pages vérifiées
+                {document.processing_progress.fallback_pages > 0
+                  ? ` · ${document.processing_progress.fallback_completed} / ${document.processing_progress.fallback_pages} pages scannées traitées`
+                  : ""}
+              </span>
+            ) : null}
+            {document.next_attempt_at && document.processing_progress.retry_reason ? (
+              <span>
+                {document.processing_progress.retry_reason === "rate_limit"
+                  ? "Le service de lecture est temporairement occupé."
+                  : document.processing_progress.retry_reason === "batch_deadline"
+                    ? "La lecture reprend dans un nouveau lot."
+                    : "Une erreur temporaire a interrompu la lecture."} Prochaine tentative à partir de {new Date(document.next_attempt_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.
+              </span>
+            ) : null}
+          </div>
         ) : null}
         <div className="document-actions">
           <button
@@ -408,15 +456,16 @@ function ExpectedDocumentRow({
   );
 }
 
-export function DocumentUpload() {
+export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
   const [analysisAccessStatus, setAnalysisAccessStatus] = useState<
     AnalysisCase["analysis_access_status"]
-  >("not_activated");
-  const [readOnly, setReadOnly] = useState(false);
+  >(publicDemo ? "active" : "not_activated");
+  const [readOnly, setReadOnly] = useState(publicDemo);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initializationAttempt, setInitializationAttempt] = useState(0);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -431,26 +480,71 @@ export function DocumentUpload() {
   const [error, setError] = useState<string | null>(null);
   const [availableAnalyses, setAvailableAnalyses] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastResumeRequest = useRef<Record<string, number>>({});
   const handleBillingSummary = useCallback((summary: BillingSummary) => {
     setAvailableAnalyses(summary.available_analyses);
   }, []);
+
+  const hasPendingProcessing = documents.some((document) => document.processing_stage &&
+    !["completed", "failed"].includes(document.processing_stage));
+
+  useEffect(() => {
+    if (!workspace || publicDemo || !hasPendingProcessing) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let failures = 0;
+    async function poll() {
+      try {
+        const response = await fetch(`${API_URL}/analysis-cases/${workspace!.caseId}/documents`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(await readApiError(response));
+        if (controller.signal.aborted) return;
+        const refreshed = (await response.json()) as UploadedDocument[];
+        setDocuments(refreshed);
+        const now = Date.now();
+        for (const document of refreshed) {
+          if (!document.processing_progress.retry_reason || !document.next_attempt_at
+            || new Date(document.next_attempt_at).getTime() > now
+            || now - (lastResumeRequest.current[document.id] ?? 0) < 60000) continue;
+          lastResumeRequest.current[document.id] = now;
+          void fetch(`${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.id}/process`, {
+            method: "POST",
+          }).catch(() => { delete lastResumeRequest.current[document.id]; });
+        }
+        failures = 0;
+      } catch {
+        if (controller.signal.aborted) return;
+        failures += 1;
+      }
+      if (!controller.signal.aborted) {
+        timer = setTimeout(poll, window.document.hidden ? 20000 : Math.min(15000, 3000 * (failures + 1)));
+      }
+    }
+    timer = setTimeout(poll, 1500);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [workspace, publicDemo, hasPendingProcessing]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function initialize() {
       try {
-        const currentWorkspace = getWorkspace();
+        const currentWorkspace = publicDemo ? { caseId: "demo" } : getWorkspace();
         if (!currentWorkspace) {
           setNeedsWorkspace(true);
           return;
         }
         const [documentsResponse, caseResponse] = await Promise.all([
-          fetchDocuments(currentWorkspace),
-          fetchAnalysisCase(currentWorkspace),
+          fetchDocuments(currentWorkspace, publicDemo),
+          fetchAnalysisCase(currentWorkspace, publicDemo),
         ]);
+        if (cancelled) return;
 
         if (documentsResponse.status === 404 || caseResponse.status === 404) {
+          if (publicDemo) {
+            throw new Error("Le dossier de démonstration est indisponible.");
+          }
           resetWorkspace(currentWorkspace.caseId);
           setNeedsWorkspace(true);
           return;
@@ -463,7 +557,7 @@ export function DocumentUpload() {
           caseResponse.json() as Promise<AnalysisCase>,
         ]);
         if (!cancelled) {
-          setWorkspace(currentWorkspace);
+          setWorkspace(publicDemo ? { caseId: analysisCase.id } : currentWorkspace);
           setDocuments(uploadedDocuments);
           setPropertyType(analysisCase.property_type);
           setAnalysisAccessStatus(analysisCase.analysis_access_status);
@@ -486,7 +580,31 @@ export function DocumentUpload() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicDemo, initializationAttempt]);
+
+  if (isInitializing) {
+    return (
+      <LoadingState
+        title="Chargement des documents…"
+        description="Nous récupérons les pièces et les informations de votre dossier."
+      />
+    );
+  }
+
+  if (error && !workspace) {
+    return (
+      <div className="report-state report-error" role="alert">
+        <span className="state-icon"><Icon name="alert" /></span>
+        <strong>Documents indisponibles</strong>
+        <span>{error}</span>
+        <button type="button" onClick={() => {
+          setError(null);
+          setIsInitializing(true);
+          setInitializationAttempt((attempt) => attempt + 1);
+        }}>Réessayer</button>
+      </div>
+    );
+  }
 
   if (needsWorkspace) {
     return (
@@ -505,7 +623,7 @@ export function DocumentUpload() {
     setIsRefreshing(true);
     setError(null);
     try {
-      const response = await fetchDocuments(workspace);
+      const response = await fetchDocuments(workspace, publicDemo);
       if (!response.ok) throw new Error(await readApiError(response));
       setDocuments((await response.json()) as UploadedDocument[]);
     } catch (refreshError) {
@@ -849,7 +967,7 @@ export function DocumentUpload() {
               }
             />
           </label>
-          <p className="privacy-note"><Icon name="shield" /> Stockage privé</p>
+          <p className="privacy-note"><Icon name="shield" /> Stockage privé. Les pages scannées nécessitant une lecture sont transmises à OpenAI.</p>
         </div>
       ) : (
         <div className="analysis-paywall document-upload-paywall">
@@ -885,6 +1003,32 @@ export function DocumentUpload() {
           <strong>Action interrompue</strong>
           <span>{error}</span>
         </div>
+      ) : null}
+
+      {hasPendingProcessing ? (
+        <p className="document-processing-notice" role="status">
+          La lecture et l’analyse continuent en arrière-plan. Les pages scannées peuvent prendre plus de temps. Vous pouvez quitter cette page et retrouver la progression à votre retour.
+        </p>
+      ) : null}
+
+      {!readOnly && documents.some((document) => ["failed", "uploaded"].includes(document.status)) ? (
+        <button className="refresh-button" type="button" disabled={isProcessing} onClick={async () => {
+          if (!workspace) return;
+          setIsProcessing(true);
+          try {
+            const results = await Promise.all(documents.filter((document) => ["failed", "uploaded"].includes(document.status)).map(async (document) => {
+              const response = await fetch(`${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.id}/process`, { method: "POST" });
+              if (!response.ok) throw new Error(await readApiError(response));
+              return await response.json() as UploadedDocument;
+            }));
+            setDocuments((current) => current.map((document) => results.find((result) => result.id === document.id) ?? document));
+            setError(null);
+          } catch (retryError) {
+            setError(retryError instanceof Error ? retryError.message : "La reprise a échoué.");
+          } finally { setIsProcessing(false); }
+        }}>
+          Reprendre la lecture des documents
+        </button>
       ) : null}
 
       <section className="document-coverage" aria-labelledby="document-coverage-title">
@@ -984,18 +1128,27 @@ export function DocumentUpload() {
         <PdfViewer
           document={viewingDocument}
           onClose={() => setViewingDocument(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
       {viewingExtraction ? (
         <RawExtractionViewer
+          key={viewingExtraction.documentId}
           document={viewingExtraction}
           onClose={() => setViewingExtraction(null)}
+          publicDemo={publicDemo}
+          canRetry={!readOnly && analysisAccessStatus === "active"}
+          processing={documents.some((document) => document.id === viewingExtraction.documentId
+            && !!document.processing_stage
+            && !["completed", "failed"].includes(document.processing_stage))}
+          onRetryStarted={() => void refreshDocuments()}
         />
       ) : null}
       {viewingDpe ? (
         <DpeExtractionViewer
           document={viewingDpe}
           onClose={() => setViewingDpe(null)}
+          publicDemo={publicDemo}
         />
       ) : null}
     </div>

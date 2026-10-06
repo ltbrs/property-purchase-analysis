@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
-import { API_URL, getWorkspace, readApiError } from "@/lib/workspace";
+import { useDocumentDialog } from "@/features/documents/use-document-dialog";
+import { API_URL, PUBLIC_DEMO_API_URL, getWorkspace, readApiError } from "@/lib/workspace";
 
 export type DpeExtractionSelection = {
   documentId: string;
@@ -101,37 +102,38 @@ function FactCard({
 export function DpeExtractionViewer({
   document,
   onClose,
+  publicDemo = false,
 }: {
   document: DpeExtractionSelection;
   onClose: () => void;
+  publicDemo?: boolean;
 }) {
   const [extraction, setExtraction] = useState<DpeExtraction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useDocumentDialog(onClose);
 
   useEffect(() => {
     const controller = new AbortController();
-    const previousActiveElement = window.document.activeElement;
-    const previousOverflow = window.document.body.style.overflow;
-    window.document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
 
     async function loadDpeExtraction() {
-      const workspace = getWorkspace();
-      if (!workspace) {
+      const workspace = publicDemo ? null : getWorkspace();
+      if (!publicDemo && !workspace) {
         setError("Aucun dossier n’est actuellement sélectionné.");
         return;
       }
       try {
         const response = await fetch(
-          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/dpe-extraction`,
+          publicDemo
+            ? `${PUBLIC_DEMO_API_URL}/documents/${document.documentId}/dpe-extraction`
+            : `${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.documentId}/dpe-extraction`,
           {
             cache: "no-store",
             signal: controller.signal,
           },
         );
         if (!response.ok) throw new Error(await readApiError(response));
-        setExtraction((await response.json()) as DpeExtraction);
+        const loadedExtraction = (await response.json()) as DpeExtraction;
+        if (!controller.signal.aborted) setExtraction(loadedExtraction);
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(
@@ -142,19 +144,11 @@ export function DpeExtractionViewer({
       }
     }
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
     void loadDpeExtraction();
-    window.addEventListener("keydown", closeOnEscape);
     return () => {
       controller.abort();
-      window.removeEventListener("keydown", closeOnEscape);
-      window.document.body.style.overflow = previousOverflow;
-      if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, onClose]);
+  }, [document.documentId, publicDemo]);
 
   const facts = extraction?.normalized_facts;
   const ademe = facts?.ademe_verification.data;

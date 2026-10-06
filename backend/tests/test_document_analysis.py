@@ -35,6 +35,7 @@ from app.property.normalization.dpe import (
     DpeNumberFactCandidate,
     DpeTextFactCandidate,
 )
+from app.risks.models.findings import RiskFindingRecord
 from tests.billing_fixtures import grant_analysis_access
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -64,8 +65,8 @@ class FakeStructuredOutputClient:
         return StructuredOutputResult(
             output=output,
             response_id=f"resp_test_{self.calls}",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
         )
 
 
@@ -195,6 +196,33 @@ def auth(user_id: UUID) -> dict[str, str]:
     return {"X-User-Id": str(user_id)}
 
 
+def test_technical_reading_status_is_excluded_from_analysis_responses(session: Session) -> None:
+    user_id = uuid4()
+    case_id, document_id = seed_extracted_dpe(session, user_id)
+    extraction = DocumentRepository(session).get_extraction(document_id)
+    assert extraction is not None
+    extraction.pages[0].read_status = "partial"
+    session.commit()
+    grant_analysis_access(session, user_id, case_id)
+    with make_client(session, FakeStructuredOutputClient([])) as client:
+        base = f"/api/v1/analysis-cases/{case_id}"
+        refreshed = client.post(f"{base}/findings/refresh", headers=auth(user_id))
+        assert refreshed.status_code == 200
+        assert all(
+            finding["code"] != "UNREAD_DOCUMENT_PAGES" for finding in refreshed.json()["findings"]
+        )
+        # Completeness is still retained internally for conservative report assembly.
+        assert (
+            session.scalar(
+                select(RiskFindingRecord).where(RiskFindingRecord.code == "UNREAD_DOCUMENT_PAGES")
+            )
+            is not None
+        )
+        stored = client.get(f"{base}/findings", headers=auth(user_id))
+        assert stored.status_code == 200
+        assert all(finding["code"] != "UNREAD_DOCUMENT_PAGES" for finding in stored.json())
+
+
 def test_low_confidence_classification_is_persisted_as_unknown(session: Session) -> None:
     user_id = uuid4()
     case_id, document_id = seed_extracted_dpe(session, user_id)
@@ -210,7 +238,7 @@ def test_low_confidence_classification_is_persisted_as_unknown(session: Session)
     assert response.status_code == 200
     assert response.json()[0]["document_type"] == "unknown"
     assert response.json()[0]["extraction_strategy"] == "none"
-    assert response.json()[0]["requested_model"] == "gpt-5.6-luna"
+    assert response.json()[0]["requested_model"] == "gpt-6-luna"
     persisted = session.scalar(select(DocumentClassificationRecord))
     assert persisted is not None
     assert persisted.raw_output["document_type"] == "dpe"
@@ -272,7 +300,7 @@ def test_dpe_extraction_persists_normalized_facts_with_page_sources(session: Ses
 
     record = session.scalar(select(DpeExtractionRecord))
     document = session.get(DocumentRecord, document_id)
-    assert record is not None and record.requested_model == "gpt-5.6-luna"
+    assert record is not None and record.requested_model == "gpt-6-luna"
     assert document is not None and document.status == DocumentStatus.COMPLETED.value
 
 

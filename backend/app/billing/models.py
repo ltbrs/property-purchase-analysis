@@ -122,6 +122,9 @@ class AnalysisCreditRecord(Base):
         nullable=False,
     )
     grant_note: Mapped[str | None] = mapped_column(String(500))
+    granted_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consumed_by_case_id: Mapped[UUID | None] = mapped_column(
         Uuid,
@@ -171,6 +174,11 @@ class CheckoutSessionCreate(BaseModel):
 
 class CheckoutSessionRead(BaseModel):
     checkout_url: str
+
+
+class CheckoutSessionStatusRead(BaseModel):
+    status: StripePurchaseStatus
+    credits_granted: int
 
 
 class AnalysisAccessRead(BaseModel):

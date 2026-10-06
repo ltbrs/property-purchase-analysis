@@ -1,4 +1,5 @@
 export const API_URL = "/api/backend";
+export const PUBLIC_DEMO_API_URL = "/api/demo";
 
 const CASE_STORAGE_KEY = "property-analysis-case-id";
 export const WORKSPACE_CHANGE_EVENT = "property-analysis-workspace-change";
@@ -49,6 +50,12 @@ export async function fetchAnalysisCases() {
   });
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as AnalysisCase[];
+}
+
+export async function fetchPublicDemoCase() {
+  const response = await fetch(`${PUBLIC_DEMO_API_URL}/case`, { cache: "no-store" });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as AnalysisCase;
 }
 
 export async function fetchUserPreferences() {

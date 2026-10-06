@@ -91,7 +91,11 @@ class FakePdfParser:
                         "DPE établi le 15/06/2024. Classe énergie D. "
                         "Classe climat B. Consommation 182 kWh/m²/an."
                     ),
-                )
+                ),
+                ParsedPage(
+                    page_number=2,
+                    text="Estimation des coûts annuels d'énergie du logement, minimum 1500 EUR.",
+                ),
             ]
         )
 
@@ -122,8 +126,8 @@ class FakeStructuredOutputClient:
         return StructuredOutputResult(
             output=output,
             response_id=f"resp_process_{self.calls}",
-            requested_model="gpt-5.6-luna",
-            resolved_model="gpt-5.6-luna",
+            requested_model="gpt-6-luna",
+            resolved_model="gpt-6-luna",
             input_tokens=100,
             output_tokens=25,
         )
@@ -147,7 +151,7 @@ def dpe_outputs() -> list[BaseModel]:
             segments=[
                 DocumentClassificationSegmentCandidate(
                     start_page=1,
-                    end_page=1,
+                    end_page=2,
                     document_type=DocumentType.DPE,
                     confidence=0.99,
                     document_date=date(2024, 6, 15),
@@ -304,6 +308,7 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
 
         first = client.post(process_url, headers=auth(user_id))
         second = client.post(process_url, headers=auth(user_id))
+        third = client.post(process_url, headers=auth(user_id))
         report = client.post(
             f"/api/v1/analysis-cases/{case_id}/report/refresh",
             headers=auth(user_id),
@@ -311,10 +316,11 @@ def test_process_runs_the_full_dpe_workflow_and_is_idempotent(
 
     assert uploaded.status_code == 201
     assert uploaded.json()["status"] == "uploaded"
-    assert first.status_code == 200
-    assert first.json()["status"] == "completed"
-    assert first.json()["document_type"] == "dpe"
-    assert second.json() == first.json()
+    assert first.status_code == 202
+    assert first.json()["processing_stage"] == "queued"
+    assert second.json()["status"] == "completed"
+    assert second.json()["document_type"] == "dpe"
+    assert third.json() == second.json()
     assert storage.download_count == 1
     assert parser.parse_count == 1
     assert llm_client.calls == 2
@@ -459,8 +465,7 @@ def test_process_extracts_each_type_from_its_pages_in_a_composite_pdf(
             headers=auth(user_id),
         )
 
-    assert processed.status_code == 200
-    assert processed.json()["document_types"] == ["dpe", "diagnostics"]
+    assert processed.status_code == 202
     assert listed.json()[0]["document_types"] == ["dpe", "diagnostics"]
     report_codes = {
         finding["code"] for section in report.json()["sections"] for finding in section["findings"]

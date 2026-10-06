@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { useDocumentDialog } from "@/features/documents/use-document-dialog";
 import { API_URL, getWorkspace, readApiError } from "@/lib/workspace";
 
 export type PdfDocumentSelection = {
@@ -30,31 +31,31 @@ function pdfUrlAtPage(url: string, pageNumber?: number) {
 export function PdfViewer({
   document,
   onClose,
+  publicDemo = false,
 }: {
   document: PdfDocumentSelection;
   onClose: () => void;
+  publicDemo?: boolean;
 }) {
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useDocumentDialog(onClose);
 
   useEffect(() => {
     const controller = new AbortController();
-    const previousActiveElement = window.document.activeElement;
-    const previousOverflow = window.document.body.style.overflow;
-    window.document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
 
     async function loadViewUrl() {
-      const workspace = getWorkspace();
-      if (!workspace) {
+      const workspace = publicDemo ? null : getWorkspace();
+      if (!publicDemo && !workspace) {
         setError("Aucun dossier n’est actuellement sélectionné.");
         return;
       }
 
       try {
         const response = await fetch(
-          `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/view-url`,
+          publicDemo
+            ? `/api/demo/documents/${document.documentId}/view-url`
+            : `${API_URL}/analysis-cases/${workspace!.caseId}/documents/${document.documentId}/view-url`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -62,7 +63,7 @@ export function PdfViewer({
         );
         if (!response.ok) throw new Error(await readApiError(response));
         const signedLink = (await response.json()) as DocumentViewUrl;
-        setViewUrl(pdfUrlAtPage(signedLink.url, document.pageNumber));
+        if (!controller.signal.aborted) setViewUrl(signedLink.url);
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(
@@ -73,19 +74,13 @@ export function PdfViewer({
       }
     }
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
     void loadViewUrl();
-    window.addEventListener("keydown", closeOnEscape);
     return () => {
       controller.abort();
-      window.removeEventListener("keydown", closeOnEscape);
-      window.document.body.style.overflow = previousOverflow;
-      if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, document.pageNumber, onClose]);
+  }, [document.documentId, publicDemo]);
+
+  const pageViewUrl = viewUrl ? pdfUrlAtPage(viewUrl, document.pageNumber) : null;
 
   return (
     <div className="pdf-viewer-layer">
@@ -109,8 +104,8 @@ export function PdfViewer({
             <h2 id="pdf-viewer-title">{document.filename}</h2>
           </div>
           <div className="pdf-viewer-actions">
-            {viewUrl ? (
-              <a href={viewUrl} target="_blank" rel="noreferrer">
+            {pageViewUrl ? (
+              <a href={pageViewUrl} target="_blank" rel="noreferrer">
                 Ouvrir dans un onglet <Icon name="arrow" />
               </a>
             ) : null}
@@ -133,8 +128,8 @@ export function PdfViewer({
               <strong>Aperçu indisponible</strong>
               <span>{error}</span>
             </div>
-          ) : viewUrl ? (
-            <iframe src={viewUrl} title={`Aperçu de ${document.filename}`} />
+          ) : pageViewUrl ? (
+            <iframe src={pageViewUrl} title={`Aperçu de ${document.filename}`} />
           ) : (
             <div className="pdf-viewer-state">
               <span className="state-icon is-loading"><Icon name="refresh" /></span>

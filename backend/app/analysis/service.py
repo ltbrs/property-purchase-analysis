@@ -12,8 +12,9 @@ from app.property.normalization.structured import StructuredExtractionType
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport, build_buyer_report
 from app.risks.engine import evaluate_case_risks
-from app.risks.models import RiskFindingRead
+from app.risks.models import TECHNICAL_FINDING_CODES, RiskFindingRead
 from app.risks.rules.missing_documents import AvailableDocument, MissingDocumentContext
+from app.risks.rules.unread_pages import unread_page_findings
 
 
 @dataclass(frozen=True)
@@ -95,11 +96,22 @@ class CaseAnalysisService:
         records = self.repository.replace_case_findings(
             analysis_case_id=analysis_case.id,
             user_id=user_id,
-            findings=evaluation.findings,
+            findings=evaluation.findings
+            + unread_page_findings(
+                self.repository.list_case_extractions(
+                    analysis_case.id,
+                    user_id,
+                    include_unpublished_demo=demo_seed,
+                )
+            ),
             allow_demo_seed=demo_seed,
         )
         return CaseAnalysisResult(
-            findings=[RiskFindingRead.model_validate(record) for record in records],
+            findings=[
+                RiskFindingRead.model_validate(record)
+                for record in records
+                if record.code not in TECHNICAL_FINDING_CODES
+            ],
             timeline=evaluation.reconciliation.timeline,
             dpe_documents=dpe_documents,
             diagnostics=diagnostics,

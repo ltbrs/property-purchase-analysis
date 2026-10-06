@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from secrets import compare_digest
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -46,8 +46,14 @@ from app.documents.validation import (
     validate_pdf_bytes,
     validate_pdf_metadata,
 )
-from app.jobs.document_processing import DocumentProcessingService
+from app.jobs.persistent_processing import (
+    ACTIVE_STAGES,
+    enqueue_document,
+    enqueue_page_retry,
+    run_document_jobs,
+)
 from app.llm import StructuredOutputClientDependency
+from app.llm.rate_budget import utc
 from app.property.models import (
     AnalysisCaseAccessMode,
     AnalysisCaseKind,
@@ -73,7 +79,12 @@ from app.property.normalization.structured_service import (
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport
 from app.reports.models import BuyerReportPreview
-from app.risks.models import FindingReviewStatus, FindingStatus, RiskFindingRead
+from app.risks.models import (
+    TECHNICAL_FINDING_CODES,
+    FindingReviewStatus,
+    FindingStatus,
+    RiskFindingRead,
+)
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -206,6 +217,14 @@ def _validate_upload_storage_key(analysis_case_id: UUID, storage_key: str) -> No
         UUID(parts[3][:-4])
     except ValueError as error:
         raise InvalidDocument("La référence de téléversement est invalide.") from error
+
+
+def _require_idle_document(document: DocumentRecord) -> None:
+    if document.processing_stage in ACTIVE_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La lecture et l’analyse de ce document sont déjà planifiées.",
+        )
 
 
 async def _delete_unpersisted_upload(storage: ObjectStorage, storage_key: str) -> None:
@@ -425,7 +444,8 @@ def get_document_extraction(
     if extraction is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune extraction brute n’est disponible pour ce document.",
+            detail=document.failure_reason
+            or "Aucune extraction brute n’est disponible pour ce document.",
         )
     return DocumentExtractionRead.model_validate(extraction)
 
@@ -623,6 +643,7 @@ async def upload_document(
 @router.post(
     "/{analysis_case_id}/documents/{document_id}/process",
     response_model=DocumentRead,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def process_document(
     analysis_case_id: UUID,
@@ -632,6 +653,7 @@ async def process_document(
     storage: ObjectStorage,
     parser: PdfParserDependency,
     llm_client: StructuredOutputClientDependency,
+    background_tasks: BackgroundTasks,
 ) -> DocumentRead:
     repository = DocumentRepository(session)
     document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
@@ -639,47 +661,23 @@ async def process_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_editable_analysis(BillingRepository(session), analysis_case_id, current_user_id)
-    if document.status in {
-        DocumentStatus.EXTRACTING.value,
-        DocumentStatus.ANALYZING.value,
-    }:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Document processing is already in progress",
+    enqueued = enqueue_document(session, document)
+    due_for_resume = (
+        document.processing_stage in ACTIVE_STAGES
+        and bool(document.processing_progress.get("retry_reason"))
+        and (document.next_attempt_at is None or utc(document.next_attempt_at) <= datetime.now(UTC))
+        and (document.lease_until is None or utc(document.lease_until) <= datetime.now(UTC))
+    )
+    if enqueued or due_for_resume:
+        background_tasks.add_task(
+            run_document_jobs,
+            session.get_bind(),
+            storage,
+            parser,
+            llm_client,
+            document.id,
         )
-
-    try:
-        classifications = await DocumentProcessingService(
-            repository, storage, parser, llm_client
-        ).process(
-            document,
-            current_user_id,
-            full_analysis=True,
-        )
-    except ObjectStorageError as error:
-        repository.mark_extraction_failed(
-            document, "Le document n’a pas pu être relu depuis le stockage privé."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Le document n’a pas pu être relu depuis le stockage privé.",
-        ) from error
-    except DocumentExtractionFailed as error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(error),
-        ) from error
-    except (
-        DocumentClassificationFailed,
-        DpeExtractionFailed,
-        StructuredExtractionFailed,
-    ) as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(error),
-        ) from error
-
-    session.refresh(document)
+    classifications = repository.list_document_classifications(document.id)
     dpe_extraction = repository.get_dpe_extraction(document.id)
     ademe_verification_status = (
         NormalizedDpeFacts.model_validate(
@@ -695,6 +693,44 @@ async def process_document(
             "ademe_verification_status": ademe_verification_status,
         }
     )
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/extraction/pages/{page_number}/retry",
+    response_model=DocumentRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_document_page(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    page_number: int,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+    parser: PdfParserDependency,
+    llm_client: StructuredOutputClientDependency,
+    background_tasks: BackgroundTasks,
+) -> DocumentRead:
+    repository = DocumentRepository(session)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
+    _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    try:
+        enqueue_page_retry(session, document, page_number)
+    except (LookupError, ValueError) as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND
+            if isinstance(error, LookupError)
+            else status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    background_tasks.add_task(
+        run_document_jobs, session.get_bind(), storage, parser, llm_client, document.id
+    )
+    return DocumentRead.model_validate(document)
 
 
 @router.delete(
@@ -744,6 +780,7 @@ async def extract_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    _require_idle_document(document)
 
     existing = repository.get_extraction(document.id)
     if existing is not None:
@@ -796,6 +833,7 @@ async def classify_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    _require_idle_document(document)
 
     extraction = repository.get_extraction(document.id)
     if extraction is None:
@@ -844,6 +882,7 @@ async def extract_dpe_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    _require_idle_document(document)
 
     extraction = repository.get_extraction(document.id)
     classifications = [
@@ -899,6 +938,7 @@ async def extract_structured_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
     _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    _require_idle_document(document)
     extraction = repository.get_extraction(document.id)
     classifications = repository.list_document_classifications(document.id)
     if extraction is None or not classifications:
@@ -971,6 +1011,7 @@ def list_case_findings(
     return [
         RiskFindingRead.model_validate(record)
         for record in repository.list_case_findings(analysis_case_id, current_user_id)
+        if record.code not in TECHNICAL_FINDING_CODES
     ]
 
 
@@ -1107,10 +1148,21 @@ def get_case_usage(
         )
     page_count = sum(len(extraction.pages) for extraction in extractions)
     ocr_page_count = sum(
-        len(extraction.pages)
+        sum(
+            (page.extraction_method == "vision" and page.read_status in {"read", "partial"})
+            or extraction.document_metadata.get("ocr_used") is True
+            for page in extraction.pages
+        )
         for extraction in extractions
-        if extraction.document_metadata.get("ocr_used") is True
     )
+    for extraction in extractions:
+        for page in extraction.pages:
+            metadata = page.vision_metadata
+            if isinstance(metadata.get("response_id"), str):
+                unique_responses[str(metadata["response_id"])] = (
+                    int(str(metadata.get("input_tokens", 0))),
+                    int(str(metadata.get("output_tokens", 0))),
+                )
     refresh_count = BillingRepository(session).report_refresh_count(
         analysis_case_id, current_user_id
     )
