@@ -769,6 +769,18 @@ svg {
   flex: 0 0 auto;
 }
 
+.billing-refresh {
+  margin-top: 0.75rem;
+  padding: 0.62rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  color: var(--green-800);
+  background: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .billing-offers {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

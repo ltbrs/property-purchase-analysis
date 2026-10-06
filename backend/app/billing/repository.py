@@ -12,6 +12,7 @@ from app.billing.models import (
     AnalysisCreditRecord,
     BillingOfferCode,
     BillingSummaryRead,
+    CheckoutSessionStatusRead,
     StripePurchaseRecord,
     StripePurchaseStatus,
     StripeWebhookEventRecord,
@@ -61,6 +62,24 @@ class BillingRepository:
     def mark_purchase_failed(self, purchase: StripePurchaseRecord) -> None:
         purchase.status = StripePurchaseStatus.FAILED.value
         self.session.commit()
+
+    def checkout_session_status(
+        self, checkout_session_id: str, user_id: UUID
+    ) -> CheckoutSessionStatusRead:
+        purchase = self.session.scalar(
+            select(StripePurchaseRecord).where(
+                StripePurchaseRecord.stripe_checkout_session_id == checkout_session_id,
+                StripePurchaseRecord.user_id == user_id,
+            )
+        )
+        if purchase is None:
+            raise LookupError("Checkout Session not found")
+        return CheckoutSessionStatusRead(
+            status=StripePurchaseStatus(purchase.status),
+            credits_granted=(
+                purchase.credit_count if purchase.status == StripePurchaseStatus.PAID.value else 0
+            ),
+        )
 
     def billing_summary(self, user_id: UUID, now: datetime) -> BillingSummaryRead:
         available_filter = (

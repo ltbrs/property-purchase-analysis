@@ -176,6 +176,11 @@ class CheckoutSessionRead(BaseModel):
     checkout_url: str
 
 
+class CheckoutSessionStatusRead(BaseModel):
+    status: StripePurchaseStatus
+    credits_granted: int
+
+
 class AnalysisAccessRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

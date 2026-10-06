@@ -70,12 +70,38 @@
       }
     },
     {
+      "label": "Start Stripe Listener",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "python", "-m", "scripts.stripe_listen"],
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "stripe",
+        "pattern": {
+          "regexp": "(?!)"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Getting ready.*",
+          "endsPattern": "^Ready!.*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "Start Full Stack",
       "dependsOrder": "sequence",
       "dependsOn": [
         "Start Services",
         "Start Backend",
-        "Start Frontend"
+        "Start Frontend",
+        "Start Stripe Listener"
       ],
       "problemMatcher": []
     }

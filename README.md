@@ -125,8 +125,24 @@ stripe listen --events checkout.session.completed,checkout.session.async_payment
 ```
 
 Copy the `whsec_…` value printed by Stripe CLI into `STRIPE_WEBHOOK_SECRET`.
+Restart the backend after changing this value. Keep the listener running while
+testing payments: Stripe cannot send events directly to `localhost`. The webhook
+must reach the backend on port 8000, rather than the authenticated frontend proxy.
+
+For subsequent local sessions, start the listener from `backend/` using:
+
+```bash
+uv run python -m scripts.stripe_listen
+```
+
+This helper uses the test API key from the root `.env` and checks that the signing
+secret matches before forwarding payments. It refuses live keys.
+
 Checkout fulfillment is webhook-only, so returning to the success page never
-creates credits by itself.
+creates credits by itself. The account page checks the returned Checkout Session
+against the signed-in user's purchase and waits up to one minute for fulfillment.
+If credits remain pending, it offers a balance refresh. Starting a listener after
+a payment does not replay earlier events; those need to be delivered again.
 
 ### Manual beta credits
 

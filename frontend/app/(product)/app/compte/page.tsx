@@ -18,7 +18,7 @@ function initials(name: string | null | undefined) {
 }
 
 type AccountPageProps = {
-  searchParams: Promise<{ paiement?: string | string[] }>;
+  searchParams: Promise<{ paiement?: string | string[]; session_id?: string | string[] }>;
 };
 
 export default async function AccountPage({ searchParams }: AccountPageProps) {
@@ -86,6 +86,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       <BillingPanel
         paymentStatus={
           Array.isArray(params.paiement) ? params.paiement[0] : params.paiement
+        }
+        paymentSessionId={
+          Array.isArray(params.session_id) ? params.session_id[0] : params.session_id
         }
       />
     </section>
