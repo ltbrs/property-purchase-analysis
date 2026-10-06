@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import {
   BillingPanel,
   type BillingSummary,
@@ -692,11 +693,10 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
 
   if (isLoading && report === null && preview === null) {
     return (
-      <div className="report-state">
-        <span className="state-icon is-loading"><Icon name="refresh" /></span>
-        <strong>Analyse du dossier…</strong>
-        <span>Les constats et leurs sources sont en cours de préparation.</span>
-      </div>
+      <LoadingState
+        title="Chargement de l’analyse…"
+        description="Les constats et leurs sources sont en cours de préparation."
+      />
     );
   }
 

@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
 from app.property.normalization.diagnostics import (
     DiagnosticKind,
     DiagnosticResult,
@@ -15,6 +17,7 @@ from app.property.normalization.dpe import (
     SourceReference,
 )
 from app.reports import build_buyer_report
+from app.reports.models import AnalysisFindingType, ReportRecord
 from app.risks.models import (
     DocumentExpectation,
     FindingReviewStatus,
@@ -27,7 +30,7 @@ from app.risks.models import (
 from tests.test_risk_engine import dpe_facts
 
 
-def test_incomplete_document_keeps_page_warning_and_suppresses_reassuring_findings() -> None:
+def test_incomplete_document_hides_technical_warning_and_suppresses_reassuring_findings() -> None:
     dpe = dpe_facts(rating="B")
     assert dpe.dpe_rating.source is not None
     source = dpe.dpe_rating.source
@@ -51,10 +54,60 @@ def test_incomplete_document_keeps_page_warning_and_suppresses_reassuring_findin
         diagnostics=[],
     )
     assert report.summary.reassuring_count == 0
-    assert report.summary.missing_information_count == 1
-    warning = report.sections[5].findings[0]
-    assert warning.sources[0].document_name == "dpe.pdf"
-    assert warning.sources[0].page_number == 2
+    assert report.summary.missing_information_count == 0
+    assert report.summary.finding_count == 0
+    assert all(not section.findings for section in report.sections)
+
+
+@pytest.mark.parametrize("analysis_type", list(AnalysisFindingType))
+def test_saved_report_hides_technical_findings_and_corrects_counts(
+    analysis_type: AnalysisFindingType,
+) -> None:
+    clean_report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=[
+            RiskFinding(
+                code="MISSING_DPE_DOCUMENT",
+                finding_key="MISSING_DPE_DOCUMENT",
+                category=RiskCategory.MISSING_INFORMATION,
+                severity=RiskSeverity.HIGH,
+                title="DPE absent",
+                description="Aucun DPE fourni.",
+                status=FindingStatus.MISSING_INFORMATION,
+            )
+        ],
+        document_names={},
+        dpe_documents=[],
+        diagnostics=[],
+    )
+    content = clean_report.model_dump(mode="json")
+    content["sections"][5]["findings"].append(
+        {
+            "code": "UNREAD_DOCUMENT_PAGES",
+            "finding_key": "UNREAD_DOCUMENT_PAGES:legacy",
+            "severity": "high",
+            "title": "Lecture incomplète",
+            "explanation": "Page 2.",
+            "status": "missing_information",
+            "analysis_type": analysis_type.value,
+            "sources": [],
+        }
+    )
+    summary = content["summary"]
+    summary["finding_count"] += 1
+    summary[f"{analysis_type.value}_count"] += 1
+    if analysis_type != AnalysisFindingType.MISSING_INFORMATION:
+        summary["analyzed_count"] += 1
+    if analysis_type == AnalysisFindingType.RISK:
+        summary["high_or_critical_count"] += 1
+        summary["risk_severity_counts"]["high"] += 1
+    record = ReportRecord(analysis_case_id=clean_report.analysis_case_id, content=content)
+
+    loaded = record.to_report()
+    assert loaded == clean_report
+    assert loaded.without_technical_findings() == clean_report
+    assert len(content["sections"][5]["findings"]) == 2
 
 
 def test_report_orders_sections_enriches_sources_and_keeps_uncertainty() -> None:

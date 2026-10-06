@@ -7,6 +7,8 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
+from openai import APIStatusError
+from pydantic import ValidationError
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
@@ -48,6 +50,7 @@ from app.property.normalization.structured_service import (
     structured_extraction_type,
 )
 from app.reports.models import ReportRecord
+from app.risks.models.findings import RiskFindingRecord
 from app.storage.object_storage import PrivateObjectStorage
 
 ACTIVE_STAGES = ("queued", "xberg", "vision", "classification", "structured")
@@ -85,6 +88,56 @@ def enqueue_document(session: Session, document: DocumentRecord) -> bool:
     session.commit()
     session.refresh(document)
     return result is not None
+
+
+def enqueue_page_retry(session: Session, document: DocumentRecord, page_number: int) -> None:
+    """Retry one unresolved page, preserving all other page transcriptions."""
+    session.refresh(document, with_for_update=True)
+    if document.processing_stage in ACTIVE_STAGES or (
+        document.lease_until is not None and utc(document.lease_until) > datetime.now(UTC)
+    ):
+        raise ValueError("La lecture et l’analyse de ce document sont déjà planifiées.")
+    extraction = DocumentRepository(session).get_extraction(document.id)
+    if extraction is None:
+        raise LookupError("Aucune extraction n’est disponible pour ce document.")
+    session.expire(extraction, ["pages"])
+    page = next((p for p in extraction.pages if p.page_number == page_number), None)
+    if page is None:
+        raise LookupError("Cette page n’existe pas dans l’extraction.")
+    if page.read_status not in UNREAD_STATUSES:
+        raise ValueError("Seules les pages dont la lecture est incomplète peuvent être relues.")
+
+    previous_status = page.read_status
+    page.read_status = "pending"
+    page.attempts = 0
+    page.next_attempt_at = None
+    page.vision_metadata = {
+        **{key: value for key, value in page.vision_metadata.items() if key != "error_code"},
+        "retry_previous_status": previous_status,
+    }
+    # Every derived result must incorporate the recovered text on the next pass.
+    for model in (DocumentClassificationRecord, DpeExtractionRecord, StructuredExtractionRecord):
+        session.execute(delete(model).where(model.document_id == document.id))
+    for case_model in (ReportRecord, RiskFindingRecord):
+        session.execute(
+            delete(case_model).where(case_model.analysis_case_id == document.analysis_case_id)
+        )
+    document.processing_stage = "vision"
+    document.status = DocumentStatus.EXTRACTING.value
+    document.failure_reason = None
+    document.processing_attempts = 0
+    document.next_attempt_at = datetime.now(UTC)
+    document.lease_token = None
+    document.lease_until = None
+    document.processing_progress = {
+        **document.processing_progress,
+        "processed_pages": sum(p.read_status not in PENDING_STATUSES for p in extraction.pages),
+        "unread_pages": [
+            p.page_number for p in extraction.pages if p.read_status in UNREAD_STATUSES
+        ],
+        "retry_reason": None,
+    }
+    session.commit()
 
 
 def claim_document(
@@ -313,6 +366,11 @@ class PersistentDocumentWorker:
                     elif output.content_kind == "no_text":
                         # Keep any short, confirmed Xberg text if vision misses it.
                         page.read_status = "read" if page.text.strip() or page.tables else "no_text"
+                        if page.read_status == "read" and page.vision_metadata.get(
+                            "retry_previous_status"
+                        ) in {"partial", "unreadable"}:
+                            # A contradictory retry cannot confirm previously uncertain text.
+                            page.read_status = str(page.vision_metadata["retry_previous_status"])
                     else:
                         if output.text.strip():
                             page.text = output.text
@@ -325,7 +383,8 @@ class PersistentDocumentWorker:
                         "input_tokens": result.input_tokens,
                         "output_tokens": result.output_tokens,
                         "content_kind": output.content_kind,
-                        "prompt_version": "vision-ocr-v1",
+                        "has_unreadable_regions": output.has_unreadable_regions,
+                        "prompt_version": "vision-ocr-v2",
                     }
                     self.session.commit()
                 except LostLease:
@@ -333,6 +392,16 @@ class PersistentDocumentWorker:
                 except Exception as error:
                     self.guard(document, token)
                     retryable = retryable_error(error)
+                    error_code = (
+                        "temporary_error"
+                        if retryable is not None
+                        else "invalid_transcription"
+                        if isinstance(error, ValidationError)
+                        else "provider_error"
+                        if isinstance(error, APIStatusError)
+                        else "reading_error"
+                    )
+                    page.vision_metadata = {**page.vision_metadata, "error_code": error_code}
                     if retryable is not None:
                         if page.attempts >= self.settings.vision_max_attempts:
                             page.read_status = "failed"
@@ -343,13 +412,14 @@ class PersistentDocumentWorker:
                             )
                     elif isinstance(error, Exception):
                         # Authentication, quota and permission errors affect all pages.
-                        from openai import APIStatusError
-
                         if isinstance(error, APIStatusError) and error.status_code in {
                             401,
                             403,
                             429,
                         }:
+                            page.read_status = "failed"
+                            page.extraction_method = "vision"
+                            self.session.commit()
                             raise
                         page.read_status = "failed"
                         page.extraction_method = "vision"

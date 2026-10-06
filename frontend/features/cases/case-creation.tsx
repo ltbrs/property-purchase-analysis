@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import {
   BillingPanel,
   fetchBillingSummary,
@@ -124,10 +125,9 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
 
   if (availableAnalyses === null) {
     return (
-      <section className="case-creation" aria-live="polite">
-        <div className="document-empty">Vérification de vos analyses disponibles…</div>
-        {error ? <p className="creation-error" role="alert">{error}</p> : null}
-      </section>
+      error ? <p className="creation-error" role="alert">{error}</p> : (
+        <LoadingState title="Vérification de vos analyses disponibles…" compact />
+      )
     );
   }
 

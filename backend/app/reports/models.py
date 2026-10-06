@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.risks.models import (
+    TECHNICAL_FINDING_CODES,
     DocumentExpectation,
     FindingReviewStatus,
     FindingStatus,
@@ -82,6 +83,86 @@ class BuyerReport(BaseModel):
     sections: list[ReportSection]
     disclaimer: str
 
+    def without_technical_findings(self) -> "BuyerReport":
+        """Hide technical entries in saved reports without requiring regeneration."""
+        removed = [
+            finding
+            for section in self.sections
+            for finding in section.findings
+            if finding.code in TECHNICAL_FINDING_CODES
+        ]
+        if not removed:
+            return self
+        removed_counts = {
+            kind: sum(finding.analysis_type == kind for finding in removed)
+            for kind in AnalysisFindingType
+        }
+        removed_risks = [
+            finding for finding in removed if finding.analysis_type == AnalysisFindingType.RISK
+        ]
+        summary = self.summary.model_copy(
+            update={
+                "finding_count": max(0, self.summary.finding_count - len(removed)),
+                "analyzed_count": max(
+                    0,
+                    self.summary.analyzed_count
+                    - sum(
+                        count
+                        for kind, count in removed_counts.items()
+                        if kind != AnalysisFindingType.MISSING_INFORMATION
+                    ),
+                ),
+                "risk_count": max(
+                    0, self.summary.risk_count - removed_counts[AnalysisFindingType.RISK]
+                ),
+                "verification_count": max(
+                    0,
+                    self.summary.verification_count
+                    - removed_counts[AnalysisFindingType.VERIFICATION],
+                ),
+                "missing_information_count": max(
+                    0,
+                    self.summary.missing_information_count
+                    - removed_counts[AnalysisFindingType.MISSING_INFORMATION],
+                ),
+                "reassuring_count": max(
+                    0,
+                    self.summary.reassuring_count - removed_counts[AnalysisFindingType.REASSURING],
+                ),
+                "high_or_critical_count": max(
+                    0,
+                    self.summary.high_or_critical_count
+                    - sum(
+                        finding.severity in {RiskSeverity.HIGH, RiskSeverity.CRITICAL}
+                        for finding in removed_risks
+                    ),
+                ),
+                "risk_severity_counts": {
+                    severity: max(
+                        0, count - sum(finding.severity == severity for finding in removed_risks)
+                    )
+                    for severity, count in self.summary.risk_severity_counts.items()
+                },
+            }
+        )
+        return self.model_copy(
+            update={
+                "summary": summary,
+                "sections": [
+                    section.model_copy(
+                        update={
+                            "findings": [
+                                finding
+                                for finding in section.findings
+                                if finding.code not in TECHNICAL_FINDING_CODES
+                            ],
+                        }
+                    )
+                    for section in self.sections
+                ],
+            }
+        )
+
 
 class BuyerReportPreview(BaseModel):
     analysis_case_id: UUID
@@ -119,7 +200,7 @@ class ReportRecord(Base):
         return record
 
     def to_report(self) -> BuyerReport:
-        return BuyerReport.model_validate(self.content)
+        return BuyerReport.model_validate(self.content).without_technical_findings()
 
 
 def report_generated_at() -> datetime:

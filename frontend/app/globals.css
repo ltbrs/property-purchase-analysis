@@ -2408,6 +2408,21 @@ svg {
   animation: spin 1.2s linear infinite;
 }
 
+.loading-state {
+  border: 1px solid var(--line);
+}
+
+.loading-state.is-compact {
+  min-height: 10rem;
+  padding: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-state .state-icon.is-loading svg {
+    animation: none;
+  }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -3544,6 +3559,30 @@ svg {
   border-radius: 0.8rem;
   background: var(--surface);
   box-shadow: var(--shadow-soft);
+}
+
+.raw-extraction-reading > div {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+  padding: 0 0.9rem 0.9rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.raw-extraction-reading p {
+  margin: 0;
+}
+
+.raw-extraction-reading button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.raw-extraction-error {
+  color: #b42318;
+  font-size: 0.75rem;
 }
 
 .dpe-viewer-dialog {

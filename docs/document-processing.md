@@ -27,10 +27,30 @@ auparavant. Aucun nouveau bucket ou fichier public n’est créé.
 Les pages portent `extraction_method` (`xberg`, `vision`), `read_status`, un
 nombre de tentatives et les métadonnées de consommation OpenAI. Les passages
 partiellement illisibles, les échecs et les pages au-delà du plafond produisent
-le constat déterministe `UNREAD_DOCUMENT_PAGES`, sourcé au document et aux pages.
+le signal interne `UNREAD_DOCUMENT_PAGES`, sourcé au document et aux pages.
+Ce signal technique ne figure ni dans les constats affichés ni dans les compteurs
+du rapport d’analyse, y compris pour les rapports déjà enregistrés.
 Les éléments rassurants de ces documents incomplets sont supprimés du rapport.
 
 ## Reprise et limites
+
+Les détails des échecs sont affichés dans la vue Extraction, sans avertissement
+de lecture incomplète dans la liste des documents ou le rapport d’analyse.
+Une page avec du texte extrait n’affiche pas de panneau de lecture partielle.
+Son statut reste conservé en interne. Le prompt demande de placer `[illisible]`
+à chaque passage concerné ; une page scannée ne constitue pas à elle seule une
+lecture partielle.
+
+`POST /api/v1/analysis-cases/{case_id}/documents/{document_id}/extraction/pages/{page_number}/retry`
+relance une seule page partielle, illisible, en échec ou au-delà du plafond.
+Cette action nécessite un dossier personnel avec analyse active et un document
+sans traitement en cours. Elle réinitialise les tentatives de la page choisie,
+conserve le texte déjà extrait et les autres pages, puis reprend directement
+la lecture visuelle. Une relance explicite peut lire une page au-delà du plafond
+automatique. La classification, les données structurées, les constats et le
+rapport précédents sont invalidés pour intégrer le nouveau texte à l’analyse.
+La vue Extraction suit automatiquement la progression et présente uniquement
+des raisons d’échec contrôlées, sans exposer les messages bruts du fournisseur.
 
 Les tâches utilisent une réservation atomique avec `FOR UPDATE SKIP LOCKED`,
 un jeton et une échéance. Les pages et chaque étape d’analyse sont persistées
@@ -108,7 +128,8 @@ Les tests utilisent des PDF textuels et des PDF réellement constitués d’imag
 avec faux appels fournisseur. Ils couvrent les pages omises, blanches et
 illustrées, les pieds de page, les plafonds, les citations, les `429`, le budget
 partagé, les réservations expirées, les lots interrompus, l’idempotence de
-`/process`, l’authentification du Cron et les avertissements dans le rapport.
+`/process`, l’authentification du Cron et l’exclusion des signaux techniques
+des constats et des compteurs du rapport, y compris les rapports enregistrés.
 Ils n’évaluent pas la précision OCR du modèle réel sur des documents clients.
 La commande explicite `uv run python -m evals.run_vision_evals` fournit un jeu
 de pages synthétiques pour mesurer rappel des montants/dates, latence et tokens

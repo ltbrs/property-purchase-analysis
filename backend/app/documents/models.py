@@ -123,6 +123,14 @@ class DocumentExtractionRecord(Base):
         order_by="DocumentExtractionPageRecord.page_number",
     )
 
+    @property
+    def processing_stage(self) -> str | None:
+        return self.document.processing_stage
+
+    @property
+    def failure_reason(self) -> str | None:
+        return self.document.failure_reason
+
 
 class DocumentExtractionPageRecord(Base):
     __tablename__ = "document_extraction_pages"
@@ -154,6 +162,18 @@ class DocumentExtractionPageRecord(Base):
     )
 
     extraction: Mapped[DocumentExtractionRecord] = relationship(back_populates="pages")
+
+    @property
+    def failure_reason(self) -> str | None:
+        # Never expose provider errors, which may include private document content.
+        return {
+            "temporary_error": (
+                "Une erreur temporaire du service de lecture a interrompu la transcription."
+            ),
+            "invalid_transcription": "Le service de lecture a renvoyé une transcription invalide.",
+            "provider_error": "Le service de lecture n’a pas pu traiter cette page.",
+            "reading_error": "Une erreur a interrompu la lecture de cette page.",
+        }.get(str((self.vision_metadata or {}).get("error_code")))
 
 
 class ProcessingProgress(BaseModel):
@@ -227,6 +247,7 @@ class ExtractionPageRead(BaseModel):
     tables: list[ExtractedTableRead]
     extraction_method: str = "xberg"
     read_status: str = "read"
+    failure_reason: str | None = None
 
 
 class DocumentExtractionRead(BaseModel):
@@ -239,6 +260,8 @@ class DocumentExtractionRead(BaseModel):
     duration_ms: int
     metadata: dict[str, object] = Field(validation_alias="document_metadata")
     pages: list[ExtractionPageRead]
+    processing_stage: str | None = None
+    failure_reason: str | None = None
     created_at: datetime
 
 

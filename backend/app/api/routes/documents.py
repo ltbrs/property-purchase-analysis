@@ -46,7 +46,12 @@ from app.documents.validation import (
     validate_pdf_bytes,
     validate_pdf_metadata,
 )
-from app.jobs.persistent_processing import ACTIVE_STAGES, enqueue_document, run_document_jobs
+from app.jobs.persistent_processing import (
+    ACTIVE_STAGES,
+    enqueue_document,
+    enqueue_page_retry,
+    run_document_jobs,
+)
 from app.llm import StructuredOutputClientDependency
 from app.llm.rate_budget import utc
 from app.property.models import (
@@ -74,7 +79,12 @@ from app.property.normalization.structured_service import (
 from app.property.reconciliation import TimelineEvent
 from app.reports import BuyerReport
 from app.reports.models import BuyerReportPreview
-from app.risks.models import FindingReviewStatus, FindingStatus, RiskFindingRead
+from app.risks.models import (
+    TECHNICAL_FINDING_CODES,
+    FindingReviewStatus,
+    FindingStatus,
+    RiskFindingRead,
+)
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 router = APIRouter(prefix="/analysis-cases", tags=["documents"])
@@ -434,7 +444,8 @@ def get_document_extraction(
     if extraction is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune extraction brute n’est disponible pour ce document.",
+            detail=document.failure_reason
+            or "Aucune extraction brute n’est disponible pour ce document.",
         )
     return DocumentExtractionRead.model_validate(extraction)
 
@@ -682,6 +693,44 @@ async def process_document(
             "ademe_verification_status": ademe_verification_status,
         }
     )
+
+
+@router.post(
+    "/{analysis_case_id}/documents/{document_id}/extraction/pages/{page_number}/retry",
+    response_model=DocumentRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def retry_document_page(
+    analysis_case_id: UUID,
+    document_id: UUID,
+    page_number: int,
+    current_user_id: CurrentUserId,
+    session: DatabaseSession,
+    storage: ObjectStorage,
+    parser: PdfParserDependency,
+    llm_client: StructuredOutputClientDependency,
+    background_tasks: BackgroundTasks,
+) -> DocumentRead:
+    repository = DocumentRepository(session)
+    document = repository.get_accessible_document(analysis_case_id, document_id, current_user_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    _require_mutable_owned_case(repository, analysis_case_id, current_user_id)
+    _require_active_analysis(BillingRepository(session), analysis_case_id, current_user_id)
+    try:
+        enqueue_page_retry(session, document, page_number)
+    except (LookupError, ValueError) as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND
+            if isinstance(error, LookupError)
+            else status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    background_tasks.add_task(
+        run_document_jobs, session.get_bind(), storage, parser, llm_client, document.id
+    )
+    return DocumentRead.model_validate(document)
 
 
 @router.delete(
@@ -962,6 +1011,7 @@ def list_case_findings(
     return [
         RiskFindingRead.model_validate(record)
         for record in repository.list_case_findings(analysis_case_id, current_user_id)
+        if record.code not in TECHNICAL_FINDING_CODES
     ]
 
 

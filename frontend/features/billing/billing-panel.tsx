@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { marketingRoutes } from "@/lib/routes";
 import { API_URL, readApiError } from "@/lib/workspace";
@@ -111,6 +112,16 @@ export function BillingPanel({
       );
       setLoadingOffer(null);
     }
+  }
+
+  if (summary === null) {
+    return (
+      <section className={`billing-panel${compact ? " is-compact" : ""}`} aria-label="Analyses disponibles">
+        {error ? <p className="billing-error" role="alert">{error}</p> : (
+          <LoadingState title="Chargement de vos analyses disponibles…" compact />
+        )}
+      </section>
+    );
   }
 
   return (

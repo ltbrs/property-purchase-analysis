@@ -39,6 +39,7 @@ export function ApplicationShell({ children, user, demoMode = false }: Applicati
   const [analysisCases, setAnalysisCases] = useState<AnalysisCase[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [caseLoadError, setCaseLoadError] = useState(false);
+  const [isLoadingCases, setIsLoadingCases] = useState(true);
 
   const caseNavItems: { href: string; label: string; icon: IconName }[] = demoMode
     ? [
@@ -76,8 +77,10 @@ export function ApplicationShell({ children, user, demoMode = false }: Applicati
           setCaseLoadError(false);
         }
       } catch {
-        if (!cancelled && demoMode) setCaseLoadError(true);
+        if (!cancelled) setCaseLoadError(true);
         // Page content owns service errors; navigation keeps its last stable state.
+      } finally {
+        if (!cancelled) setIsLoadingCases(false);
       }
     }
 
@@ -187,11 +190,11 @@ export function ApplicationShell({ children, user, demoMode = false }: Applicati
             </div>
           ) : (
             <p className="sidebar-cases-empty">
-              {demoMode
-                ? caseLoadError
-                  ? "Dossier indisponible"
-                  : "Chargement de la démonstration…"
-                : "Aucun dossier créé"}
+              {isLoadingCases
+                ? "Chargement des dossiers…"
+                : caseLoadError
+                  ? "Dossiers indisponibles"
+                  : "Aucun dossier créé"}
             </p>
           )}
         </section>
@@ -263,7 +266,7 @@ export function ApplicationShell({ children, user, demoMode = false }: Applicati
                   ? "Démonstration fictive"
                   : "Dossier d’achat"}
             </span>
-            <strong>{isGlobalView ? "Tous les dossiers" : activeCase?.title ?? (demoMode ? "Dossier de démonstration" : "Aucun dossier sélectionné")}</strong>
+            <strong>{isGlobalView ? "Tous les dossiers" : activeCase?.title ?? (isLoadingCases ? "Chargement du dossier…" : demoMode ? "Dossier de démonstration" : "Aucun dossier sélectionné")}</strong>
           </div>
           {isGlobalView ? (
             <button className="primary-action" type="button" onClick={requestCaseCreation}>

@@ -22,6 +22,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.property.normalization.dpe import SourceReference
 
+TECHNICAL_FINDING_CODES = frozenset({"UNREAD_DOCUMENT_PAGES"})
+
 
 class RiskCategory(StrEnum):
     ENERGY = "energy"

@@ -13,7 +13,7 @@ import {
 } from "@/lib/workspace";
 
 export function DemoPreference() {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,16 +78,20 @@ export function DemoPreference() {
           Un exemple fictif en lecture seule pour découvrir un rapport Acquora complet.
         </span>
       </div>
-      <label className="preference-switch">
-        <input
-          type="checkbox"
-          checked={isVisible}
-          disabled={isLoading || isSaving}
-          onChange={(event) => void changeVisibility(event.currentTarget.checked)}
-        />
-        <span aria-hidden="true" />
-        <small>{isSaving ? "Enregistrement…" : isVisible ? "Affiché" : "Masqué"}</small>
-      </label>
+      {isLoading ? (
+        <span role="status">Chargement de la préférence…</span>
+      ) : isVisible !== null ? (
+        <label className="preference-switch">
+          <input
+            type="checkbox"
+            checked={isVisible}
+            disabled={isSaving}
+            onChange={(event) => void changeVisibility(event.currentTarget.checked)}
+          />
+          <span aria-hidden="true" />
+          <small>{isSaving ? "Enregistrement…" : isVisible ? "Affiché" : "Masqué"}</small>
+        </label>
+      ) : null}
       {error ? <p className="preference-error" role="alert">{error}</p> : null}
     </section>
   );

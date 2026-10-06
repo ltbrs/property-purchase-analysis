@@ -25,6 +25,7 @@ type ExtractionPage = {
   tables: ExtractedTable[];
   extraction_method: string;
   read_status: string;
+  failure_reason: string | null;
 };
 
 type RawExtraction = {
@@ -34,23 +35,51 @@ type RawExtraction = {
   metadata: Record<string, unknown>;
   pages: ExtractionPage[];
   created_at: string;
+  processing_stage: string | null;
+  failure_reason: string | null;
 };
+
+const retryablePageStatuses = ["unreadable", "failed", "limit_exceeded"];
+
+function pageReadingMessage(page: ExtractionPage) {
+  switch (page.read_status) {
+    case "unreadable": return "Le service de lecture n’a pas pu déchiffrer le texte de cette page.";
+    case "failed": return page.failure_reason || "La lecture de cette page a échoué. Vous pouvez réessayer.";
+    case "limit_exceeded": return "Cette page n’a pas été lue car la limite de pages scannées a été atteinte.";
+    case "retry": return page.failure_reason || "Une nouvelle tentative de lecture est programmée.";
+    case "pending": return "Lecture de cette page en attente.";
+    default: return null;
+  }
+}
 
 export function RawExtractionViewer({
   document,
   onClose,
   publicDemo = false,
+  canRetry = false,
+  processing = false,
+  onRetryStarted,
 }: {
   document: RawExtractionSelection;
   onClose: () => void;
   publicDemo?: boolean;
+  canRetry?: boolean;
+  processing?: boolean;
+  onRetryStarted?: () => void;
 }) {
   const [extraction, setExtraction] = useState<RawExtraction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryingPage, setRetryingPage] = useState<number | null>(null);
   const closeButtonRef = useDocumentDialog(onClose);
+  const isProcessing = processing || !!(extraction?.processing_stage
+    && !["completed", "failed"].includes(extraction.processing_stage));
+  const hasPendingPages = extraction?.processing_stage !== "failed"
+    && (extraction?.pages.some((page) => ["pending", "retry"].includes(page.read_status)) ?? false);
 
   useEffect(() => {
     const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function loadExtraction() {
       const workspace = publicDemo ? null : getWorkspace();
@@ -71,7 +100,10 @@ export function RawExtractionViewer({
         );
         if (!response.ok) throw new Error(await readApiError(response));
         const loadedExtraction = (await response.json()) as RawExtraction;
-        if (!controller.signal.aborted) setExtraction(loadedExtraction);
+        if (!controller.signal.aborted) {
+          setExtraction(loadedExtraction);
+          setError(null);
+        }
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(
@@ -79,14 +111,45 @@ export function RawExtractionViewer({
             ? loadError.message
             : "L’extraction brute ne peut pas être affichée pour le moment.",
         );
+      } finally {
+        if (!controller.signal.aborted && (isProcessing || hasPendingPages)) {
+          timer = setTimeout(() => void loadExtraction(), 3000);
+        }
       }
     }
 
     void loadExtraction();
     return () => {
       controller.abort();
+      clearTimeout(timer);
     };
-  }, [document.documentId, publicDemo]);
+  }, [document.documentId, publicDemo, isProcessing, hasPendingPages]);
+
+  async function retryPage(pageNumber: number) {
+    const workspace = getWorkspace();
+    if (!workspace || publicDemo || !canRetry || retryingPage !== null || isProcessing || hasPendingPages) return;
+    setRetryingPage(pageNumber);
+    setRetryError(null);
+    try {
+      const response = await fetch(
+        `${API_URL}/analysis-cases/${workspace.caseId}/documents/${document.documentId}/extraction/pages/${pageNumber}/retry`,
+        { method: "POST" },
+      );
+      if (!response.ok) throw new Error(await readApiError(response));
+      setExtraction((current) => current ? {
+        ...current,
+        processing_stage: "vision",
+        failure_reason: null,
+        pages: current.pages.map((page) => page.page_number === pageNumber
+          ? { ...page, read_status: "pending", failure_reason: null } : page),
+      } : current);
+      onRetryStarted?.();
+    } catch (retryFailure) {
+      setRetryError(retryFailure instanceof Error ? retryFailure.message : "La nouvelle lecture n’a pas pu être lancée.");
+    } finally {
+      setRetryingPage(null);
+    }
+  }
 
   return (
     <div className="pdf-viewer-layer">
@@ -119,7 +182,7 @@ export function RawExtractionViewer({
         </header>
 
         <div className="raw-extraction-content">
-          {error ? (
+          {error && !extraction ? (
             <div className="pdf-viewer-state" role="alert">
               <span className="state-icon"><Icon name="alert" /></span>
               <strong>Extraction indisponible</strong>
@@ -150,6 +213,8 @@ export function RawExtractionViewer({
                 transcription OpenAI des pages scannées. Les passages illisibles
                 restent signalés. Vous pouvez comparer chaque page au document original.
               </p>
+              {error || retryError ? <p className="raw-extraction-error" role="alert">{retryError || error}</p> : null}
+              {extraction.failure_reason ? <p className="raw-extraction-error" role="status">{extraction.failure_reason}</p> : null}
               <div className="raw-extraction-pages">
                 {extraction.pages.map((page) => (
                   <article className="raw-extraction-page" key={page.page_number}>
@@ -163,10 +228,27 @@ export function RawExtractionViewer({
                           : ""}
                       </span>
                     </header>
-                    {["partial", "unreadable", "failed", "limit_exceeded"].includes(page.read_status) ? (
-                      <p role="status">Lecture incomplète. Certains passages n’ont pas pu être transcrits.</p>
-                    ) : ["pending", "retry"].includes(page.read_status) ? (
-                      <p role="status">Lecture de cette page en attente.</p>
+                    {pageReadingMessage(page) ? (
+                      <details className="raw-extraction-reading" open>
+                        <summary>{["pending", "retry"].includes(page.read_status)
+                            ? extraction.processing_stage === "failed" ? "Lecture interrompue" : "Lecture en cours"
+                            : "Lecture à relancer"}</summary>
+                        <div>
+                          <p role="status">{extraction.processing_stage === "failed" && ["pending", "retry"].includes(page.read_status)
+                            ? "La lecture de cette page a été interrompue." : pageReadingMessage(page)}</p>
+                          {!publicDemo && canRetry && retryablePageStatuses.includes(page.read_status) ? (
+                            <button
+                              type="button"
+                              className="raw-extraction-button"
+                              disabled={retryingPage !== null || isProcessing || hasPendingPages}
+                              onClick={() => void retryPage(page.page_number)}
+                            >
+                              <Icon name="refresh" />
+                              {retryingPage === page.page_number ? "Relance en cours…" : `Réessayer la page ${page.page_number}`}
+                            </button>
+                          ) : null}
+                        </div>
+                      </details>
                     ) : null}
                     <pre>{page.text.trim() || "Aucun texte détecté sur cette page."}</pre>
                     {page.tables.map((table, index) => (

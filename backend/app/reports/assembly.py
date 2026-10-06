@@ -23,6 +23,7 @@ from app.reports.models import (
     report_generated_at,
 )
 from app.risks.models import (
+    TECHNICAL_FINDING_CODES,
     FindingReviewStatus,
     FindingStatus,
     RiskCategory,
@@ -213,6 +214,8 @@ def build_buyer_report(
         if finding.code == "UNREAD_DOCUMENT_PAGES"
         for source in finding.sources
     }
+    # Reading quality remains an internal completeness signal, not a property finding.
+    findings = [finding for finding in findings if finding.code not in TECHNICAL_FINDING_CODES]
     for finding in findings:
         analysis_type = _analysis_type_for_finding(finding)
         section = (

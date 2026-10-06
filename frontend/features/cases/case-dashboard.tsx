@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import { CaseCreation } from "@/features/cases/case-creation";
 import { propertyTypeLabels } from "@/features/documents/document-catalog";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
@@ -126,11 +127,11 @@ export function CaseDashboard() {
             <p className="section-kicker">Portefeuille</p>
             <h2 id="case-library-title">Tous les dossiers</h2>
           </div>
-          <span>{analysisCases.length}</span>
+          {isLoading || error ? null : <span>{analysisCases.length}</span>}
         </div>
 
         {isLoading ? (
-          <div className="document-empty">Chargement des dossiers…</div>
+          <LoadingState title="Chargement des dossiers…" compact />
         ) : analysisCases.length > 0 ? (
           <div className="case-grid">
             {analysisCases.map((analysisCase) => {
@@ -165,7 +166,7 @@ export function CaseDashboard() {
               );
             })}
           </div>
-        ) : (
+        ) : error ? null : (
           <div className="case-library-empty">
             <span><Icon name="folder" /></span>
             <strong>Aucun dossier pour le moment</strong>

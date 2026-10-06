@@ -14,6 +14,10 @@ unreadable (texte présent mais illisible). Transcris exclusivement le texte vis
 dans l'ordre de lecture. Préserve nombres, dates, unités et alignement des tableaux
 en texte. N'invente et ne complète rien, même si le contexte semble évident.
 Pour un passage illisible, écris [illisible] et indique has_unreadable_regions=true.
+Signale uniquement du texte présent que tu ne peux pas déchiffrer, pas une page
+scannée, un défaut de mise en page, une zone blanche ou une illustration.
+Si has_unreadable_regions=true, marque chaque passage concerné avec [illisible]
+à sa position dans la transcription. Si tout le texte est lisible, indique false.
 Ne résume pas, n'analyse pas et ne déduis aucune information. Aucun texte pour no_text.
 """
 

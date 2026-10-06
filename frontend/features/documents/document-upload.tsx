@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AdemeMark } from "@/components/ademe-mark";
 import { Icon } from "@/components/icons";
+import { LoadingState } from "@/components/loading-state";
 import {
   BillingPanel,
   type BillingSummary,
@@ -229,7 +230,7 @@ function DocumentFile({
   onViewExtraction: (document: UploadedDocument) => void;
   onView: (document: UploadedDocument) => void;
 }) {
-  const canViewExtraction = ["extracted", "analyzing", "completed"].includes(
+  const canViewExtraction = ["extracting", "extracted", "analyzing", "completed", "failed"].includes(
     document.status,
   );
   const isAdemeVerified = document.ademe_verification_status === "verified";
@@ -333,14 +334,6 @@ function DocumentFile({
               </span>
             ) : null}
           </div>
-        ) : null}
-        {document.processing_progress?.unread_pages.length > 0 ? (
-          <p className="document-failure" role="status">
-            Lecture incomplète, pages {document.processing_progress.unread_pages.join(", ")}. Leur contenu manquant ne peut pas être vérifié.
-          </p>
-        ) : null}
-        {document.failure_reason ? (
-          <span className="document-failure">{document.failure_reason}</span>
         ) : null}
         <div className="document-actions">
           <button
@@ -472,6 +465,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
   const [readOnly, setReadOnly] = useState(publicDemo);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initializationAttempt, setInitializationAttempt] = useState(0);
   const [needsWorkspace, setNeedsWorkspace] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -545,6 +539,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
           fetchDocuments(currentWorkspace, publicDemo),
           fetchAnalysisCase(currentWorkspace, publicDemo),
         ]);
+        if (cancelled) return;
 
         if (documentsResponse.status === 404 || caseResponse.status === 404) {
           if (publicDemo) {
@@ -585,7 +580,31 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
     return () => {
       cancelled = true;
     };
-  }, [publicDemo]);
+  }, [publicDemo, initializationAttempt]);
+
+  if (isInitializing) {
+    return (
+      <LoadingState
+        title="Chargement des documents…"
+        description="Nous récupérons les pièces et les informations de votre dossier."
+      />
+    );
+  }
+
+  if (error && !workspace) {
+    return (
+      <div className="report-state report-error" role="alert">
+        <span className="state-icon"><Icon name="alert" /></span>
+        <strong>Documents indisponibles</strong>
+        <span>{error}</span>
+        <button type="button" onClick={() => {
+          setError(null);
+          setIsInitializing(true);
+          setInitializationAttempt((attempt) => attempt + 1);
+        }}>Réessayer</button>
+      </div>
+    );
+  }
 
   if (needsWorkspace) {
     return (
@@ -1114,9 +1133,15 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
       ) : null}
       {viewingExtraction ? (
         <RawExtractionViewer
+          key={viewingExtraction.documentId}
           document={viewingExtraction}
           onClose={() => setViewingExtraction(null)}
           publicDemo={publicDemo}
+          canRetry={!readOnly && analysisAccessStatus === "active"}
+          processing={documents.some((document) => document.id === viewingExtraction.documentId
+            && !!document.processing_stage
+            && !["completed", "failed"].includes(document.processing_stage))}
+          onRetryStarted={() => void refreshDocuments()}
         />
       ) : null}
       {viewingDpe ? (

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 from openai import RateLimitError
 from PIL import Image, ImageDraw
 from sqlalchemy import create_engine, select
@@ -15,10 +16,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import Settings
-from app.core.database import Base
+from app.core.database import Base, get_db_session
 from app.documents.classification.models import DocumentClassificationCandidate
 from app.documents.llm_content import extraction_as_numbered_text, page_source_text
-from app.documents.models import DocumentExtractionPageRecord, DocumentRecord
+from app.documents.models import (
+    DocumentExtractionPageRecord,
+    DocumentExtractionRead,
+    DocumentRecord,
+)
+from app.documents.parsers import get_pdf_parser
 from app.documents.parsers.base import ParsedPage, ParsedPdf, ParsedTable, PdfParserError
 from app.documents.parsers.page_inspection import inspect_pages, render_page_image
 from app.documents.parsers.vision import PageTranscription
@@ -27,10 +33,17 @@ from app.jobs.persistent_processing import (
     PersistentDocumentWorker,
     claim_document,
     enqueue_document,
+    enqueue_page_retry,
 )
+from app.llm import get_structured_output_client
 from app.llm.rate_budget import DeferredLLMCall, LLMRateBudget, retry_at_for
 from app.llm.structured_output import StructuredOutputResult
+from app.main import create_app
+from app.reports.models import ReportRecord
+from app.risks.models.findings import RiskFindingRecord
 from app.risks.rules.unread_pages import unread_page_findings
+from app.storage.object_storage import get_object_storage
+from tests.billing_fixtures import grant_analysis_access
 from tests.pdf_fixtures import make_text_pdf
 
 
@@ -272,6 +285,189 @@ def test_illisible_marker_is_always_treated_as_partial() -> None:
     assert transcription("Montant [illisible]").has_unreadable_regions is True
 
 
+def test_readable_scan_is_not_marked_partial() -> None:
+    assert not transcription().has_unreadable_regions
+
+
+@pytest.mark.parametrize("status", ["partial", "failed", "unreadable", "limit_exceeded"])
+def test_page_retry_preserves_other_pages_and_refreshes_analysis(
+    session: Session, status: str
+) -> None:
+    document = document_for(session)
+    runner = worker(
+        session,
+        image_pdf([scanned_image()] * 2),
+        VisionClient(
+            [transcription("Budget [illisible]"), transcription("Texte confirmé")], pages=2
+        ),
+    )
+    enqueue_document(session, document)
+    claimed = claim_document(session, runner.settings)
+    assert claimed is not None
+    asyncio.run(runner.run(claimed))
+    extraction = runner.repository.get_extraction(document.id)
+    assert extraction is not None
+    page, healthy_page = extraction.pages
+    page.text = "Budget [illisible]"
+    page.read_status = status
+    page.attempts = runner.settings.vision_max_attempts
+    page.vision_metadata = {**page.vision_metadata, "error_code": "temporary_error"}
+    old_classification_id = runner.repository.list_document_classifications(document.id)[0].id
+    report = ReportRecord(analysis_case_id=document.analysis_case_id, content={})
+    finding = unread_page_findings([extraction])[0]
+    session.add(report)
+    session.add(
+        RiskFindingRecord.from_finding(analysis_case_id=document.analysis_case_id, finding=finding)
+    )
+    session.commit()
+    healthy_text = healthy_page.text
+    healthy_metadata = healthy_page.vision_metadata.copy()
+
+    enqueue_page_retry(session, document, 1)
+    assert document.processing_stage == "vision"
+    assert page.read_status == "pending" and page.attempts == 0
+    assert page.text == "Budget [illisible]"
+    assert runner.repository.list_document_classifications(document.id) == []
+    assert session.scalar(select(ReportRecord)) is None
+    assert session.scalar(select(RiskFindingRecord)) is None
+    with pytest.raises(ValueError, match="déjà planifiées"):
+        enqueue_page_retry(session, document, 1)
+    session.rollback()
+
+    resumed = worker(
+        session, runner.storage.pdf, VisionClient([transcription("Budget 48000 EUR")], pages=2)
+    )
+    claimed = claim_document(session, resumed.settings)
+    assert claimed is not None
+    asyncio.run(resumed.run(claimed))
+    session.refresh(healthy_page)
+    assert resumed.parser.calls == 0
+    assert resumed.client.calls == 1
+    assert healthy_page.text == healthy_text
+    assert healthy_page.vision_metadata == healthy_metadata
+    assert healthy_page.attempts == 1
+    session.refresh(page)
+    assert page.text == "Budget 48000 EUR" and page.read_status == "read"
+    assert page.failure_reason is None
+    assert document.status == "completed"
+    assert document.processing_progress["unread_pages"] == []
+    new_classification = resumed.repository.list_document_classifications(document.id)[0]
+    assert new_classification.id != old_classification_id
+
+
+def test_page_retry_rejects_missing_and_successful_pages(session: Session) -> None:
+    document = document_for(session)
+    runner = worker(session, image_pdf([scanned_image()]), VisionClient([transcription()]))
+    enqueue_document(session, document)
+    claimed = claim_document(session, runner.settings)
+    assert claimed is not None
+    asyncio.run(runner.run(claimed))
+    with pytest.raises(LookupError):
+        enqueue_page_retry(session, document, 2)
+    session.rollback()
+    with pytest.raises(ValueError, match="Seules les pages"):
+        enqueue_page_retry(session, document, 1)
+    session.rollback()
+    assert document.status == "completed"
+    assert len(runner.repository.list_document_classifications(document.id)) == 1
+
+
+def test_retry_without_text_does_not_confirm_a_previous_partial_transcription(
+    session: Session,
+) -> None:
+    document = document_for(session)
+    runner = worker(
+        session, image_pdf([scanned_image()]), VisionClient([transcription("Budget [illisible]")])
+    )
+    enqueue_document(session, document)
+    claimed = claim_document(session, runner.settings)
+    assert claimed is not None
+    asyncio.run(runner.run(claimed))
+    enqueue_page_retry(session, document, 1)
+    resumed = worker(
+        session,
+        runner.storage.pdf,
+        VisionClient(
+            [PageTranscription(content_kind="no_text", text="", has_unreadable_regions=False)]
+        ),
+    )
+    claimed = claim_document(session, resumed.settings)
+    assert claimed is not None
+    asyncio.run(resumed.run(claimed))
+    extraction = resumed.repository.get_extraction(document.id)
+    assert extraction is not None
+    assert extraction.pages[0].text == "Budget [illisible]"
+    assert extraction.pages[0].read_status == "partial"
+    assert document.processing_progress["unread_pages"] == [1]
+
+
+def test_page_retry_api_requires_ownership_access_and_idle_document(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = document_for(session)
+    repository = DocumentRepository(session)
+    extraction = repository.save_extraction(
+        document,
+        ParsedPdf(
+            pages=[ParsedPage(page_number=1, text="Montant [illisible]", read_status="partial")]
+        ),
+        "xberg",
+        "test",
+        1,
+    )
+    document.status = "completed"
+    document.processing_stage = "completed"
+    session.commit()
+    application = create_app()
+    application.dependency_overrides[get_db_session] = lambda: session
+    application.dependency_overrides[get_object_storage] = lambda: Storage(b"")
+    application.dependency_overrides[get_pdf_parser] = lambda: FakeParser()
+    application.dependency_overrides[get_structured_output_client] = lambda: VisionClient([])
+    jobs = []
+
+    async def capture_job(*args: Any) -> None:
+        jobs.append(args[-1])
+
+    monkeypatch.setattr("app.api.routes.documents.run_document_jobs", capture_job)
+    url = (
+        f"/api/v1/analysis-cases/{document.analysis_case_id}/documents/{document.id}"
+        "/extraction/pages/1/retry"
+    )
+    owner_id = document.analysis_case.user_id
+    assert owner_id is not None
+    headers = {"X-User-Id": str(owner_id)}
+    with TestClient(application) as client:
+        assert client.post(url, headers={"X-User-Id": str(uuid4())}).status_code == 404
+        assert client.post(url, headers=headers).status_code == 402
+        grant_analysis_access(session, owner_id, document.analysis_case_id)
+        case = document.analysis_case
+        case.case_kind = "demo"
+        case.user_id = None
+        case.template_key = "retry-test"
+        case.template_manifest_sha256 = "a" * 64
+        case.access_mode = "grandfathered"
+        case.published_at = datetime.now(UTC)
+        session.commit()
+        assert client.post(url, headers=headers).status_code == 409
+        case.case_kind = "user"
+        case.user_id = owner_id
+        case.template_key = None
+        case.template_manifest_sha256 = None
+        case.access_mode = "standard"
+        case.published_at = None
+        document.processing_stage = "vision"
+        session.commit()
+        assert client.post(url, headers=headers).status_code == 409
+        document.processing_stage = "completed"
+        session.commit()
+        response = client.post(url, headers=headers)
+        assert response.status_code == 202
+        assert response.json()["processing_stage"] == "vision"
+        assert extraction.pages[0].read_status == "pending"
+        assert client.post(url, headers=headers).status_code == 409
+    assert jobs == [document.id]
+
+
 def rate_limit(headers: dict[str, str] | None = None) -> RateLimitError:
     return RateLimitError(
         "rate limit",
@@ -390,6 +586,10 @@ def test_exhausted_attempts_and_partial_pages_create_missing_information(session
     extraction = runner.repository.get_extraction(document.id)
     assert extraction is not None
     assert [p.read_status for p in extraction.pages] == ["failed", "partial"]
+    response = DocumentExtractionRead.model_validate(extraction)
+    assert response.pages[0].failure_reason is not None
+    assert "erreur temporaire" in response.pages[0].failure_reason
+    assert response.pages[1].failure_reason is None
     findings = unread_page_findings([extraction])
     assert findings[0].code == "UNREAD_DOCUMENT_PAGES"
     assert [source.page_number for source in findings[0].sources] == [1, 2]
