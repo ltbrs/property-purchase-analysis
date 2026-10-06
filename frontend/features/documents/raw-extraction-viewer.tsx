@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { useDocumentDialog } from "@/features/documents/use-document-dialog";
 import { API_URL, PUBLIC_DEMO_API_URL, getWorkspace, readApiError } from "@/lib/workspace";
 
 export type RawExtractionSelection = {
@@ -46,14 +47,10 @@ export function RawExtractionViewer({
 }) {
   const [extraction, setExtraction] = useState<RawExtraction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useDocumentDialog(onClose);
 
   useEffect(() => {
     const controller = new AbortController();
-    const previousActiveElement = window.document.activeElement;
-    const previousOverflow = window.document.body.style.overflow;
-    window.document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
 
     async function loadExtraction() {
       const workspace = publicDemo ? null : getWorkspace();
@@ -73,7 +70,8 @@ export function RawExtractionViewer({
           },
         );
         if (!response.ok) throw new Error(await readApiError(response));
-        setExtraction((await response.json()) as RawExtraction);
+        const loadedExtraction = (await response.json()) as RawExtraction;
+        if (!controller.signal.aborted) setExtraction(loadedExtraction);
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(
@@ -84,19 +82,11 @@ export function RawExtractionViewer({
       }
     }
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
     void loadExtraction();
-    window.addEventListener("keydown", closeOnEscape);
     return () => {
       controller.abort();
-      window.removeEventListener("keydown", closeOnEscape);
-      window.document.body.style.overflow = previousOverflow;
-      if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
-  }, [document.documentId, onClose, publicDemo]);
+  }, [document.documentId, publicDemo]);
 
   return (
     <div className="pdf-viewer-layer">
