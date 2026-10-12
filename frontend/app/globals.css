@@ -3197,11 +3197,11 @@ svg {
 }
 
 .ademe-verification.has-inconsistencies > span,
-.ademe-verification.is-not-found > span {
+.ademe-verification.needs-verification > span {
   background: var(--amber);
 }
 
-.ademe-verification.is-not-found {
+.ademe-verification.needs-verification {
   color: #664e1a;
   background: #f7edd2;
 }
@@ -3627,19 +3627,8 @@ svg {
   background: #f7edd2;
 }
 
-.dpe-verification-icon {
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
+.dpe-verification-card > .ademe-verification {
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.65);
-}
-
-.dpe-verification-icon svg {
-  width: 1.05rem;
-  height: 1.05rem;
 }
 
 .dpe-verification-card > div {
