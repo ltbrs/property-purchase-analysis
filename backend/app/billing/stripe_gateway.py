@@ -1,3 +1,5 @@
+import secrets
+import string
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Protocol
@@ -44,6 +46,7 @@ class StripeSdkGateway:
     def __init__(self, secret_key: str, webhook_secret: str) -> None:
         self._client = stripe.StripeClient(secret_key, max_network_retries=2)
         self._webhook_secret = webhook_secret
+        self._live_mode = secret_key.startswith(("sk_live_", "rk_live_"))
 
     def create_checkout_session(
         self,
@@ -58,8 +61,13 @@ class StripeSdkGateway:
     ) -> CreatedCheckoutSession:
         params: SessionCreateParams = {
             "mode": "payment",
-            "ui_mode": "hosted",
+            "ui_mode": "hosted_page",
             "locale": "fr",
+            # Fulfillment requires the advertised EUR total and direct Acquora payments.
+            "managed_payments": {"enabled": False},
+            "adaptive_pricing": {"enabled": False},
+            "integration_identifier": "acquora_"
+            + "".join(secrets.choice(string.ascii_lowercase) for _ in range(8)),
             "success_url": success_url,
             "cancel_url": cancel_url,
             "client_reference_id": str(purchase_id),
@@ -81,15 +89,17 @@ class StripeSdkGateway:
         return CreatedCheckoutSession(id=session.id, url=session.url)
 
     def construct_webhook_event(self, payload: bytes, signature: str) -> VerifiedStripeEvent:
-        event = stripe.Webhook.construct_event(  # type: ignore[no-untyped-call]
+        event = stripe.Webhook.construct_event(
             payload,
             signature,
             self._webhook_secret,
         )
+        if event.livemode != self._live_mode:
+            raise ValueError("Stripe webhook mode does not match the configured API key")
         return VerifiedStripeEvent(
             id=event.id,
             type=event.type,
-            data_object=dict(event.data.object),
+            data_object=event.data.object.to_dict(),
         )
 
 
@@ -101,8 +111,17 @@ def get_stripe_gateway() -> StripeSdkGateway:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Le paiement n’est pas configuré.",
         )
+    key = settings.stripe_secret_key.get_secret_value()
+    prefixes = (
+        ("sk_live_", "rk_live_") if settings.app_env == "production" else ("sk_test_", "rk_test_")
+    )
+    if not key.startswith(prefixes):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Le paiement n’est pas configuré pour cet environnement.",
+        )
     return StripeSdkGateway(
-        settings.stripe_secret_key.get_secret_value(),
+        key,
         settings.stripe_webhook_secret.get_secret_value(),
     )
 
