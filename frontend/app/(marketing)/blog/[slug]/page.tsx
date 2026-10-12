@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { ButtonLink } from "@/components/design-system/button-link";
 import { Icon } from "@/components/icons";
+import { PptArticleContent } from "@/components/marketing/ppt-article";
 import {
   blogArticles,
   formatBlogDate,
@@ -105,9 +106,11 @@ function ArticleByline({ article }: Readonly<{ article: BlogArticle }>) {
       <time dateTime={article.publishedAt}>
         Publié le {formatBlogDate(article.publishedAt)}
       </time>
-      <time dateTime={article.modifiedAt}>
-        Mis à jour le {formatBlogDate(article.modifiedAt)}
-      </time>
+      {article.modifiedAt !== article.publishedAt && (
+        <time dateTime={article.modifiedAt}>
+          Mis à jour le {formatBlogDate(article.modifiedAt)}
+        </time>
+      )}
       <span>{article.readingTime} de lecture</span>
     </div>
   );
@@ -287,6 +290,8 @@ function DocumentsArticle({ article }: Readonly<{ article: BlogArticle }>) {
               son projet lorsqu’il a été élaboré, complète la vision à moyen terme.
               Comparez ces documents aux procès-verbaux : un poste coûteux peut être
               décrit dans une étude sans être encore voté.
+              Notre guide du <Link href="/blog/plan-pluriannuel-travaux-avant-achat">plan pluriannuel de travaux avant achat</Link>{" "}
+              propose une méthode pour relier ces estimations au budget de votre lot.
             </p>
 
             <h2 id="diagnostics">2. Le dossier de diagnostic technique</h2>
@@ -838,6 +843,7 @@ function VotedWorksArticle({ article }: Readonly<{ article: BlogArticle }>) {
               ans. Recherchez dans les procès-verbaux une résolution adoptée, puis
               son montant, sa clé de répartition et ses dates d’exigibilité. Sans
               ce vote, conservez le poste parmi les coûts possibles à clarifier.
+              Consultez aussi notre guide pour <Link href="/blog/plan-pluriannuel-travaux-avant-achat">lire le plan pluriannuel de travaux avant d’acheter</Link>.
             </p>
 
             <section className="article-sources" aria-labelledby="sources-title">
@@ -883,5 +889,59 @@ export default async function BlogArticlePage({ params }: BlogArticlePageProps) 
   if (!article) notFound();
   if (article.slug === "documents-achat-appartement") return <DocumentsArticle article={article} />;
   if (article.slug === "travaux-votes-avant-compromis") return <VotedWorksArticle article={article} />;
+  if (article.slug === "plan-pluriannuel-travaux-avant-achat") return <PptArticle article={article} />;
   notFound();
+}
+
+function PptArticle({ article }: Readonly<{ article: BlogArticle }>) {
+  return (
+    <>
+      <JsonLd article={article} />
+      <article className="blog-article">
+        <nav className="blog-breadcrumb" aria-label="Fil d’Ariane">
+          <Link href={marketingRoutes.home}>Accueil</Link>
+          <span aria-hidden="true">/</span>
+          <Link href={marketingRoutes.blog}>Blog</Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{article.title}</span>
+        </nav>
+        <header className="article-header">
+          <Link className="article-category" href={article.categoryHref}>{article.category}</Link>
+          <h1>{article.title}</h1>
+          <p className="article-standfirst">
+            Le plan pluriannuel de travaux donne une vue des besoins de l’immeuble
+            sur dix ans. Pour préparer votre achat, rapprochez ses estimations des
+            votes, du financement et de la situation de votre lot.
+          </p>
+          <ArticleByline article={article} />
+        </header>
+        <figure className="article-cover">
+          <Image
+            src={article.cover}
+            alt={article.coverAlt}
+            fill
+            preload
+            sizes="(max-width: 56rem) calc(100vw - 2rem), 864px"
+          />
+        </figure>
+        <div className="article-layout">
+          <aside className="article-toc" aria-label="Sommaire">
+            <strong>Dans ce guide</strong>
+            <ol>
+              <li><a href="#projet-plan-vote">Projet, plan et vote</a></li>
+              <li><a href="#obligation">Les immeubles concernés</a></li>
+              <li><a href="#lecture">Les points à lire</a></li>
+              <li><a href="#budget">Votre budget par lot</a></li>
+              <li><a href="#plan-manquant">Un plan manquant</a></li>
+              <li><a href="#checklist">Avant le compromis</a></li>
+              <li><a href="#sources-title">Les sources officielles</a></li>
+            </ol>
+          </aside>
+          <div className="article-body">
+            <PptArticleContent />
+          </div>
+        </div>
+      </article>
+    </>
+  );
 }

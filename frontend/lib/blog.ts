@@ -23,6 +23,22 @@ export type BlogArticle = Readonly<{
 
 export const blogArticles = [
   {
+    slug: "plan-pluriannuel-travaux-avant-achat",
+    title: "Plan pluriannuel de travaux : que vérifier avant d’acheter ?",
+    description:
+      "Avant d’acheter en copropriété, lisez le PPT : travaux prévus, votes, quote-part et fonds travaux. Une checklist pour préparer votre budget.",
+    excerpt:
+      "Un plan sur dix ans, plusieurs décisions à recouper. Les points à vérifier pour distinguer coûts envisagés et appels de fonds votés.",
+    category: "Copropriété",
+    categoryHref: "/blog/copropriete",
+    publishedAt: "2026-10-12",
+    modifiedAt: "2026-10-12",
+    readingTime: "7 min",
+    cover: "/images/blog/plan-pluriannuel-travaux-avant-achat.png",
+    coverAlt:
+      "Plan de travaux et étapes d’un calendrier devant un immeuble de copropriété",
+  },
+  {
     slug: "travaux-votes-avant-compromis",
     title: "Travaux votés avant le compromis : qui paie ?",
     description:

@@ -41,7 +41,7 @@ export default function CopropertyBlogPage() {
               <div className="blog-card-meta">
                 <span>{article.category}</span>
                 <time dateTime={article.modifiedAt}>
-                  Mis à jour le {formatBlogDate(article.modifiedAt)}
+                  {article.modifiedAt === article.publishedAt ? "Publié le " : "Mis à jour le "}{formatBlogDate(article.modifiedAt)}
                 </time>
                 <span>{article.readingTime} de lecture</span>
               </div>
