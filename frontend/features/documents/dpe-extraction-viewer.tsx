@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  AdemeVerification,
+  ademeVerificationCopy,
+  type AdemeVerificationStatus,
+} from "@/components/ademe-verification";
 import { Icon } from "@/components/icons";
 import { useDocumentDialog } from "@/features/documents/use-document-dialog";
 import { API_URL, PUBLIC_DEMO_API_URL, getWorkspace, readApiError } from "@/lib/workspace";
@@ -51,12 +56,7 @@ type DpeExtraction = {
       source: SourceReference;
     }[];
     ademe_verification: {
-      status:
-        | "not_attempted"
-        | "verified"
-        | "verified_with_inconsistencies"
-        | "not_found"
-        | "unavailable";
+      status: AdemeVerificationStatus;
       dpe_number: string | null;
       data: AdemeData | null;
       consistent_fields: string[];
@@ -153,15 +153,8 @@ export function DpeExtractionViewer({
   const facts = extraction?.normalized_facts;
   const ademe = facts?.ademe_verification.data;
   const verificationStatus = facts?.ademe_verification.status;
-  const verificationCopy = {
-    verified: ["Vérifié auprès de l’ADEME", "Le numéro a été retrouvé et les données comparables sont cohérentes."],
-    verified_with_inconsistencies: ["Écarts avec l’ADEME", "Le numéro existe, mais certaines données diffèrent du registre."],
-    not_found: ["Non retrouvé dans le registre", "Le numéro extrait n’a pas été trouvé dans le jeu de données ADEME."],
-    unavailable: ["Vérification indisponible", "L’API ADEME n’était pas disponible pendant l’analyse."],
-    not_attempted: ["Vérification non effectuée", "Aucun numéro DPE exploitable n’a été détecté."],
-  } as const;
   const verification = verificationStatus
-    ? verificationCopy[verificationStatus]
+    ? ademeVerificationCopy[verificationStatus]
     : null;
 
   return (
@@ -204,10 +197,10 @@ export function DpeExtractionViewer({
           ) : facts && verification ? (
             <>
               <section className={`dpe-verification-card is-${verificationStatus}`}>
-                <span className="dpe-verification-icon"><Icon name={verificationStatus === "verified" ? "check" : "info"} /></span>
+                {verificationStatus ? <AdemeVerification status={verificationStatus} /> : null}
                 <div>
-                  <strong>{verification[0]}</strong>
-                  <p>{verification[1]}</p>
+                  <strong>Enregistrement ADEME</strong>
+                  <p>{verification.description}</p>
                   {facts.dpe_number.value ? <small>N° {facts.dpe_number.value}</small> : null}
                 </div>
               </section>

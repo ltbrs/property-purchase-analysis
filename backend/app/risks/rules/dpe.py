@@ -35,6 +35,53 @@ def _finding_key(
 
 def evaluate_dpe_risks(facts: NormalizedDpeFacts, *, as_of: date) -> list[RiskFinding]:
     risks: list[RiskFinding] = []
+    unverified_reasons = {
+        AdemeVerificationStatus.NOT_ATTEMPTED: (
+            "Aucun numéro DPE exploitable n’a été détecté dans le document. "
+            "Demandez un numéro lisible au vendeur ou au diagnostiqueur pour vérifier "
+            "son enregistrement auprès de l’ADEME."
+        ),
+        AdemeVerificationStatus.NOT_FOUND: (
+            "Le numéro DPE extrait n’a pas été retrouvé dans le registre public de l’ADEME. "
+            "Demandez au vendeur ou au diagnostiqueur de confirmer le numéro "
+            "et l’enregistrement du DPE."
+        ),
+        AdemeVerificationStatus.UNAVAILABLE: (
+            "L’API ADEME était indisponible pendant l’analyse. "
+            "L’enregistrement du DPE reste à vérifier auprès de l’ADEME."
+        ),
+    }
+    if description := unverified_reasons.get(facts.ademe_verification.status):
+        # A document page provides context, not proof that registration is absent.
+        source = facts.dpe_number.source
+        if source is None:
+            source = next(
+                (
+                    fact.source
+                    for fact in (
+                        facts.dpe_rating,
+                        facts.energy_consumption_kwh_m2_year,
+                        facts.dpe_date,
+                        facts.surface,
+                    )
+                    if fact.source is not None
+                ),
+                None,
+            )
+            if source is not None:
+                source = source.model_copy(update={"quote": None})
+        risks.append(
+            RiskFinding(
+                code="DPE_ADEME_NOT_VERIFIED",
+                finding_key=_finding_key("DPE_ADEME_NOT_VERIFIED", facts, source),
+                category=RiskCategory.ENERGY,
+                title="Enregistrement ADEME du DPE à vérifier",
+                severity=RiskSeverity.MEDIUM,
+                description=description,
+                status=FindingStatus.POSSIBLE,
+                sources=_sources(source),
+            )
+        )
     if facts.ademe_verification.status == AdemeVerificationStatus.VERIFIED_WITH_INCONSISTENCIES:
         fields = ", ".join(facts.ademe_verification.inconsistent_fields)
         risks.append(

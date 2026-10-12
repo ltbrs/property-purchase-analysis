@@ -1,8 +1,11 @@
 from datetime import date
 from uuid import uuid4
 
+import pytest
+
 from app.property.normalization.dpe import (
     AdemeVerificationStatus,
+    DpeAdemeVerification,
     DpeDateFact,
     DpeNumberFact,
     DpeRatingMethod,
@@ -17,6 +20,7 @@ from app.property.normalization.dpe_ademe import (
     find_dpe_number,
     resolve_dpe_facts,
 )
+from app.risks.models import FindingStatus, RiskSeverity
 from app.risks.rules.dpe import evaluate_dpe_risks
 
 
@@ -128,6 +132,57 @@ def test_missing_ademe_record_is_exposed_as_not_found() -> None:
     assert resolved.ademe_verification.status == AdemeVerificationStatus.NOT_FOUND
     assert resolved.ademe_verification.dpe_number == dpe_number.value
     assert resolved.ademe_verification.data is None
+
+
+@pytest.mark.parametrize(
+    ("status", "reason", "has_number"),
+    [
+        (AdemeVerificationStatus.NOT_ATTEMPTED, "Aucun numéro DPE exploitable", False),
+        (AdemeVerificationStatus.NOT_FOUND, "n’a pas été retrouvé", True),
+        (AdemeVerificationStatus.UNAVAILABLE, "API ADEME était indisponible", True),
+    ],
+)
+def test_unverified_ademe_registration_is_a_sourced_point_to_verify(
+    status: AdemeVerificationStatus, reason: str, has_number: bool
+) -> None:
+    document_facts = facts(rating="D")
+    number_source = source(page_number=8)
+    document_facts = document_facts.model_copy(
+        update={
+            "dpe_number": DpeTextFact(
+                value="2475E4333306Q" if has_number else None,
+                source=number_source if has_number else None,
+            ),
+            "ademe_verification": DpeAdemeVerification(status=status),
+        }
+    )
+
+    risks = evaluate_dpe_risks(document_facts, as_of=date(2026, 10, 12))
+    finding = next(risk for risk in risks if risk.code == "DPE_ADEME_NOT_VERIFIED")
+
+    assert finding.status == FindingStatus.POSSIBLE
+    assert finding.severity == RiskSeverity.MEDIUM
+    assert reason in finding.description
+    expected_source = number_source if has_number else document_facts.dpe_rating.source
+    assert expected_source is not None
+    assert finding.finding_key == f"DPE_ADEME_NOT_VERIFIED:{expected_source.document_id}"
+    assert finding.sources[0].document_id == expected_source.document_id
+    assert finding.sources[0].page_number == expected_source.page_number
+    assert finding.sources[0].quote == (expected_source.quote if has_number else None)
+
+
+@pytest.mark.parametrize("rating", ["D", "E"])
+def test_registered_dpe_does_not_also_get_an_unverified_finding(rating: str) -> None:
+    resolved = resolve_dpe_facts(
+        facts(rating=rating),
+        dpe_number=DpeTextFact(value="2475E4333306Q", source=source()),
+        ademe_record=ademe_record(),
+    )
+
+    codes = {risk.code for risk in evaluate_dpe_risks(resolved, as_of=date(2026, 10, 12))}
+
+    assert "DPE_ADEME_NOT_VERIFIED" not in codes
+    assert ("DPE_ADEME_INCONSISTENCY" in codes) == (rating == "E")
 
 
 def test_rating_fallback_uses_the_worse_energy_or_ges_class() -> None:

@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { AdemeMark } from "@/components/ademe-mark";
+import {
+  AdemeVerification,
+  ademeVerificationCopy,
+  type AdemeVerificationStatus,
+} from "@/components/ademe-verification";
 import { Icon } from "@/components/icons";
 import { LoadingState } from "@/components/loading-state";
 import {
@@ -51,13 +55,6 @@ type DocumentStatus =
   | "analyzing"
   | "completed"
   | "failed";
-
-type AdemeVerificationStatus =
-  | "not_attempted"
-  | "verified"
-  | "verified_with_inconsistencies"
-  | "not_found"
-  | "unavailable";
 
 type UploadedDocument = {
   id: string;
@@ -222,6 +219,7 @@ function DocumentFile({
   deletingDocumentId,
   readOnly,
   showType,
+  showDpeDetails = classifiedTypes(document).includes("dpe"),
   onDelete,
   onViewDpe,
   onViewExtraction,
@@ -231,6 +229,7 @@ function DocumentFile({
   deletingDocumentId: string | null;
   readOnly: boolean;
   showType?: boolean;
+  showDpeDetails?: boolean;
   onDelete: (document: UploadedDocument) => void;
   onViewDpe: (document: UploadedDocument) => void;
   onViewExtraction: (document: UploadedDocument) => void;
@@ -240,11 +239,9 @@ function DocumentFile({
   const canViewExtraction = ["extracting", "extracted", "analyzing", "completed", "failed"].includes(
     document.status,
   );
-  const isAdemeVerified = document.ademe_verification_status === "verified";
-  const hasAdemeInconsistencies =
-    document.ademe_verification_status === "verified_with_inconsistencies";
-  const wasAdemeNumberNotFound =
-    document.ademe_verification_status === "not_found";
+  const ademeStatus = showDpeDetails && classifiedTypes(document).includes("dpe")
+    ? document.ademe_verification_status
+    : null;
   const analysisStatusIcon = isProcessing
     ? "refresh"
     : document.status === "failed"
@@ -257,13 +254,7 @@ function DocumentFile({
     ...(document.status === "uploaded" && !isProcessing
       ? []
       : [processingLabel(document).toLocaleLowerCase("fr-FR")]),
-    ...(isAdemeVerified
-      ? ["vérifié auprès de l’ADEME"]
-      : hasAdemeInconsistencies
-        ? ["écarts détectés avec l’ADEME"]
-        : wasAdemeNumberNotFound
-          ? ["non vérifié, numéro introuvable auprès de l’ADEME"]
-          : []),
+    ...(ademeStatus ? [`ADEME : ${ademeVerificationCopy[ademeStatus].label}`] : []),
   ].join(", ");
 
   return (
@@ -298,32 +289,7 @@ function DocumentFile({
                 {processingLabel(document)}
               </span>
             ) : null}
-            {isAdemeVerified || hasAdemeInconsistencies || wasAdemeNumberNotFound ? (
-              <span
-                className={`ademe-verification${
-                  hasAdemeInconsistencies
-                    ? " has-inconsistencies"
-                    : wasAdemeNumberNotFound
-                      ? " is-not-found"
-                      : ""
-                }`}
-                title={
-                  isAdemeVerified
-                    ? "Le numéro DPE a été retrouvé dans le registre public de l’ADEME et les données comparables sont cohérentes."
-                    : hasAdemeInconsistencies
-                      ? "Le numéro DPE a été retrouvé dans le registre public de l’ADEME, avec des écarts sur certaines données."
-                      : "Le numéro DPE extrait n’a pas été retrouvé dans le registre public de l’ADEME."
-                }
-              >
-                <AdemeMark />
-                <span aria-hidden="true"><Icon name={isAdemeVerified ? "check" : "info"} /></span>
-                {isAdemeVerified
-                  ? "Vérifié"
-                  : hasAdemeInconsistencies
-                    ? "Écarts détectés"
-                    : "Non vérifié"}
-              </span>
-            ) : null}
+            {ademeStatus ? <AdemeVerification status={ademeStatus} /> : null}
           </div>
         </div>
         {isProcessing ? (
@@ -356,7 +322,7 @@ function DocumentFile({
           >
             <Icon name="eye" /> Visualiser
           </button>
-          {classifiedTypes(document).includes("dpe") && document.status === "completed" ? (
+          {showDpeDetails && classifiedTypes(document).includes("dpe") && document.status === "completed" ? (
             <button
               className="dpe-data-button"
               type="button"
@@ -457,6 +423,7 @@ function ExpectedDocumentRow({
               document={document}
               deletingDocumentId={deletingDocumentId}
               readOnly={readOnly}
+              showDpeDetails={expectation.acceptedTypes.includes("dpe")}
               onDelete={onDelete}
               onViewDpe={onViewDpe}
               onViewExtraction={onViewExtraction}
