@@ -32,7 +32,7 @@ The frontend needs no Stripe secret or publishable key for this integration.
    The command creates missing one-time EUR prices using lookup keys
    `acquora_single_analysis` (€19) and `acquora_search_pack` (€39), validates
    existing prices, and configures an endpoint at
-   `https://api.acquora.fr/api/v1/billing/stripe/webhook` for:
+   `https://acquora-api-acquora.vercel.app/api/v1/billing/stripe/webhook` for:
 
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
