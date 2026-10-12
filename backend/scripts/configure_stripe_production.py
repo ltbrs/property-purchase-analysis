@@ -17,7 +17,7 @@ from app.billing.models import BillingOfferCode
 from app.core.config import REPOSITORY_ROOT
 
 WEBHOOK_EVENTS = ["checkout.session.completed", "checkout.session.async_payment_succeeded"]
-WEBHOOK_URL = "https://api.acquora.fr/api/v1/billing/stripe/webhook"
+WEBHOOK_URL = "https://acquora-api-acquora.vercel.app/api/v1/billing/stripe/webhook"
 PRICE_VARIABLES = {
     BillingOfferCode.SINGLE_ANALYSIS: "STRIPE_SINGLE_ANALYSIS_PRICE_ID",
     BillingOfferCode.SEARCH_PACK: "STRIPE_SEARCH_PACK_PRICE_ID",
