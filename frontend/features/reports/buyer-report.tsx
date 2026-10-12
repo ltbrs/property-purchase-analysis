@@ -864,7 +864,7 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
       <header className="report-page-heading">
         <div>
           <p className="report-updated">Analyse mise à jour le {dateFormatter.format(new Date(report.generated_at))}</p>
-          <h1>{variant === "overview" ? "Votre dossier, en clair" : "Analyse du dossier"}</h1>
+          <h1>{variant === "overview" ? "Votre dossier" : "Analyse du dossier"}</h1>
         </div>
         <div className="report-heading-actions">
           <span className="attention-count">

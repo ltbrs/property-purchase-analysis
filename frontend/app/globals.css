@@ -3096,6 +3096,10 @@ svg {
   height: 2.15rem;
 }
 
+.document-type.is-processing svg {
+  animation: spin 1.2s linear infinite;
+}
+
 .document-file .document-details strong {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -3262,14 +3266,6 @@ svg {
   gap: 0.3rem;
   font-size: 0.75rem;
   color: var(--muted);
-}
-
-.document-processing-notice {
-  padding: 0.9rem 1rem;
-  border-radius: 0.6rem;
-  background: var(--surface);
-  font-size: 0.85rem;
-  line-height: 1.5;
 }
 
 .status-badge {
