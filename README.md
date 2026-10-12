@@ -68,7 +68,7 @@ The initial scaffold recognizes these variables:
 | `DOCUMENT_VIEW_URL_TTL_SECONDS` | Lifetime of private PDF viewing links (5 minutes by default) |
 | `MAX_UPLOAD_SIZE_BYTES` | Maximum PDF size (25 MiB by default) |
 | `OPENAI_API_KEY` | Server-side OpenAI API key used for structured extraction |
-| `STRIPE_SECRET_KEY` | Server-side Stripe secret key, use `sk_test_…` outside production |
+| `STRIPE_SECRET_KEY` | Server-side Stripe API key, prefer `rk_test_…` locally and `rk_live_…` in production |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for the Stripe webhook endpoint |
 | `STRIPE_SINGLE_ANALYSIS_PRICE_ID` | Stripe Price ID for one analysis at 19 € TTC |
 | `STRIPE_SEARCH_PACK_PRICE_ID` | Stripe Price ID for three analyses at 39 € TTC |
@@ -143,6 +143,12 @@ creates credits by itself. The account page checks the returned Checkout Session
 against the signed-in user's purchase and waits up to one minute for fulfillment.
 If credits remain pending, it offers a balance refresh. Starting a listener after
 a payment does not replay earlier events; those need to be delivered again.
+
+### Stripe production setup
+
+See [docs/stripe-production.md](docs/stripe-production.md) for live account
+configuration, the provisioning command, sandbox scenarios, and production
+checks without a charge.
 
 ### Manual beta credits
 

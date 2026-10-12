@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title description">
+  <title id="title">Plan pluriannuel de travaux avant achat</title>
+  <desc id="description">Un plan de travaux et un calendrier à trois étapes devant un immeuble stylisé.</desc>
+  <!-- Illustration originale Acquora, source du rendu PNG utilisé par le blog. -->
+  <rect width="1200" height="675" rx="32" fill="#eaf1ed"/>
+  <circle cx="1080" cy="110" r="180" fill="#d8ff72" opacity=".78"/>
+  <circle cx="106" cy="618" r="230" fill="#d7e5df"/>
+  <path d="M778 144h274v410H778z" fill="#315e52"/>
+  <path d="M816 188h54v67h-54zm75 0h54v67h-54zm75 0h54v67h-54zm-150 92h54v67h-54zm75 0h54v67h-54zm75 0h54v67h-54zm-150 92h54v67h-54zm150 0h54v67h-54z" fill="#f7faf8" opacity=".94"/>
+  <path d="M886 427h58v127h-58z" fill="#102a25"/>
+  <g transform="rotate(-4 472 340)">
+    <rect x="205" y="136" width="526" height="402" rx="28" fill="#fff"/>
+    <rect x="250" y="182" width="186" height="26" rx="13" fill="#d8ff72"/>
+    <path d="M262 371V259h218v112H262zm83-112v112m0-54h135m-78-58v58" fill="none" stroke="#315e52" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M533 266h139m-139 43h112m-112 43h126" stroke="#aabbb4" stroke-width="14" stroke-linecap="round"/>
+    <path d="M284 454h362" stroke="#aabbb4" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="284" cy="454" r="24" fill="#315e52"/>
+    <path d="m275 454 7 7 13-16" fill="none" stroke="#d8ff72" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="465" cy="454" r="24" fill="#d8ff72"/>
+    <circle cx="646" cy="454" r="24" fill="#e5eee9"/>
+  </g>
+  <path d="m703 377 40-52 41 52v114h-81z" fill="#d8ff72"/>
+  <path d="m743 325 13 17h-26z" fill="#102a25"/>
+  <path d="M722 383v83" stroke="#315e52" stroke-width="8" stroke-linecap="round"/>
+  <path d="M173 574h880" stroke="#102a25" stroke-width="12" stroke-linecap="round" opacity=".15"/>
+</svg>

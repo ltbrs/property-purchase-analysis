@@ -84,3 +84,10 @@ Do not hesitate to ask for clarifications or credentials in a form if required. 
 Github CLI is installed. Accessible via 'gh' in terminal. Already authentificated.
 The app is deployed on OVH, on the domain "acquora.fr", vercel and supabase (data and file store).
 Vercel CLI is authentificated.
+
+# AI Slop
+
+
+Avoid using slop words or phrases like "Bottom Line:" in conclusions, "delve," "foster," "leverage," "it's worth noting," "importantly," "Question? Answer." or "This isn't about X. It's about Y.", "genuinely" or hyphenated compound descriptions and adjectives. Do not use concluding summary statements such as "In short:..", "The simplest mental model is:...".
+
+State the intended action directly. Avoid adding what you won't do, what will remain unchanged, or how you'll separate or categorize results. Do not use contrastive framing such as "X, not Y" or "X—not Y" that introduces an unprompted alternative that the user didn't ask about. Avoid invented compound labels like "exact-head checks" and "editorial-row layouts", vague qualifiers, and canned transitions; use plain verbs and prepositions to state the actual relationship directly.

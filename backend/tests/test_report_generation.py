@@ -27,6 +27,7 @@ from app.risks.models import (
     RiskFinding,
     RiskSeverity,
 )
+from app.risks.rules.dpe import evaluate_dpe_risks
 from tests.test_risk_engine import dpe_facts
 
 
@@ -289,6 +290,43 @@ def test_uncertain_or_medium_findings_are_points_to_verify() -> None:
     assert report_finding.analysis_type.value == "verification"
     assert report.summary.verification_count == 1
     assert report.summary.risk_count == 0
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        AdemeVerificationStatus.NOT_ATTEMPTED,
+        AdemeVerificationStatus.NOT_FOUND,
+        AdemeVerificationStatus.UNAVAILABLE,
+    ],
+)
+def test_report_counts_unverified_dpe_registration_as_a_point_to_verify(
+    status: AdemeVerificationStatus,
+) -> None:
+    dpe = dpe_facts(rating="D").model_copy(
+        update={"ademe_verification": DpeAdemeVerification(status=status)}
+    )
+    source = dpe.dpe_rating.source
+    assert source is not None
+    report = build_buyer_report(
+        analysis_case_id=uuid4(),
+        title="Appartement test",
+        findings=evaluate_dpe_risks(dpe, as_of=datetime(2026, 10, 12).date()),
+        document_names={source.document_id: "DPE.pdf"},
+        dpe_documents=[dpe],
+        diagnostics=[],
+    )
+
+    finding = report.sections[2].findings[0]
+    assert finding.code == "DPE_ADEME_NOT_VERIFIED"
+    assert finding.analysis_type == AnalysisFindingType.VERIFICATION
+    assert finding.sources[0].document_name == "DPE.pdf"
+    assert report.summary.verification_count == 1
+    assert report.summary.risk_count == 0
+    assert report.summary.missing_information_count == 0
+    assert all(
+        finding.code != "REASSURING_DPE_ADEME_VERIFIED" for finding in report.sections[-1].findings
+    )
 
 
 def test_report_exposes_verified_ademe_registration() -> None:
