@@ -171,6 +171,29 @@ class BuyerReportPreview(BaseModel):
     verification_count: int = Field(ge=0)
     missing_information_count: int = Field(ge=0)
     reassuring_count: int = Field(ge=0)
+    first_finding: ReportFinding | None = None
+
+    @classmethod
+    def from_report(cls, report: BuyerReport) -> "BuyerReportPreview":
+        report = report.without_technical_findings()
+        first_finding = next(
+            (
+                finding
+                for section in report.sections
+                for finding in section.findings
+                if finding.sources
+            ),
+            None,
+        )
+        return cls(
+            analysis_case_id=report.analysis_case_id,
+            generated_at=report.generated_at,
+            risk_count=report.summary.risk_count,
+            verification_count=report.summary.verification_count,
+            missing_information_count=report.summary.missing_information_count,
+            reassuring_count=report.summary.reassuring_count,
+            first_finding=first_finding,
+        )
 
 
 class ReportRecord(Base):

@@ -13,20 +13,20 @@ export const metadata = createMarketingMetadata({
 
 const offers = [
   {
-    name: "Dossier gratuit",
-    description: "Pour préparer le bien et vérifier les pièces à réunir avant l’analyse.",
+    name: "Aperçu gratuit",
+    description: "Pour découvrir l’analyse avec un premier PDF sur votre premier dossier.",
     price: "0 €",
     priceDetail: "sans carte bancaire",
     href: productRoutes.cases,
     cta: "Créer un dossier",
     features: [
       { label: "Biens concernés", value: "1 bien à préparer" },
-      { label: "Documents", value: "liste des pièces attendues" },
-      { label: "Risques et coûts", value: "non inclus" },
-      { label: "Incohérences et informations manquantes", value: "non incluses" },
-      { label: "Sources et pages", value: "non incluses" },
+      { label: "Documents", value: "1 PDF, jusqu’à 25 Mo" },
+      { label: "Risques et coûts", value: "un premier constat, s’il est disponible" },
+      { label: "Incohérences et informations manquantes", value: "compteurs par catégorie" },
+      { label: "Sources et pages", value: "sources du premier constat" },
       { label: "Questions à poser", value: "non incluses" },
-      { label: "Accès", value: "création sans carte bancaire" },
+      { label: "Accès", value: "premier dossier, sans carte bancaire" },
     ],
   },
   {
@@ -72,7 +72,7 @@ export default function PricingPage() {
         <p className="pricing-kicker"><span /> Tarifs</p>
         <h1 id="pricing-title">Un prix simple pour une décision importante.</h1>
         <p>
-          Préparez gratuitement votre dossier, analysez un bien en profondeur ou
+          Essayez gratuitement un premier document, analysez un bien en profondeur ou
           gardez trois analyses pour votre recherche. Aucun abonnement.
         </p>
         <span className="pricing-launch-note">

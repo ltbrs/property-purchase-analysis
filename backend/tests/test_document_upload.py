@@ -14,6 +14,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.analysis import CaseAnalysisService
 from app.billing.models import AnalysisAccessRecord
 from app.core.config import get_settings
 from app.core.database import Base, get_db_session
@@ -26,6 +27,10 @@ from app.property.models import (
     AuthAccountRecord,
     UserRecord,
 )
+from app.property.normalization.dpe import SourceReference
+from app.reports import build_buyer_report
+from app.reports.models import BuyerReport
+from app.risks.models import FindingStatus, RiskCategory, RiskFinding, RiskSeverity
 from app.storage.object_storage import (
     ObjectStorageError,
     StoredObjectMetadata,
@@ -366,7 +371,7 @@ def test_free_preview_allows_one_document_and_rejects_a_second(
     assert "limité à un fichier" in second.json()["detail"]
 
 
-def test_free_preview_exposes_counts_but_not_report_details(
+def test_free_preview_without_sources_keeps_full_report_locked(
     client: TestClient,
 ) -> None:
     user_id = uuid4()
@@ -394,9 +399,88 @@ def test_free_preview_exposes_counts_but_not_report_details(
         "verification_count",
         "missing_information_count",
         "reassuring_count",
+        "first_finding",
     }
     assert preview.json()["missing_information_count"] == 1
+    assert preview.json()["first_finding"] is None
     assert full_report.status_code == 402
+
+
+def test_free_preview_exposes_only_first_sourced_finding_and_checks_ownership(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id = uuid4()
+    created = client.post(
+        "/api/v1/analysis-cases",
+        headers=auth(user_id),
+        json={"title": "Essai gratuit", "property_type": "house"},
+    )
+    case_id = UUID(created.json()["id"])
+    document_id = uuid4()
+    report = build_buyer_report(
+        analysis_case_id=case_id,
+        title="Essai gratuit",
+        findings=[
+            RiskFinding(
+                code="FINANCIAL_FIRST",
+                finding_key="FINANCIAL_FIRST",
+                category=RiskCategory.FINANCIAL,
+                severity=RiskSeverity.HIGH,
+                title="Travaux votés",
+                description="Le document mentionne une quote-part de travaux.",
+                status=FindingStatus.CONFIRMED,
+                sources=[
+                    SourceReference(document_id=document_id, page_number=2, quote="Travaux votés")
+                ],
+            ),
+            RiskFinding(
+                code="ENERGY_LOCKED",
+                finding_key="ENERGY_LOCKED",
+                category=RiskCategory.ENERGY,
+                severity=RiskSeverity.HIGH,
+                title="Second constat réservé au rapport complet",
+                description="Ce contenu doit rester masqué.",
+                status=FindingStatus.CONFIRMED,
+                sources=[SourceReference(document_id=document_id, page_number=3)],
+            ),
+        ],
+        document_names={document_id: "diagnostics.pdf"},
+        dpe_documents=[],
+        diagnostics=[],
+    )
+
+    def refresh_report(*args: object, **kwargs: object) -> BuyerReport:
+        return report
+
+    monkeypatch.setattr(CaseAnalysisService, "refresh_report", refresh_report)
+    response = client.post(
+        f"/api/v1/analysis-cases/{case_id}/report/preview", headers=auth(user_id)
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["risk_count"] == 2
+    assert body["first_finding"]["code"] == "FINANCIAL_FIRST"
+    assert body["first_finding"]["sources"] == [
+        {
+            "document_id": str(document_id),
+            "document_name": "diagnostics.pdf",
+            "page_number": 2,
+            "quote": "Travaux votés",
+        }
+    ]
+    assert "ENERGY_LOCKED" not in response.text
+    assert "Ce contenu doit rester masqué" not in response.text
+    assert (
+        client.get(f"/api/v1/analysis-cases/{case_id}/report", headers=auth(user_id)).status_code
+        == 402
+    )
+    assert (
+        client.post(
+            f"/api/v1/analysis-cases/{case_id}/report/preview", headers=auth(uuid4())
+        ).status_code
+        == 404
+    )
 
 
 def test_consumed_credit_keeps_case_open_for_new_documents_after_access_window(

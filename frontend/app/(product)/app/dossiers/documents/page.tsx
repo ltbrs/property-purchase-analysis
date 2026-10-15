@@ -1,6 +1,9 @@
 import { DocumentUpload } from "@/features/documents/document-upload";
 
-export default function DocumentsPage() {
+export default async function DocumentsPage({ searchParams }: {
+  searchParams: Promise<{ import?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <section className="upload-page">
       <div className="upload-heading">
@@ -10,7 +13,7 @@ export default function DocumentsPage() {
         </div>
         <p>Vérifiez ce qui est reçu, attendu ou encore manquant.</p>
       </div>
-      <DocumentUpload />
+      <DocumentUpload pendingDocumentId={typeof params.import === "string" ? params.import : undefined} />
     </section>
   );
 }

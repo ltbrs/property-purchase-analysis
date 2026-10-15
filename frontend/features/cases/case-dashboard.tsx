@@ -27,12 +27,12 @@ const numberFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
-export function CaseDashboard() {
+export function CaseDashboard({ pendingDocumentId }: { pendingDocumentId?: string }) {
   const router = useRouter();
   const creationRef = useRef<HTMLDivElement>(null);
   const [analysisCases, setAnalysisCases] = useState<AnalysisCase[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
-  const [showCreation, setShowCreation] = useState(false);
+  const [showCreation, setShowCreation] = useState(Boolean(pendingDocumentId));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +104,10 @@ export function CaseDashboard() {
     window.requestAnimationFrame(() => {
       creationRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  if (pendingDocumentId) {
+    return <CaseCreation pendingDocumentId={pendingDocumentId} />;
   }
 
   return (

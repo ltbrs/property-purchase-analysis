@@ -12,6 +12,7 @@ import {
 import type { PropertyType } from "@/features/documents/document-catalog";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
 import { productRoutes } from "@/lib/routes";
+import { getPendingDocument } from "@/lib/pending-document";
 import {
   API_URL,
   type AnalysisCase,
@@ -21,6 +22,7 @@ import {
 
 type CaseCreationProps = {
   onCreated?: (analysisCase: AnalysisCase) => void;
+  pendingDocumentId?: string;
 };
 
 const propertyTypes: {
@@ -48,13 +50,25 @@ function optionalValue(formData: FormData, name: string) {
   return value === "" ? null : value;
 }
 
-export function CaseCreation({ onCreated }: CaseCreationProps) {
+export function CaseCreation({ onCreated, pendingDocumentId }: CaseCreationProps) {
   const router = useRouter();
   const [propertyType, setPropertyType] = useState<Exclude<PropertyType, "unknown"> | null>(null);
   const [availableAnalyses, setAvailableAnalyses] = useState<number | null>(null);
   const [canCreateFreePreview, setCanCreateFreePreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFilename, setPendingFilename] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingDocumentId) return;
+    let cancelled = false;
+    void getPendingDocument(pendingDocumentId).then((file) => {
+      if (!cancelled) setPendingFilename(file?.name ?? null);
+    }).catch(() => {
+      if (!cancelled) setError("Le PDF sélectionné n’a pas pu être retrouvé. Vous pourrez le choisir à nouveau dans le dossier.");
+    });
+    return () => { cancelled = true; };
+  }, [pendingDocumentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +126,9 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
       });
       saveWorkspace(analysisCase.id);
       onCreated?.(analysisCase);
-      router.push(productRoutes.caseOverview);
+      router.push(pendingDocumentId
+        ? `${productRoutes.documents}?import=${encodeURIComponent(pendingDocumentId)}`
+        : productRoutes.caseOverview);
     } catch (creationError) {
       setError(
         creationError instanceof Error
@@ -161,12 +177,14 @@ export function CaseCreation({ onCreated }: CaseCreationProps) {
         <h1 id="case-creation-title">Commençons par le bien</h1>
         <p>
           {availableAnalyses === 0
-            ? "Créez votre dossier d’essai et analysez gratuitement un premier document. Les constats détaillés resteront masqués jusqu’au déblocage."
+            ? "Créez votre dossier d’essai et analysez gratuitement un premier document. Découvrez un premier constat sourcé, puis débloquez le rapport complet."
             : "Ces quelques informations permettent d’adapter les documents attendus et de contextualiser l’analyse."}
         </p>
         <div className="creation-trust-note">
           <Icon name="shield" />
-          <span>Vous pourrez ensuite ajouter les documents du bien en stockage privé.</span>
+          <span>{pendingFilename
+            ? `« ${pendingFilename} » sera importé dans ce dossier après sa création.`
+            : "Vous pourrez ensuite ajouter les documents du bien en stockage privé."}</span>
         </div>
       </div>
 

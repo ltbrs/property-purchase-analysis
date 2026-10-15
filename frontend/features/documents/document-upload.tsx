@@ -35,6 +35,8 @@ import {
   type RawExtractionSelection,
 } from "@/features/documents/raw-extraction-viewer";
 import { captureProductEvent } from "@/lib/analytics/product-analytics";
+import { pdfValidationError } from "@/lib/pending-document";
+import { PendingDocumentImport } from "@/features/documents/pending-document-import";
 import { productRoutes } from "@/lib/routes";
 import {
   API_URL,
@@ -45,8 +47,6 @@ import {
   type AnalysisCase,
   type Workspace,
 } from "@/lib/workspace";
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 type DocumentStatus =
   | "uploaded"
@@ -436,7 +436,10 @@ function ExpectedDocumentRow({
   );
 }
 
-export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean }) {
+export function DocumentUpload({ publicDemo = false, pendingDocumentId }: {
+  publicDemo?: boolean;
+  pendingDocumentId?: string;
+}) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyType>("unknown");
   const [analysisAccessStatus, setAnalysisAccessStatus] = useState<
@@ -647,7 +650,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
     }
   }
 
-  async function uploadFiles(files: File[]) {
+  async function uploadFiles(files: File[], onUploaded?: () => Promise<void>): Promise<boolean> {
     const canUpload = !readOnly && (analysisAccessStatus === "active"
       || analysisAccessStatus === "expired"
       || (analysisAccessStatus === "preview" && documents.length === 0));
@@ -655,23 +658,19 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
       !workspace ||
       !canUpload ||
       files.length === 0
-    ) return;
+    ) return false;
 
     setError(null);
     const invalidFile = files.find(
-      (file) => file.type !== "application/pdf" || file.size > MAX_FILE_SIZE,
+      (file) => pdfValidationError(file) !== null,
     );
     if (invalidFile) {
-      setError(
-        invalidFile.type !== "application/pdf"
-          ? `« ${invalidFile.name} » n’est pas un fichier PDF.`
-          : `« ${invalidFile.name} » dépasse la limite de 25 Mo.`,
-      );
-      return;
+      setError(`« ${invalidFile.name} » : ${pdfValidationError(invalidFile)}`);
+      return false;
     }
     if (analysisAccessStatus === "preview" && files.length > 1) {
       setError("L’aperçu gratuit est limité à un seul fichier.");
-      return;
+      return false;
     }
 
     setIsUploading(true);
@@ -685,7 +684,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               original_filename: file.name,
-              content_type: file.type,
+              content_type: file.type || "application/pdf",
               size_bytes: file.size,
             }),
           },
@@ -711,7 +710,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               original_filename: file.name,
-              content_type: file.type,
+              content_type: file.type || "application/pdf",
               size_bytes: file.size,
               sha256: checksum,
               storage_key: upload.storage_key,
@@ -743,6 +742,8 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
     setIsUploading(false);
 
     if (successfulDocuments.length > 0) {
+      // Local handoff cleanup must not prevent the server-side analysis.
+      if (onUploaded) await onUploaded().catch(() => {});
       captureProductEvent("documents_uploaded", {
         document_count: successfulDocuments.length,
         document_types: successfulDocuments.flatMap(classifiedTypes),
@@ -808,6 +809,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
     const failures = [...uploadFailures, ...processingFailures];
     setError(failures.length > 0 ? failures.join(" ") : null);
     if (inputRef.current) inputRef.current.value = "";
+    return successfulDocuments.length > 0;
   }
 
   async function deleteDocument(document: UploadedDocument) {
@@ -915,6 +917,14 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
         />
       )}
 
+      {!readOnly && pendingDocumentId ? (
+        <PendingDocumentImport
+          key={pendingDocumentId}
+          id={pendingDocumentId}
+          ready={canUpload && !isUploading && !isProcessing}
+          onImport={(file, onUploaded) => uploadFiles([file], onUploaded)}
+        />
+      ) : null}
       {readOnly ? null : canUpload ? (
         <div className="upload-card">
           <div className="upload-card-copy">
@@ -964,7 +974,7 @@ export function DocumentUpload({ publicDemo = false }: { publicDemo?: boolean })
             </h1>
             <p>
               {analysisAccessStatus === "preview"
-                ? "Débloquez ce dossier pour ajouter d’autres pièces et consulter les constats détaillés."
+                ? "Consultez votre premier constat sourcé dans l’aperçu gratuit. Débloquez ce dossier pour ajouter d’autres pièces et lire le rapport complet."
                 : "Utilisez une analyse disponible pour ajouter des documents à ce dossier."}
             </p>
             {availableAnalyses > 0 ? (
