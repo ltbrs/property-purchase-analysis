@@ -1088,14 +1088,7 @@ def refresh_case_report_preview(
         analysis_case=analysis_case,
         user_id=current_user_id,
     )
-    return BuyerReportPreview(
-        analysis_case_id=analysis_case_id,
-        generated_at=report.generated_at,
-        risk_count=report.summary.risk_count,
-        verification_count=report.summary.verification_count,
-        missing_information_count=report.summary.missing_information_count,
-        reassuring_count=report.summary.reassuring_count,
-    )
+    return BuyerReportPreview.from_report(report)
 
 
 @router.get("/{analysis_case_id}/report", response_model=BuyerReport)

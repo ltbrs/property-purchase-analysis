@@ -86,6 +86,7 @@ type BuyerReportPreviewData = {
   verification_count: number;
   missing_information_count: number;
   reassuring_count: number;
+  first_finding: ReportFinding | null;
 };
 
 type BuyerReportProps = {
@@ -727,13 +728,18 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
       <div className="report-state">
         <span className="state-icon"><Icon name="upload" /></span>
         <strong>Ajoutez votre document d’essai</strong>
-        <span>Votre premier PDF sera analysé gratuitement. Les catégories de constats seront comptées, puis les détails resteront masqués jusqu’au déblocage.</span>
+        <span>Votre premier PDF sera analysé gratuitement. Découvrez un premier constat et sa source, s’ils sont disponibles. Les autres détails seront accessibles dans le rapport complet.</span>
         <Link href={productRoutes.documents}>Ajouter un document</Link>
       </div>
     );
   }
 
   if (accessStatus === "preview" && preview !== null) {
+    const firstFinding = preview.first_finding;
+    const remainingFindingCount = Math.max(0,
+      preview.risk_count + preview.verification_count + preview.reassuring_count
+      + preview.missing_information_count - (firstFinding ? 1 : 0),
+    );
     const previewMetrics = [
       { value: preview.risk_count, label: "risques détectés" },
       { value: preview.verification_count, label: "points à vérifier" },
@@ -744,8 +750,8 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
       <div className="analysis-preview">
         <section className="analysis-preview-summary">
           <p className="eyebrow">Aperçu gratuit</p>
-          <h1>Votre document a bien été analysé</h1>
-          <p>Voici le nombre de constats trouvés. Leur contenu et leurs sources sont masqués jusqu’au déblocage du dossier.</p>
+          <h1>Votre premier aperçu</h1>
+          <p>Découvrez un premier constat sourcé et les catégories relevées dans votre document. Le rapport complet donne accès aux autres constats et permet d’ajouter les pièces du bien.</p>
           <div className="analysis-preview-metrics">
             {previewMetrics.map((metric) => (
               <div key={metric.label}>
@@ -755,18 +761,47 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
             ))}
           </div>
         </section>
-        <div className="analysis-preview-locked" aria-hidden="true">
-          {[0, 1, 2].map((item) => (
+        {firstFinding ? (
+          <section className="analysis-preview-first" aria-labelledby="preview-finding-title">
+            <p className="eyebrow">Votre premier constat</p>
+            <div className="detail-labels">
+              <span className={`severity-pill severity-${firstFinding.severity}`}>
+                {firstFinding.analysis_type === "reassuring" ? "Rassurant" : severityLabels[firstFinding.severity]}
+              </span>
+              <span>{statusLabels[firstFinding.status]}</span>
+              <span>{analysisTypeLabels[firstFinding.analysis_type]}</span>
+            </div>
+            <h2 id="preview-finding-title">{firstFinding.title}</h2>
+            {firstFinding.amount_eur !== null ? <p className="analysis-preview-amount">Montant documenté : <strong>{currencyFormatter.format(Number(firstFinding.amount_eur))}</strong></p> : null}
+            <p>{firstFinding.explanation}</p>
+            <div className="source-list">
+              {firstFinding.sources.map((source) => (
+                <article key={`${source.document_id}-${source.page_number}`} className="source-card">
+                  <div className="source-heading">
+                    <Icon name="document" />
+                    <div><strong>{source.document_name}</strong><small>Page {source.page_number}</small></div>
+                    <button type="button" className="source-view-button" onClick={() => setViewingSource({ documentId: source.document_id, filename: source.document_name, pageNumber: source.page_number })}>
+                      Voir la page <Icon name="arrow" />
+                    </button>
+                  </div>
+                  {source.quote ? <blockquote>« {source.quote} »</blockquote> : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : <p className="analysis-preview-empty">Aucun constat sourcé disponible pour le moment. Vérifiez la progression et les éventuelles erreurs sur la page Documents.</p>}
+        {remainingFindingCount > 0 ? <div className="analysis-preview-locked" aria-hidden="true">
+          {Array.from({ length: Math.min(3, remainingFindingCount) }, (_, item) => (
             <div key={item} className="analysis-preview-finding">
               <span />
-              <div><strong>Constat issu de votre document</strong><p>Le détail, l’explication et la source seront affichés ici.</p></div>
+              <div><strong>Autre constat du dossier</strong><p>Explications et références disponibles dans le rapport complet.</p></div>
             </div>
           ))}
-        </div>
+        </div> : null}
         <div className="analysis-preview-paywall">
           <div>
-            <h2>Consultez les constats et leurs sources</h2>
-            <p>Débloquez ce dossier pour voir les risques, les éléments manquants et les pages justificatives, puis ajouter toutes les pièces utiles.</p>
+            <h2>Consultez le rapport complet</h2>
+            <p>{remainingFindingCount > 0 ? `${remainingFindingCount} autre${remainingFindingCount > 1 ? "s" : ""} constat${remainingFindingCount > 1 ? "s" : ""} à consulter. ` : ""}Débloquez les explications et leurs sources, puis ajoutez les autres documents pour compléter l’analyse du bien.</p>
             {availableAnalyses > 0 ? (
               <button type="button" disabled={isLoading} onClick={() => void activateAnalysis()}>
                 {isLoading ? "Analyse en cours…" : "Utiliser une analyse disponible"}
@@ -776,6 +811,7 @@ export function BuyerReport({ variant = "details", publicDemo = false }: BuyerRe
           <BillingPanel compact onSummaryChange={handleBillingSummary} />
         </div>
         {error ? <p className="billing-error" role="alert">{error}</p> : null}
+        {viewingSource ? <PdfViewer document={viewingSource} onClose={() => setViewingSource(null)} /> : null}
       </div>
     );
   }
